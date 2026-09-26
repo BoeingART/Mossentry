@@ -1,0 +1,44 @@
+---
+- name: Read user and privilege state
+  hosts: managed
+  gather_facts: false
+  tasks:
+    - name: Read passwd database
+      ansible.builtin.command: getent passwd
+      register: passwd_result
+      changed_when: false
+
+    - name: Read sudo group
+      ansible.builtin.shell: getent group sudo || true
+      register: sudo_result
+      changed_when: false
+
+    - name: Read wheel group
+      ansible.builtin.shell: getent group wheel || true
+      register: wheel_result
+      changed_when: false
+
+    - name: Identify accounts with administrative sudo privilege
+      become: true
+      ansible.builtin.shell: |
+        getent passwd | awk -F: '$3 >= 1000 || $1 == "root" || $1 == "srvmgr" {print $1}' |
+        while read -r account; do
+          if sudo -l -U "$account" /bin/sh >/dev/null 2>&1; then
+            echo "$account"
+          fi
+        done
+      register: effective_sudo_result
+      changed_when: false
+
+    - name: Save scan result on control server
+      ansible.builtin.copy:
+        dest: "{{ scan_output_dir }}/{{ inventory_hostname }}.json"
+        mode: "0600"
+        content: >-
+          {{ {'passwd': passwd_result.stdout,
+              'sudo': sudo_result.stdout,
+              'wheel': wheel_result.stdout,
+              'effective_sudo': effective_sudo_result.stdout} | to_json }}
+      delegate_to: localhost
+      vars:
+        ansible_remote_tmp: "{{ scan_output_dir }}/.ansible-tmp"

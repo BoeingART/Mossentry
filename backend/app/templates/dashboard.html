@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Server Manager</title>
+  <link rel="stylesheet" href="/static/app.css?v=20260926-3">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="window-bar"><span class="window-title">Server Manager</span></header>
+    <aside class="sidebar">
+      <div class="sidebar-brand"><div class="brand-mark small">SM</div><div><strong>Server Manager</strong><span>Infrastructure</span></div></div>
+      <nav aria-label="Main navigation">
+        <button class="nav-item active" data-view="overview"><span>▤</span>Hosts</button>
+        <button class="nav-item" data-view="users"><span>♙</span>Users &amp; access</button>
+        <button class="nav-item" data-view="approvals"><span>✓</span>Approvals <b id="approval-count">0</b></button>
+        <button class="nav-item" data-view="audit"><span>◷</span>Activity log</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="admin-chip"><span class="avatar">{{ session.username[0] | upper }}</span><div><strong>{{ session.username }}</strong><small>Administrator</small></div></div>
+        {% if not desktop_mode %}
+        <button id="password-button" class="text-button">Change password</button>
+        <button id="logout" class="text-button">Sign out</button>
+        {% endif %}
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="search-strip"><label class="global-search"><span aria-hidden="true">⌕</span><input id="host-search" type="search" placeholder="Find a host..." aria-label="Search hosts"></label><span id="last-updated" class="updated">Waiting for first sync</span></div>
+      <div class="action-strip"><div class="action-strip-left"><button id="scan-button" class="button toolbar-button">↻ Sync hosts</button><button id="new-user-button" class="button toolbar-button">＋ New user</button></div><span id="page-title">Hosts</span></div>
+
+      <div id="notice" class="notice" hidden></div>
+
+      <section id="view-overview" class="view active">
+        <div class="section-heading"><div><h1>Hosts</h1><p>Managed servers and their latest scan status</p></div><span class="legend"><i></i> Last scan successful</span></div>
+        <div id="server-grid" class="server-grid loading-block">Loading hosts…</div>
+        <div class="split-grid">
+          <section class="panel"><div class="panel-head"><div><h2>Recent approvals</h2><p>Latest access requests and changes</p></div><button class="link-button" data-goto="approvals">View all →</button></div><div id="recent-actions"></div></section>
+          <section class="panel"><div class="panel-head"><div><h2>Access overview</h2><p>Based on the latest server scan</p></div></div><div id="privilege-summary"></div></section>
+        </div>
+      </section>
+
+      <section id="view-users" class="view users-view">
+        <div class="section-heading"><div><h1>Users &amp; access</h1><p>Accounts grouped by Linux username</p></div></div>
+        <div class="toolbar">
+          <label class="search">⌕ <input id="user-search" placeholder="Search a user or host"></label>
+          <div class="filter-chips"><button class="chip active" data-filter="enabled">Enabled</button><button class="chip" data-filter="sudo">Sudo</button><button class="chip" data-filter="disabled">Disabled</button><button class="chip" data-filter="all">All</button></div>
+        </div>
+        <section class="panel table-panel">
+          <div class="panel-head"><div><h2>Server users</h2><p>Expand a user to review accounts and permissions on each host.</p></div></div>
+          <div id="users-list" class="user-groups"></div>
+          <nav id="users-pagination" class="users-pagination" aria-label="User pages"></nav>
+        </section>
+      </section>
+
+      <section id="view-approvals" class="view">
+        <div class="section-heading"><div><h1>Approvals</h1><p>Requests run on a server only after administrator approval.</p></div><button id="approve-all-button" type="button" class="button primary compact">Approve all</button></div>
+        <div id="actions-list" class="action-list"></div>
+        <nav id="actions-pagination" class="users-pagination" aria-label="Approval history pages"></nav>
+      </section>
+
+      <section id="view-audit" class="view">
+        <div class="section-heading"><div><h1>Activity log</h1><p>Sign-ins, scans, approvals, executions, and credential downloads</p></div></div>
+        <section class="panel table-panel"><div class="panel-head"><div><h2>Audit trail</h2><p>Most recent events across this manager</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Time</th><th>Administrator</th><th>Event</th><th>Target</th><th>Source</th></tr></thead><tbody id="audit-table"></tbody></table></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="user-dialog">
+    <form id="user-form" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow">ACCESS REQUEST</p><h2 id="dialog-title">New user</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div>
+      <input type="hidden" name="mode" value="create_user">
+      <label class="create-only">Linux username<input name="username" required pattern="[a-z_][a-z0-9_-]{0,31}" placeholder="e.g. alex"></label>
+      <div class="action-identity action-only" hidden><span>Linux user</span><strong id="action-username"></strong></div>
+      <label class="create-only">Name or note (optional)<input name="full_name" maxlength="100" placeholder="e.g. Alex Morgan · Research"></label>
+      <fieldset class="create-only"><legend id="server-selection-label">Allowed hosts</legend><p id="server-selection-help" class="field-help">An account will be created on each selected host.</p><div id="server-options" class="server-options"></div></fieldset>
+      <section class="action-target action-only" hidden><div><span>Target host</span><strong id="action-target-server"></strong></div></section>
+      <label class="switch-row create-only"><span><strong>Grant sudo access</strong><small>Allow this user to run administrative commands</small></span><input type="checkbox" name="sudo" role="switch"></label>
+      <p class="dialog-note create-only">Approval generates an Ed25519 key. The private key can be downloaded once; share it through a secure channel.</p>
+      <p id="user-form-error" class="form-error" role="alert"></p>
+      <div class="dialog-actions"><button type="button" class="button ghost close-dialog">Cancel</button><button id="user-submit-button" type="submit" class="button primary">Submit for approval</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="profile-dialog">
+    <form id="profile-form" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow">USER PROFILE</p><h2>Edit name or note</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div>
+      <input type="hidden" name="username">
+      <div class="action-identity"><span>Linux user</span><strong id="profile-username"></strong></div>
+      <label>Name or note (optional)<input name="full_name" maxlength="100" placeholder="e.g. Alex Morgan · Research"></label>
+      <p class="dialog-note">This profile is shared across the user's accounts on all hosts. Save an empty field to clear it.</p>
+      <p id="profile-form-error" class="form-error" role="alert"></p>
+      <div class="dialog-actions"><button type="button" class="button ghost close-dialog">Cancel</button><button type="submit" class="button primary">Save</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="confirm-dialog">
+    <form method="dialog">
+      <div class="confirm-icon">!</div><h2 id="confirm-title">Confirm action</h2><p id="confirm-text"></p>
+      <div class="dialog-actions"><button value="cancel" class="button ghost">Cancel</button><button id="confirm-button" value="confirm" class="button danger">Confirm and run</button></div>
+    </form>
+  </dialog>
+  {% if not desktop_mode %}
+  <dialog id="password-dialog">
+    <form id="password-form" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow">SECURITY</p><h2>Change administrator password</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close">×</button></div>
+      <label>Current password<input name="current_password" type="password" autocomplete="current-password" required></label>
+      <label>New password<input name="new_password" type="password" autocomplete="new-password" minlength="12" required><small class="muted">At least 12 characters</small></label>
+      <label>Confirm new password<input name="confirm_password" type="password" autocomplete="new-password" minlength="12" required></label>
+      <p id="password-error" class="form-error" role="alert"></p>
+      <div class="dialog-actions"><button type="button" class="button ghost close-dialog">Cancel</button><button type="submit" class="button primary">Save password</button></div>
+    </form>
+  </dialog>
+  {% endif %}
+  <script src="/static/app.js?v=20260926-3" defer></script>
+</body>
+</html>

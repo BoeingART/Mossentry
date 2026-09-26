@@ -1,0 +1,16 @@
+---
+- name: Verify every target is safe to change
+  hosts: managed
+  gather_facts: false
+  any_errors_fatal: true
+  become: true
+  tasks:
+    - name: Verify privilege escalation
+      ansible.builtin.command: id -u
+      register: sudo_check
+      changed_when: false
+      failed_when: sudo_check.rc != 0 or sudo_check.stdout.strip() != '0'
+
+    - name: Verify required account tools exist
+      ansible.builtin.shell: "command -v useradd && command -v usermod && command -v getent"
+      changed_when: false

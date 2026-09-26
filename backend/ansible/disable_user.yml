@@ -1,0 +1,19 @@
+---
+- name: Disable a user's interactive login
+  hosts: managed
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Validate requested username
+      ansible.builtin.assert:
+        that: managed_username is match('^[a-z_][a-z0-9_-]{0,31}$')
+
+    - name: Verify the user already exists
+      ansible.builtin.command: "getent passwd {{ managed_username }}"
+      changed_when: false
+
+    - name: Lock password and set nologin shell
+      ansible.builtin.user:
+        name: "{{ managed_username }}"
+        password_lock: true
+        shell: /usr/sbin/nologin

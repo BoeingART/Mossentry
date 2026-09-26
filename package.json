@@ -1,0 +1,17 @@
+{
+  "name": "server-manager-desktop",
+  "productName": "Server Manager",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop manager for SSH hosts and access requests",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "setup:backend": "python3.12 -m venv .venv && .venv/bin/python -m pip install -r backend/requirements.txt",
+    "setup:test": ".venv/bin/python -m pip install -r backend/requirements-dev.txt",
+    "start": "electron .",
+    "check": "node --check desktop/main.cjs && node --check backend/app/static/app.js && .venv/bin/python -m compileall -q backend/app && cd backend && ../.venv/bin/python -m unittest discover -s tests -v"
+  },
+  "devDependencies": {
+    "electron": "44.4.4"
+  }
+}

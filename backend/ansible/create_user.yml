@@ -1,0 +1,51 @@
+---
+- name: Create a managed user and install their SSH public key
+  hosts: managed
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Validate requested username
+      ansible.builtin.assert:
+        that: managed_username is match('^[a-z_][a-z0-9_-]{0,31}$')
+
+    - name: Create user with an initial password
+      ansible.builtin.user:
+        name: "{{ managed_username }}"
+        comment: "{{ managed_comment | default('') }}"
+        state: present
+        create_home: true
+        shell: /bin/bash
+        password: "{{ managed_password_hash }}"
+        password_lock: false
+        update_password: always
+      no_log: true
+
+    - name: Create SSH directory
+      ansible.builtin.file:
+        path: "/home/{{ managed_username }}/.ssh"
+        state: directory
+        owner: "{{ managed_username }}"
+        group: "{{ managed_username }}"
+        mode: "0700"
+
+    - name: Install managed public key
+      ansible.builtin.lineinfile:
+        path: "/home/{{ managed_username }}/.ssh/authorized_keys"
+        line: "{{ managed_public_key }}"
+        create: true
+        owner: "{{ managed_username }}"
+        group: "{{ managed_username }}"
+        mode: "0600"
+
+    - name: Select the platform sudo group
+      ansible.builtin.shell: "getent group sudo >/dev/null && echo sudo || echo wheel"
+      register: sudo_group
+      changed_when: false
+      when: managed_sudo | bool
+
+    - name: Grant sudo membership when approved
+      ansible.builtin.user:
+        name: "{{ managed_username }}"
+        groups: "{{ sudo_group.stdout }}"
+        append: true
+      when: managed_sudo | bool

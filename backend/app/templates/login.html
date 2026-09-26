@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · Server Manager</title>
+  <link rel="stylesheet" href="/static/app.css?v=20260926-2">
+</head>
+<body class="login-page">
+  <main class="login-shell">
+    <section class="login-brand">
+      <div class="brand-mark">SM</div>
+      <p class="eyebrow">INFRASTRUCTURE</p>
+      <h1>Infrastructure Manager</h1>
+    </section>
+    <section class="login-card">
+      <div>
+        <p class="eyebrow">SERVER MANAGER</p>
+        <h2>Administrator sign-in</h2>
+      </div>
+      <form id="login-form">
+        <label>Username<input name="username" autocomplete="username" required autofocus></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+        <p id="login-error" class="form-error" role="alert"></p>
+        <button class="button primary wide" type="submit">Sign in <span>→</span></button>
+      </form>
+    </section>
+  </main>
+  <script>
+    document.querySelector('#login-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = event.currentTarget.querySelector('button');
+      const error = document.querySelector('#login-error');
+      button.disabled = true; button.textContent = 'Signing in…'; error.textContent = '';
+      const form = new FormData(event.currentTarget);
+      try {
+        const response = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.fromEntries(form))});
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Sign-in failed');
+        location.href = '/';
+      } catch (e) {
+        error.textContent = e.message;
+        button.disabled = false; button.innerHTML = 'Sign in <span>→</span>';
+      }
+    });
+  </script>
+</body>
+</html>

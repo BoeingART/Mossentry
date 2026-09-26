@@ -1,0 +1,8 @@
+node_modules/
+.venv/
+backend/data/
+backend/**/__pycache__/
+*.pyc
+*.log
+.DS_Store
+server_manager.tar.gz
