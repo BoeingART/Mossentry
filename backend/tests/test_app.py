@@ -43,8 +43,8 @@ class AppTests(unittest.TestCase):
         self.assertEqual(len(servers), 5)
         self.assertEqual(servers["gpu1"]["hostname"], "server.luo-group.com")
         self.assertEqual(servers["gpu1"]["port"], 10901)
-        self.assertEqual(servers["gpu1"]["public_port_start"], 10000)
-        self.assertEqual(servers["gpu1"]["public_port_end"], 10999)
+        self.assertEqual(Path(servers["gpu1"]["key_path"]).name, "id_rsa")
+        self.assertEqual(set(servers["gpu1"]), {"id", "name", "hostname", "port", "ssh_user", "key_path", "enabled", "last_scan_at", "last_scan_status", "last_scan_error"})
         self.assertTrue(csrf)
 
     def test_write_requires_csrf(self):

@@ -5,7 +5,7 @@ import ipaddress
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 
@@ -57,10 +57,8 @@ class ServerRequest(BaseModel):
     hostname: str = Field(min_length=1, max_length=253)
     port: int = Field(default=22, ge=1, le=65535)
     ssh_user: str = Field(pattern=r"^[a-z_][a-z0-9_-]{0,31}$")
-    key_path: str = Field(min_length=1, max_length=1024)
+    key_path: str = Field(default_factory=lambda: str(Path("~/.ssh/id_rsa").expanduser()), min_length=1, max_length=1024)
     enabled: bool = True
-    public_port_start: int | None = Field(default=None, ge=1, le=65535)
-    public_port_end: int | None = Field(default=None, ge=1, le=65535)
 
     @field_validator("hostname")
     @classmethod
@@ -90,11 +88,3 @@ class ServerRequest(BaseModel):
         if not path.is_absolute():
             raise ValueError("Use an absolute SSH key path or a path starting with ~/")
         return str(path)
-
-    @model_validator(mode="after")
-    def valid_port_range(self):
-        if (self.public_port_start is None) != (self.public_port_end is None):
-            raise ValueError("Enter both ends of the public port range")
-        if self.public_port_start and self.public_port_end < self.public_port_start:
-            raise ValueError("The public port range ends before it starts")
-        return self

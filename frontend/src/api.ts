@@ -17,7 +17,7 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
   const data = contentType.includes('json') ? await response.json() : await response.text();
   if (!response.ok) {
     const detail = data?.detail;
-    const labels: Record<string, string> = { name: 'server name', hostname: 'server address', port: 'SSH port', ssh_user: 'SSH login account', key_path: 'private key path', username: 'username', servers: 'server selection', public_port_start: 'start port', public_port_end: 'end port', new_password: 'new password' };
+    const labels: Record<string, string> = { name: 'server name', hostname: 'server address', port: 'SSH port', ssh_user: 'SSH login account', key_path: 'private key path', username: 'username', servers: 'server selection', new_password: 'new password' };
     const message = response.status === 500 ? 'The local service could not complete this operation. Please retry.'
       : Array.isArray(detail) ? [...new Set(detail.map(item => {
         if (item.type === 'value_error' && typeof item.msg === 'string') return item.msg.replace(/^Value error, /, '');

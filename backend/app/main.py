@@ -129,7 +129,7 @@ def logout(
 @app.get("/api/dashboard")
 def dashboard(session: dict[str, Any] = Depends(current_admin)) -> dict[str, Any]:
     servers = rows(
-        """SELECT id,name,hostname,port,public_port_start,public_port_end,ssh_user,key_path,enabled,
+        """SELECT id,name,hostname,port,ssh_user,key_path,enabled,
         last_scan_at,last_scan_status,last_scan_error FROM servers ORDER BY name"""
     )
     for server in servers:
@@ -196,10 +196,9 @@ def _require_no_pending(server: dict[str, Any]) -> None:
 def create_server(body: ServerRequest, request: Request, session: dict[str, Any] = Depends(csrf_admin)):
     try:
         server_id = execute(
-            """INSERT INTO servers(name,hostname,port,ssh_user,key_path,enabled,public_port_start,public_port_end)
-            VALUES(?,?,?,?,?,?,?,?)""",
-            (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled,
-             body.public_port_start, body.public_port_end),
+            """INSERT INTO servers(name,hostname,port,ssh_user,key_path,enabled)
+            VALUES(?,?,?,?,?,?)""",
+            (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled),
         )
     except sqlite3.IntegrityError as exc:
         raise HTTPException(409, "A server with this name already exists") from exc
@@ -216,10 +215,8 @@ def update_server(server_id: int, body: ServerRequest, request: Request, session
     try:
         with connect() as conn:
             conn.execute(
-                """UPDATE servers SET name=?,hostname=?,port=?,ssh_user=?,key_path=?,enabled=?,
-                public_port_start=?,public_port_end=? WHERE id=?""",
-                (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled,
-                 body.public_port_start, body.public_port_end, server_id),
+                """UPDATE servers SET name=?,hostname=?,port=?,ssh_user=?,key_path=?,enabled=? WHERE id=?""",
+                (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled, server_id),
             )
             if connection_changed:
                 conn.execute("DELETE FROM server_users WHERE server_id=?", (server_id,))

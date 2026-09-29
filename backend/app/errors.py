@@ -3,6 +3,8 @@ def friendly_error(raw: str | None) -> str | None:
     if not raw:
         return None
     text = raw.lower()
+    if "controlpath too long" in text or "unix_listener: path" in text and "too long" in text:
+        return "The local SSH connection path is too long. Update and restart the application, then retry."
     if "host key verification failed" in text or "identification has changed" in text:
         return "Verify this server's SSH fingerprint and update the local known hosts file, then retry."
     if "no such identity" in text or "private key" in text or "unprotected private" in text:

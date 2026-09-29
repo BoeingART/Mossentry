@@ -16,7 +16,8 @@ button { cursor: pointer; }
 .sidebar-link:hover { color: white; }
 .main-area { min-width: 0; }
 .content { width: min(1380px, 100%); margin: 0 auto; padding: 32px; }
-.host-card { transition: transform .15s, box-shadow .15s; }
+.host-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; align-items: start; }
+.host-card { min-width: 0; transition: transform .15s, box-shadow .15s; }
 .host-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(28, 49, 78, .08); }
 .list-row + .list-row { border-top: 1px solid #edf0f4; }
 .user-group { border-top: 1px solid #edf0f4; }

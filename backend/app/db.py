@@ -52,8 +52,6 @@ CREATE TABLE IF NOT EXISTS servers (
   name TEXT NOT NULL UNIQUE,
   hostname TEXT NOT NULL,
   port INTEGER NOT NULL,
-  public_port_start INTEGER,
-  public_port_end INTEGER,
   ssh_user TEXT NOT NULL,
   key_path TEXT NOT NULL,
   enabled INTEGER NOT NULL DEFAULT 1,
@@ -119,20 +117,15 @@ def init_db() -> None:
     (DATA_DIR / "keys").mkdir(mode=0o700, exist_ok=True)
     with connect() as conn:
         conn.executescript(SCHEMA)
-        server_columns = {item[1] for item in conn.execute("PRAGMA table_info(servers)")}
-        if "public_port_start" not in server_columns:
-            conn.execute("ALTER TABLE servers ADD COLUMN public_port_start INTEGER")
-        if "public_port_end" not in server_columns:
-            conn.execute("ALTER TABLE servers ADD COLUMN public_port_end INTEGER")
         seeded = conn.execute("SELECT 1 FROM settings WHERE key='servers_seeded'").fetchone()
         # Existing installations keep their inventory; deleted hosts stay deleted on restart.
         has_servers = conn.execute("SELECT 1 FROM servers LIMIT 1").fetchone()
-        for name, hostname, port, public_port_start, public_port_end, ssh_user, key_path in (() if seeded or has_servers else DEFAULT_SERVERS):
+        for name, hostname, port, ssh_user, key_path in (() if seeded or has_servers else DEFAULT_SERVERS):
             conn.execute(
                 """INSERT INTO servers(
-                    name, hostname, port, public_port_start, public_port_end, ssh_user, key_path
-                ) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(name) DO NOTHING""",
-                (name, hostname, port, public_port_start, public_port_end, ssh_user, str(key_path)),
+                    name, hostname, port, ssh_user, key_path
+                ) VALUES (?, ?, ?, ?, ?) ON CONFLICT(name) DO NOTHING""",
+                (name, hostname, port, ssh_user, str(key_path)),
             )
         conn.execute("INSERT OR IGNORE INTO settings(key,value) VALUES('servers_seeded','1')")
         conn.execute("PRAGMA optimize")

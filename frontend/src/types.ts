@@ -1,6 +1,6 @@
 export type Server = {
-  id: number; name: string; hostname: string; port: number; public_port_start: number | null;
-  public_port_end: number | null; ssh_user: string; key_path: string; enabled: number; last_scan_at: string | null;
+  id: number; name: string; hostname: string; port: number;
+  ssh_user: string; key_path: string; enabled: number; last_scan_at: string | null;
   last_scan_status: string | null; last_scan_error: string | null;
 };
 export type User = {

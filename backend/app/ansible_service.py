@@ -93,22 +93,25 @@ def _run(playbook: str, limit: str, extra: dict[str, Any] | None = None, timeout
         command.extend(["--extra-vars", f"@{extra_path}"])
     env = os.environ.copy()
     local_tmp = DATA_DIR / "jobs" / "ansible-local"
-    control_dir = DATA_DIR / "jobs" / "ssh-control"
     local_tmp.mkdir(mode=0o700, exist_ok=True)
-    control_dir.mkdir(mode=0o700, exist_ok=True)
     env.update({
         "ANSIBLE_HOST_KEY_CHECKING": "True",
         "ANSIBLE_RETRY_FILES_ENABLED": "False",
         "ANSIBLE_NOCOLOR": "True",
         "ANSIBLE_DISPLAY_SKIPPED_HOSTS": "False",
         "ANSIBLE_LOCAL_TEMP": str(local_tmp),
-        "ANSIBLE_SSH_CONTROL_PATH_DIR": str(control_dir),
     })
     try:
-        completed = subprocess.run(
-            command, cwd=ANSIBLE_DIR.parent, env=env, capture_output=True,
-            text=True, timeout=timeout, check=False,
-        )
+        # macOS limits Unix socket paths to 104 bytes. Neither the application
+        # data directory nor macOS's per-user TMPDIR is reliably short enough.
+        # mkdtemp creates a private (0700), unpredictable directory per run.
+        with tempfile.TemporaryDirectory(prefix="srvmgr-ssh-", dir="/tmp") as control_dir:
+            env["ANSIBLE_SSH_CONTROL_PATH_DIR"] = control_dir
+            env["ANSIBLE_SSH_CONTROL_PATH"] = "%(directory)s/%%C"
+            completed = subprocess.run(
+                command, cwd=ANSIBLE_DIR.parent, env=env, capture_output=True,
+                text=True, timeout=timeout, check=False,
+            )
         output = (completed.stdout + "\n" + completed.stderr).strip()
         return RunResult(completed.returncode == 0, output[-12000:])
     except subprocess.TimeoutExpired as exc:

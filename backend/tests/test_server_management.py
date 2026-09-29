@@ -55,6 +55,16 @@ class ServerManagementTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/scan', headers=self.headers).status_code, 400)
         self.assertTrue(self.db.row("SELECT 1 FROM audit_log WHERE event='server_removed'"))
 
+    def test_default_key_path_is_expanded_and_saved(self):
+        body = {key: value for key, value in self.body.items() if key != 'key_path'}
+        response = self.client.post('/api/servers', json=body, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        server_id = response.json()['id']
+        server = self.db.row('SELECT * FROM servers WHERE id=?', (server_id,))
+        self.assertEqual(server['key_path'], str(Path('~/.ssh/id_rsa').expanduser()))
+        self.db.init_db()
+        self.assertEqual(self.db.row('SELECT key_path FROM servers WHERE id=?', (server_id,))['key_path'], server['key_path'])
+
     def test_server_validation_and_csrf(self):
         self.assertEqual(self.client.post('/api/servers', json=self.body).status_code, 403)
         server_id = self.add_server()
@@ -63,7 +73,7 @@ class ServerManagementTests(unittest.TestCase):
         for action in ('test', 'scan', 'status'):
             self.assertEqual(self.client.post(f'/api/servers/{server_id}/{action}').status_code, 403)
         self.assertEqual(self.client.post('/api/servers', json=self.body, headers=self.headers).status_code, 409)
-        for fields in ({'name': 'all'}, {'name': 'x,all'}, {'hostname': '-oProxyCommand=x'}, {'hostname': 'https://server:22'}, {'ssh_user': 'root x=y'}, {'port': 0}, {'port': 65536}, {'key_path': 'relative'}, {'public_port_start': 30}, {'public_port_start': 30, 'public_port_end': 20}):
+        for fields in ({'name': 'all'}, {'name': 'x,all'}, {'hostname': '-oProxyCommand=x'}, {'hostname': 'https://server:22'}, {'ssh_user': 'root x=y'}, {'port': 0}, {'port': 65536}, {'key_path': 'relative'}):
             with self.subTest(fields=fields):
                 self.assertEqual(self.client.post('/api/servers', json={**self.body, **fields}, headers=self.headers).status_code, 422)
 

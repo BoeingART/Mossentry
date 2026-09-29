@@ -34,11 +34,13 @@ For interface development, run `npm run dev:ui` in another terminal; Vite proxie
 
 ## Host connections and data
 
-Add, edit, pause, or remove servers from the **Servers** page. The five hosts in `backend/app/config.py` seed new installations once; subsequent changes live in SQLite, and removed hosts stay removed after restart. The connection form accepts a hostname or IPv4/IPv6 address, SSH port, login account and an absolute or `~/` private-key path. Management keys such as `id_rsa_srvmgr-for-gpu1` are read from `~/.ssh`; set `SRVMGR_SSH_DIR` to use another directory. Keys must have mode `0600`. Each remote host must accept SSH and grant the `srvmgr` account the configured sudo access.
+Add, edit, pause, or remove servers from the **Servers** page. The five hosts in `backend/app/config.py` seed new installations once; subsequent changes live in SQLite, and removed hosts stay removed after restart. The connection form accepts a hostname or IPv4/IPv6 address, SSH port, login account and an absolute or `~/` private-key path. The default management key is `~/.ssh/id_rsa`; existing servers keep their saved key paths. Set `SRVMGR_SSH_DIR` to use another key directory for the initial server inventory. Keys must have mode `0600`. Each remote host must accept SSH and grant the `srvmgr` account the configured sudo access.
 
 If sudo needs a password, put one nonempty line in `srvmgr.passwd` in the application data directory with mode `0600`, or set `SRVMGR_BECOME_PASSWORD_FILE` to another file.
 
 Runtime data lives under `data` in the Electron user-data directory. Set `SRVMGR_USER_DATA_DIR` to choose another parent directory. Existing data from earlier builds is reused automatically when the new data directory is empty.
+
+SSH connection-reuse sockets use a private temporary directory under `/tmp`, removed after each operation. This keeps socket paths within macOS limits even when the application data directory has a long name.
 
 The input archive `server_manager.tar.gz` is retained for reference. It includes runtime data and sensitive paths and must not be distributed with the application.
 
@@ -54,7 +56,7 @@ The desktop service listens only on a random `127.0.0.1` port and requires a fre
 
 ## Management workflows
 
-- **Servers**: test a single SSH connection, sync its accounts, or read uptime, load, memory and root-disk usage. **Sync all** refreshes enabled servers. Pausing a server excludes it from remote operations. Public port ranges are optional reference information, not firewall rules.
+- **Servers**: test a single SSH connection, sync its accounts, or read uptime, load, memory and root-disk usage. **Sync all** refreshes enabled servers. Pausing a server excludes it from remote operations.
 - **Users & access**: filter by server, create accounts, enable/disable interactive login, grant/revoke sudo membership, edit local display names, and request account deletion. Deletion requires typing the username and approval, keeps the home directory and files, and does not force-terminate sessions. System accounts and SSH management accounts are protected locally and checked again on the remote host.
 - Pending requests must be handled before a server can be edited or removed. Removing a server removes only its local configuration and cached account list; remote accounts and files and local operation history are retained. Connection changes invalidate cached accounts. Remote operations are serialized with configuration changes.
 - The interface shows short error explanations. Raw execution details remain in the local database for troubleshooting. Failed syncs identify saved account data as potentially stale. Server status is a point-in-time snapshot, not continuous monitoring.
