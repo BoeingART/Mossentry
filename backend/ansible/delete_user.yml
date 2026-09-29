@@ -1,0 +1,23 @@
+---
+- name: Remove a user while preserving their files
+  hosts: managed
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Verify account before deletion
+      ansible.builtin.command:
+        argv: [getent, passwd, "{{ managed_username }}"]
+      register: target_account
+      changed_when: false
+    - name: Protect system and management accounts
+      ansible.builtin.assert:
+        that:
+          - managed_username is match('^[a-z_][a-z0-9_-]{0,31}$')
+          - managed_username not in ['root', 'srvmgr', 'nobody', ansible_user]
+          - target_account.stdout.split(':')[2] | int >= 1000
+    - name: Delete account and keep home directory
+      ansible.builtin.user:
+        name: "{{ managed_username }}"
+        state: absent
+        remove: false
+        force: false

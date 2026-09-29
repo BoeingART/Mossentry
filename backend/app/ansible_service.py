@@ -42,17 +42,16 @@ def _enabled_servers() -> list[dict[str, Any]]:
 
 
 def _inventory() -> Path:
-    path = DATA_DIR / "inventory.ini"
-    lines = ["[managed]"]
+    path = DATA_DIR / "inventory.json"
+    hosts = {}
     for server in _enabled_servers():
-        if not SAFE_HOST.fullmatch(server["hostname"]):
-            raise RuntimeError(f"Host {server['name']} has an invalid address")
-        lines.append(
-            f"{server['name']} ansible_host={server['hostname']} ansible_port={int(server['port'])} "
-            f"ansible_user={server['ssh_user']} ansible_ssh_private_key_file={server['key_path']} "
-            "ansible_python_interpreter=/usr/bin/python3"
-        )
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        hosts[server["name"]] = {
+            "ansible_host": server["hostname"], "ansible_port": int(server["port"]),
+            "ansible_user": server["ssh_user"], "ansible_ssh_private_key_file": server["key_path"],
+            "ansible_python_interpreter": "/usr/bin/python3",
+            "ansible_ssh_common_args": "-o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=10",
+        }
+    path.write_text(json.dumps({"all": {"children": {"managed": {"hosts": hosts}}}}), encoding="utf-8")
     path.chmod(0o600)
     return path
 
@@ -82,7 +81,7 @@ def _run(playbook: str, limit: str, extra: dict[str, Any] | None = None, timeout
     ]
     extra_path: Path | None = None
     effective_extra = dict(extra or {})
-    become_password = _become_password()
+    become_password = None if playbook in {"test_connection.yml", "server_status.yml"} else _become_password()
     if become_password is not None:
         effective_extra["ansible_become_password"] = become_password
     if effective_extra:
@@ -155,6 +154,8 @@ def _parse_scan(name: str, raw: dict[str, Any]) -> list[dict[str, Any]]:
 
 def scan_servers(server_names: list[str] | None = None) -> tuple[list[dict[str, Any]], dict[str, str]]:
     selected = server_names or [s["name"] for s in _enabled_servers()]
+    if not selected:
+        return [], {}
     job_dir = Path(tempfile.mkdtemp(prefix="scan-", dir=DATA_DIR / "jobs"))
     try:
         result = _run("scan_users.yml", ",".join(selected), {"scan_output_dir": str(job_dir)}, timeout=120)
@@ -198,6 +199,29 @@ def _host_error(output: str, name: str) -> str:
     matching = [line.strip() for line in output.splitlines() if name in line and ("FAILED" in line or "UNREACHABLE" in line)]
     fallback = "\n".join(output.splitlines()[-8:]).strip() or "Scan returned no result"
     return (matching[-1] if matching else fallback)[-1000:]
+
+
+def inspect_server(name: str) -> dict[str, Any]:
+    job_dir = Path(tempfile.mkdtemp(prefix="status-", dir=DATA_DIR / "jobs"))
+    try:
+        result = _run("server_status.yml", name, {"status_output_dir": str(job_dir)}, timeout=45)
+        output_file = job_dir / f"{name}.json"
+        if not result.ok or not output_file.exists():
+            raise RuntimeError(result.output or "No status received")
+        raw = json.loads(output_file.read_text())
+        memory = {line.split(':')[0]: int(line.split()[1]) for line in raw["memory"].splitlines()}
+        disk = raw["disk"].splitlines()[-1].split()
+        return {
+            "checked_at": now(), "uptime_seconds": int(float(raw["uptime"].split()[0])),
+            "load": [float(value) for value in raw["load"].split()[:3]],
+            "memory_total_mb": round(memory["MemTotal"] / 1024),
+            "memory_used_mb": round((memory["MemTotal"] - memory["MemAvailable"]) / 1024),
+            "disk_total_gb": round(int(disk[1]) / 1024 ** 2, 1),
+            "disk_used_gb": round(int(disk[2]) / 1024 ** 2, 1),
+            "disk_percent": int(disk[4].rstrip('%')),
+        }
+    finally:
+        shutil.rmtree(job_dir, ignore_errors=True)
 
 
 def _generate_key(action_id: int, username: str) -> tuple[Path, str, str]:
@@ -313,7 +337,9 @@ def execute_action(action_id: int) -> RunResult:
     private_path: Path | None = None
     download_path: Path | None = None
     try:
-        preflight = _run("preflight.yml", ",".join(servers), timeout=45)
+        preflight = _run("preflight.yml", ",".join(servers), {
+            **extra, "managed_create": action["action_type"] == "create_user",
+        }, timeout=45)
         if not preflight.ok:
             with connect() as conn:
                 conn.execute(
@@ -351,6 +377,8 @@ def execute_action(action_id: int) -> RunResult:
         elif action["action_type"] == "set_sudo":
             extra["managed_sudo"] = bool(payload["sudo"])
             result = _run("set_sudo.yml", ",".join(servers), extra)
+        elif action["action_type"] == "delete_user":
+            result = _run("delete_user.yml", ",".join(servers), extra)
         else:
             raise ValueError("Unknown action type")
         with connect() as conn:

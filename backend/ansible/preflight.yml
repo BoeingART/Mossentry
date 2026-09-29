@@ -5,6 +5,25 @@
   any_errors_fatal: true
   become: true
   tasks:
+    - name: Protect management accounts
+      ansible.builtin.assert:
+        that:
+          - managed_username is match('^[a-z_][a-z0-9_-]{0,31}$')
+          - managed_username not in ['root', 'srvmgr', 'nobody', ansible_user]
+
+    - name: Look up target account
+      ansible.builtin.command:
+        argv: [getent, passwd, "{{ managed_username }}"]
+      register: target_account
+      changed_when: false
+      failed_when: target_account.rc not in [0, 2]
+
+    - name: Require an appropriate target account
+      ansible.builtin.assert:
+        that:
+          - (managed_create | bool and target_account.rc == 2) or (not (managed_create | bool) and target_account.rc == 0)
+          - target_account.rc != 0 or target_account.stdout.split(':')[2] | int >= 1000
+
     - name: Verify privilege escalation
       ansible.builtin.command: id -u
       register: sudo_check

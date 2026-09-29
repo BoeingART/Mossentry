@@ -1,0 +1,7 @@
+---
+- name: Test SSH and remote Python
+  hosts: managed
+  gather_facts: false
+  tasks:
+    - name: Check connection
+      ansible.builtin.ping:

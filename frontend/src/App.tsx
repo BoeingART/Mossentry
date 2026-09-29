@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type * as React from 'react';
 import {
   ActionIcon, Alert, AppShell, Avatar, Badge, Box, Burger, Button, Card, Center, Checkbox,
-  Divider, Group, Loader, Modal, Pagination, Paper, Progress, ScrollArea,
-  SegmentedControl, SimpleGrid, Stack, Switch, Table, Text, TextInput, PasswordInput,
+  Divider, Group, Loader, Modal, Pagination, Paper, ScrollArea,
+  SegmentedControl, Select, SimpleGrid, Stack, Switch, Table, Text, TextInput, PasswordInput,
   ThemeIcon, Title, Tooltip,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -14,17 +14,20 @@ import {
 } from '@tabler/icons-react';
 import { api, downloadCredentials, fetchDashboard, setCsrf } from './api';
 import type { Action, Dashboard, Server, User } from './types';
+import Servers from './Servers';
 
 type View = 'overview' | 'users' | 'approvals' | 'audit';
-type UserAction = 'disable_user' | 'enable_user' | 'set_sudo';
+type UserAction = 'disable_user' | 'enable_user' | 'set_sudo' | 'delete_user';
 type RequestDraft = { mode: 'create_user' | UserAction; username: string; server?: string; sudo: boolean };
 type ConfirmDraft = { title: string; message: string; run: () => Promise<void> };
 
 const actionLabels: Record<Action['action_type'], string> = {
-  create_user: 'Create user', disable_user: 'Disable sign-in',
+  delete_user: 'Delete user', create_user: 'Create user', disable_user: 'Disable sign-in',
   enable_user: 'Enable sign-in', set_sudo: 'Change sudo access',
 };
 const eventLabels: Record<string, string> = {
+  server_created: 'Server added', server_updated: 'Server updated', server_removed: 'Server removed',
+  connection_tested: 'Connection successful', connection_failed: 'Connection failed', status_checked: 'Server status checked', status_failed: 'Server status unavailable',
   login_success: 'Administrator sign-in', login_failed: 'Sign-in failed', logout: 'Sign-out',
   scan_started: 'Scan started', scan_completed: 'Scan completed', scan_failed: 'Scan failed',
   action_requested: 'Request submitted', action_approved: 'Action approved',
@@ -68,7 +71,7 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
     <div className="login-shell">
       <div className="login-hero">
         <ThemeIcon size={60} radius="xl" variant="light" color="cyan"><IconServer size={31} /></ThemeIcon>
-        <div><Text size="sm" fw={700} c="cyan.2" tt="uppercase" lts={2}>Infrastructure</Text>
+        <div>
           <Title order={1} mt="sm">Server Manager</Title>
           <Text mt="lg" c="blue.1" maw={310}>One place to review hosts, manage Linux accounts, and approve access changes.</Text>
         </div>
@@ -100,64 +103,14 @@ function SectionHeading({ title, description, action }: { title: string; descrip
   </Group>;
 }
 
-function HostCard({ server, count }: { server: Server; count: number }) {
-  const status = server.last_scan_status;
-  const healthy = status === 'ok';
-  return <Card withBorder radius="lg" p="lg" className="host-card">
-    <Group justify="space-between" align="start" mb="lg">
-      <ThemeIcon size={42} radius="md" color={healthy ? 'teal' : status === 'failed' || status === 'error' ? 'red' : 'gray'} variant="light"><IconServer size={23} /></ThemeIcon>
-      <Badge color={healthy ? 'teal' : status === 'failed' || status === 'error' ? 'red' : 'gray'} variant="light">
-        {healthy ? 'Synced' : status === 'failed' || status === 'error' ? 'Scan failed' : 'Not scanned'}
-      </Badge>
-    </Group>
-    <Title order={3} size="h4">{server.name.toUpperCase()}</Title>
-    <Text size="sm" c="dimmed" truncate title={server.hostname}>{server.hostname}:{server.port}</Text>
-    <Divider my="md" />
-    <Group justify="space-between"><Text size="sm" c="dimmed">Accounts</Text><Text fw={700}>{count}</Text></Group>
-    <Group justify="space-between" mt={6}><Text size="sm" c="dimmed">Last scan</Text><Text size="sm">{formatDate(server.last_scan_at)}</Text></Group>
-    {server.last_scan_error && <Alert color="red" mt="md" p="xs"><Text size="xs" lineClamp={3}>{server.last_scan_error}</Text></Alert>}
-  </Card>;
-}
-
-function Overview({ data, go }: { data: Dashboard; go: (view: View) => void }) {
-  const [search, setSearch] = useState('');
-  const servers = data.servers.filter(server => [server.name, server.hostname, server.ssh_user]
-    .some(value => value.toLowerCase().includes(search.toLowerCase())));
-  const normal = data.users.filter(user => !user.is_sudo && !user.is_disabled).length;
-  const sudo = data.users.filter(user => user.is_sudo && !user.is_disabled).length;
-  const disabled = data.users.filter(user => user.is_disabled).length;
-  const total = Math.max(1, data.users.length);
-  return <>
-    <SectionHeading title="Hosts" description="Managed servers and their latest scan status" />
-    <TextInput leftSection={<IconSearch size={16} />} placeholder="Find a host" value={search} onChange={e => setSearch(e.currentTarget.value)} mb="lg" maw={330} />
-    {servers.length ? <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-      {servers.map(server => <HostCard key={server.id} server={server} count={data.users.filter(user => user.server === server.name).length} />)}
-    </SimpleGrid> : <Paper withBorder radius="lg"><Empty text="No hosts match your search" /></Paper>}
-    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" mt="xl">
-      <Card withBorder radius="lg" p="lg">
-        <Group justify="space-between" mb="md"><div><Title order={3} size="h4">Recent requests</Title><Text size="sm" c="dimmed">Latest access changes</Text></div><Button variant="subtle" size="xs" rightSection={<IconChevronRight size={14} />} onClick={() => go('approvals')}>View all</Button></Group>
-        {data.actions.length ? <Stack gap={0}>{data.actions.slice(0, 4).map(action => <Box key={action.id} py="sm" className="list-row">
-          <Group justify="space-between" wrap="nowrap"><div><Text fw={600} size="sm">{actionLabels[action.action_type]} · {action.target_user}</Text><Text size="xs" c="dimmed">{action.target_server} · {formatDate(action.requested_at)}</Text></div><Badge color={statusColors[action.status]} variant="light">{statusLabels[action.status]}</Badge></Group>
-        </Box>)}</Stack> : <Empty text="No approval history yet" />}
-      </Card>
-      <Card withBorder radius="lg" p="lg">
-        <Title order={3} size="h4">Access overview</Title><Text size="sm" c="dimmed">Based on the latest server scan</Text>
-        <Progress.Root size="lg" radius="xl" mt="xl"><Progress.Section value={normal / total * 100} color="blue" /><Progress.Section value={sudo / total * 100} color="orange" /><Progress.Section value={disabled / total * 100} color="red" /></Progress.Root>
-        <SimpleGrid cols={2} mt="xl" spacing="lg">
-          {[[normal, 'Standard accounts'], [sudo, 'Sudo accounts'], [disabled, 'Disabled accounts'], [`${data.servers.filter(s => s.last_scan_status === 'ok').length}/${data.servers.length}`, 'Hosts synced']].map(([value, label]) => <div key={label}><Title order={3}>{value}</Title><Text size="sm" c="dimmed">{label}</Text></div>)}
-        </SimpleGrid>
-      </Card>
-    </SimpleGrid>
-  </>;
-}
-
 function Users({ data, openRequest, openProfile }: { data: Dashboard; openRequest: (draft: RequestDraft) => void; openProfile: (username: string, fullName: string) => void }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('enabled');
+  const [host, setHost] = useState<string | null>('all');
   const [page, setPage] = useState(1);
   const groups = useMemo(() => {
     const grouped = new Map<string, User[]>();
-    for (const user of data.users) grouped.set(user.username, [...(grouped.get(user.username) || []), user]);
+    for (const user of data.users.filter(user => host === 'all' || user.server === host)) grouped.set(user.username, [...(grouped.get(user.username) || []), user]);
     return [...grouped].map(([username, accounts]) => ({
       username, accounts: accounts.sort((a, b) => a.server.localeCompare(b.server, undefined, { numeric: true })),
       fullName: accounts.find(a => a.full_name)?.full_name || '',
@@ -166,14 +119,15 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
       const selected = filter === 'all' || group.accounts.some(a => filter === 'sudo' ? !!a.is_sudo : filter === 'disabled' ? !!a.is_disabled : !a.is_disabled);
       return match && selected;
     }).sort((a, b) => a.username.localeCompare(b.username, undefined, { numeric: true }));
-  }, [data.users, search, filter]);
+  }, [data.users, search, filter, host]);
   const pages = Math.max(1, Math.ceil(groups.length / pageSize));
   const shown = groups.slice((Math.min(page, pages) - 1) * pageSize, Math.min(page, pages) * pageSize);
   return <>
     <SectionHeading title="Users & access" description="Accounts grouped by Linux username" />
+    {data.servers.some(s => s.enabled && ['error', 'failed'].includes(s.last_scan_status || '')) && <Alert color="orange" mb="md">Some servers could not sync. Their displayed accounts may be out of date. Sync those servers before making further changes.</Alert>}
     <Group mb="lg" justify="space-between" gap="sm">
       <TextInput leftSection={<IconSearch size={16} />} placeholder="Search a user or host" value={search} onChange={e => { setSearch(e.currentTarget.value); setPage(1); }} w={{ base: '100%', sm: 290 }} />
-      <SegmentedControl value={filter} onChange={value => { setFilter(value); setPage(1); }} data={['Enabled', 'Sudo', 'Disabled', 'All'].map(label => ({ label, value: label.toLowerCase() }))} />
+      <Select aria-label="Filter by server" value={host} allowDeselect={false} onChange={value => { setHost(value); setPage(1); }} data={[{ value: 'all', label: 'All servers' }, ...data.servers.map(s => ({ value: s.name, label: s.name }))]} /><SegmentedControl value={filter} onChange={value => { setFilter(value); setPage(1); }} data={['Enabled', 'Sudo', 'Disabled', 'All'].map(label => ({ label, value: label.toLowerCase() }))} />
     </Group>
     <Card withBorder radius="lg" p={0}>
       <Box p="lg"><Title order={3} size="h4">Server users</Title><Text size="sm" c="dimmed">Expand a user to review accounts and permissions on each host.</Text></Box>
@@ -187,11 +141,14 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
             <IconChevronRight className="details-chevron" size={17} />
           </Group>
         </Group></summary>
-        <ScrollArea><Table striped highlightOnHover miw={650} verticalSpacing="sm" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>Host</Table.Th><Table.Th>UID</Table.Th><Table.Th>Access</Table.Th><Table.Th>Sign-in</Table.Th><Table.Th>Actions</Table.Th></Table.Tr></Table.Thead><Table.Tbody>
-          {group.accounts.map(account => <Table.Tr key={account.id}>
-            <Table.Td><Badge variant="light" color="blue">{account.server}</Badge></Table.Td><Table.Td>{account.uid}</Table.Td><Table.Td><Badge variant="light" color={account.is_sudo ? 'orange' : 'gray'}>{account.is_sudo ? 'Sudo' : 'Standard'}</Badge></Table.Td><Table.Td><Badge variant="light" color={account.is_disabled ? 'red' : 'teal'}>{account.is_disabled ? 'Disabled' : 'Enabled'}</Badge></Table.Td>
-            <Table.Td><Group gap="xs" wrap="nowrap"><Button size="compact-xs" variant="light" color={account.is_disabled ? 'teal' : 'orange'} onClick={() => openRequest({ mode: account.is_disabled ? 'enable_user' : 'disable_user', username: account.username, server: account.server, sudo: false })}>{account.is_disabled ? 'Enable' : 'Disable'}</Button><Button size="compact-xs" variant="light" onClick={() => openRequest({ mode: 'set_sudo', username: account.username, server: account.server, sudo: !account.is_sudo })}>{account.is_sudo ? 'Revoke sudo' : 'Grant sudo'}</Button></Group></Table.Td>
-          </Table.Tr>)}
+        <ScrollArea><Table striped highlightOnHover miw={650} verticalSpacing="sm" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>Host</Table.Th><Table.Th>Access</Table.Th><Table.Th>Sign-in</Table.Th><Table.Th>Actions</Table.Th></Table.Tr></Table.Thead><Table.Tbody>
+          {group.accounts.map(account => {
+            const server = data.servers.find(s => s.name === account.server);
+            const protectedAccount = account.uid < 1000 || ['root', 'srvmgr', 'nobody', server?.ssh_user].includes(account.username);
+            return <Table.Tr key={`${account.server}:${account.username}`}>
+            <Table.Td><Badge variant="light" color="blue">{account.server}</Badge></Table.Td><Table.Td><Badge variant="light" color={account.is_sudo ? 'orange' : 'gray'}>{account.is_sudo ? 'Sudo' : 'Standard'}</Badge></Table.Td><Table.Td><Badge variant="light" color={account.is_disabled ? 'red' : 'teal'}>{account.is_disabled ? 'Disabled' : 'Enabled'}</Badge></Table.Td>
+            <Table.Td>{protectedAccount ? <Text size="xs" c="dimmed">Protected account</Text> : !server?.enabled ? <Text size="xs" c="dimmed">Server paused</Text> : <Group gap="xs" wrap="nowrap"><Button size="compact-xs" variant="light" color={account.is_disabled ? 'teal' : 'orange'} onClick={() => openRequest({ mode: account.is_disabled ? 'enable_user' : 'disable_user', username: account.username, server: account.server, sudo: false })}>{account.is_disabled ? 'Enable' : 'Disable'}</Button><Button size="compact-xs" variant="light" onClick={() => openRequest({ mode: 'set_sudo', username: account.username, server: account.server, sudo: !account.is_sudo })}>{account.is_sudo ? 'Revoke sudo' : 'Grant sudo'}</Button><Button size="compact-xs" color="red" variant="subtle" onClick={() => openRequest({ mode: 'delete_user', username: account.username, server: account.server, sudo: false })}>Delete</Button></Group>}</Table.Td>
+          </Table.Tr>; })}
         </Table.Tbody></Table></ScrollArea>
       </details>) : <Empty text="No users match your search" />}
       {groups.length > pageSize && <Group justify="space-between" p="md" className="pagination-row"><Text size="sm" c="dimmed">{groups.length} users</Text><Pagination value={Math.min(page, pages)} onChange={setPage} total={pages} size="sm" /></Group>}
@@ -212,7 +169,6 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
             <Group gap="xs"><Text fw={700}>#{action.id} {actionLabels[action.action_type]} · {action.target_user}</Text><Badge color={statusColors[action.status]} variant="light">{statusLabels[action.status]}</Badge></Group>
             <Text size="sm" c="dimmed" mt={3}>Target: {action.target_server}{action.action_type === 'set_sudo' ? ` · ${action.payload.sudo ? 'Grant sudo' : 'Revoke sudo'}` : ''}{action.action_type === 'create_user' ? ` · ${action.payload.sudo ? 'Sudo user' : 'Standard user'}` : ''}</Text>
             <Text size="xs" c="dimmed" mt={4}>Requested by {action.requested_by_name} · {formatDate(action.requested_at)}</Text>
-            {action.key_fingerprint && <Text size="xs" c="dimmed" mt={4}>Fingerprint: {action.key_fingerprint}</Text>}
           </div></Group>
           <Group gap="xs" className="approval-controls">
             {action.status === 'pending' && <><Button variant="light" color="gray" size="xs" disabled={busy} onClick={() => run(action, 'reject')}>Reject</Button><Button size="xs" disabled={busy} onClick={() => run(action, 'approve')}>Approve and run</Button></>}
@@ -231,8 +187,8 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
 function AuditLog({ data }: { data: Dashboard }) {
   return <><SectionHeading title="Activity log" description="Sign-ins, scans, approvals, executions, and credential downloads" />
     <Card withBorder radius="lg" p={0}><Box p="lg"><Title order={3} size="h4">Audit trail</Title><Text size="sm" c="dimmed">Most recent events across this manager</Text></Box>
-      <ScrollArea><Table striped highlightOnHover miw={700} verticalSpacing="md" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>Time</Table.Th><Table.Th>Administrator</Table.Th><Table.Th>Event</Table.Th><Table.Th>Target</Table.Th><Table.Th>Source</Table.Th></Table.Tr></Table.Thead><Table.Tbody>
-        {data.audit.map(item => <Table.Tr key={item.id}><Table.Td>{formatDate(item.created_at)}</Table.Td><Table.Td>{item.actor || 'System'}</Table.Td><Table.Td><Text fw={600} size="sm">{eventLabels[item.event] || item.event}</Text></Table.Td><Table.Td>{item.target || '—'}</Table.Td><Table.Td>{item.ip_address || '—'}</Table.Td></Table.Tr>)}
+      <ScrollArea><Table striped highlightOnHover miw={700} verticalSpacing="md" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>Time</Table.Th><Table.Th>Administrator</Table.Th><Table.Th>Event</Table.Th><Table.Th>Target</Table.Th>{!data.admin.desktop_mode && <Table.Th>Source</Table.Th>}</Table.Tr></Table.Thead><Table.Tbody>
+        {data.audit.map(item => <Table.Tr key={item.id}><Table.Td>{formatDate(item.created_at)}</Table.Td><Table.Td>{item.actor || 'System'}</Table.Td><Table.Td><Text fw={600} size="sm">{eventLabels[item.event] || 'Other activity'}</Text></Table.Td><Table.Td>{item.target === 'all_servers' ? 'All servers' : item.target?.startsWith('action:') ? `Request #${item.target.slice(7)}` : item.target || '—'}</Table.Td>{!data.admin.desktop_mode && <Table.Td>{item.ip_address || '—'}</Table.Td>}</Table.Tr>)}
       </Table.Tbody></Table></ScrollArea>{!data.audit.length && <Empty text="No activity yet" />}</Card>
   </>;
 }
@@ -242,14 +198,16 @@ function RequestModal({ draft, servers, close, saved }: { draft: RequestDraft | 
   const [fullName, setFullName] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [sudo, setSudo] = useState(false);
+  const [deleteName, setDeleteName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { if (draft) { setUsername(draft.username); setFullName(''); setSelected(draft.server ? [draft.server] : []); setSudo(draft.sudo); setError(''); } }, [draft]);
+  useEffect(() => { if (draft) { setUsername(draft.username); setFullName(''); setSelected(draft.server ? [draft.server] : []); setSudo(draft.sudo); setDeleteName(''); setError(''); } }, [draft]);
   if (!draft) return null;
   const create = draft.mode === 'create_user';
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setError('');
     if (!selected.length) { setError('Select at least one host'); return; }
+    if (draft?.mode === 'delete_user' && deleteName !== username) { setError('Type the username to confirm deletion'); return; }
     setBusy(true);
     try {
       if (create) await api('/api/actions/create-user', 'POST', { username, full_name: fullName, servers: selected, sudo });
@@ -258,15 +216,16 @@ function RequestModal({ draft, servers, close, saved }: { draft: RequestDraft | 
     } catch (cause) { setError(message(cause)); }
     finally { setBusy(false); }
   }
-  return <Modal opened onClose={close} title={create ? 'New user' : actionLabels[draft.mode]} centered radius="lg">
+  return <Modal opened onClose={() => !busy && close()} closeOnClickOutside={!busy} closeOnEscape={!busy} title={create ? 'New user' : actionLabels[draft.mode]} centered radius="lg">
     <form onSubmit={submit}><Stack gap="md">
       {create ? <><TextInput label="Linux username" placeholder="e.g. alex" value={username} onChange={e => setUsername(e.currentTarget.value)} pattern="[a-z_][a-z0-9_-]{0,31}" required /><TextInput label="Name or note (optional)" placeholder="e.g. Alex Morgan · Research" value={fullName} onChange={e => setFullName(e.currentTarget.value)} maxLength={100} />
         <Checkbox.Group label="Allowed hosts" description="An account will be created on each selected host." value={selected} onChange={setSelected}><SimpleGrid cols={2} mt="sm">{servers.filter(s => s.enabled).map(server => <Checkbox key={server.id} value={server.name} label={server.name.toUpperCase()} />)}</SimpleGrid></Checkbox.Group>
         <Switch label="Grant sudo access" description="Allow this user to run administrative commands" checked={sudo} onChange={e => setSudo(e.currentTarget.checked)} />
         <Alert color="blue" variant="light" icon={<IconKey size={17} />}>Approval generates an Ed25519 key. Credentials can be downloaded once; share them through a secure channel.</Alert>
       </> : <><Paper withBorder p="sm"><Text size="xs" c="dimmed">Linux user</Text><Text fw={700}>{username}</Text></Paper><Paper withBorder p="sm"><Text size="xs" c="dimmed">Target host</Text><Text fw={700}>{draft.server?.toUpperCase()}</Text></Paper>{draft.mode === 'set_sudo' && <Text size="sm">This request will {sudo ? 'grant' : 'revoke'} sudo access.</Text>}</>}
+      {draft.mode === 'delete_user' && <><Alert color="red">This removes the account from {draft.server}. Its home directory and files will be kept. End running sessions first. Deletion runs after approval.</Alert><TextInput label={`Type ${username} to confirm`} value={deleteName} onChange={e => setDeleteName(e.currentTarget.value)} required /></>}
       {error && <Alert color="red" role="alert">{error}</Alert>}
-      <Group justify="end"><Button variant="default" onClick={close}>Cancel</Button><Button type="submit" loading={busy}>{create ? 'Submit for approval' : 'Submit request'}</Button></Group>
+      <Group justify="end"><Button variant="default" disabled={busy} onClick={close}>Cancel</Button><Button type="submit" color={draft.mode === 'delete_user' ? 'red' : 'blue'} disabled={!selected.length || (draft.mode === 'delete_user' && deleteName !== username)} loading={busy}>{create ? 'Submit for approval' : 'Submit request'}</Button></Group>
     </Stack></form>
   </Modal>;
 }
@@ -341,18 +300,18 @@ export default function App() {
   }
   function actionConfirm(action: Action, kind: 'approve' | 'reject') {
     setConfirm({ title: kind === 'approve' ? 'Approve and run request?' : 'Reject request?',
-      message: kind === 'approve' ? `${actionLabels[action.action_type]} for ${action.target_user} on ${action.target_server}. This connects to the target host.` : `Reject request #${action.id} for ${action.target_user}?`,
-      run: async () => { await api(`/api/actions/${action.id}/${kind}`, 'POST'); notify(kind === 'approve' ? 'Action completed' : 'Request rejected'); await refresh(); },
+      message: kind === 'approve' ? `${actionLabels[action.action_type]} for ${action.target_user} on ${action.target_server}.${action.action_type === 'delete_user' ? ' The account will be deleted; its home directory and files will be kept.' : ' This connects to the target host.'}` : `Reject request #${action.id} for ${action.target_user}?`,
+      run: async () => { const result = await api<{ warning?: string }>(`/api/actions/${action.id}/${kind}`, 'POST'); notify(result.warning || (kind === 'approve' ? 'Action completed' : 'Request rejected'), !!result.warning); await refresh(); },
     });
   }
   function approveAll() {
     const pending = data?.actions.filter(a => a.status === 'pending') || [];
     if (!pending.length) return;
-    setConfirm({ title: `Approve all ${pending.length} requests?`, message: 'Each request will connect to its target host and run in order.',
+    setConfirm({ title: `Approve all ${pending.length} requests?`, message: `Each request will connect to its target host and run in order.${pending.some(a => a.action_type === 'delete_user') ? ' Includes account deletion. Home directories and files will be kept.' : ''}`,
       run: async () => {
         let succeeded = 0; const failed: number[] = [];
         for (const action of pending) {
-          try { await api(`/api/actions/${action.id}/approve`, 'POST'); succeeded++; }
+          try { const result = await api<{ warning?: string }>(`/api/actions/${action.id}/approve`, 'POST'); if (result.warning) notify(result.warning, true); succeeded++; }
           catch { failed.push(action.id); }
           await refresh();
         }
@@ -379,17 +338,17 @@ export default function App() {
   if (authRequired) return <Login onSuccess={() => { void refresh(); }} />;
   if (!data) return <Center h="100vh"><Stack align="center"><Alert color="red">{fatal || 'Could not load the dashboard'}</Alert><Button onClick={() => void refresh()}>Retry</Button></Stack></Center>;
   const pending = data.actions.filter(a => a.status === 'pending').length;
-  const latestScan = data.servers.map(s => s.last_scan_at).filter((v): v is string => !!v).sort().at(-1);
+  const latestScan = data.servers.filter(s => s.last_scan_status === 'ok').map(s => s.last_scan_at).filter((v): v is string => !!v).sort().at(-1);
   const nav: { id: View; label: string; icon: React.ReactNode }[] = [
-    { id: 'overview', label: 'Hosts', icon: <IconServer size={19} /> },
+    { id: 'overview', label: 'Servers', icon: <IconServer size={19} /> },
     { id: 'users', label: 'Users & access', icon: <IconUsers size={19} /> },
     { id: 'approvals', label: 'Approvals', icon: <IconShieldCheck size={19} /> },
     { id: 'audit', label: 'Activity log', icon: <IconActivity size={19} /> },
   ];
   return <AppShell navbar={{ width: 230, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: 64 }} padding={0}>
     <AppShell.Header className="topbar"><Group h="100%" justify="space-between" px="xl" wrap="nowrap">
-      <Group gap="sm" className="topbar-heading"><Burger opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" /><Text fw={800} size="sm">Server Manager</Text><Badge variant="light" color="blue">Infrastructure</Badge></Group>
-      <Group gap="sm" className="topbar-actions"><Text size="xs" c="dimmed" className="last-sync">{latestScan ? `Last sync ${formatDate(latestScan)}` : 'Waiting for first sync'}</Text><Button size="xs" variant="default" leftSection={<IconRefresh size={15} />} loading={scanning} onClick={() => void scan()}>Sync hosts</Button><Button size="xs" leftSection={<IconPlus size={15} />} onClick={() => setRequest({ mode: 'create_user', username: '', sudo: false })}>New user</Button></Group>
+      <Group gap="sm" className="topbar-heading"><Burger opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" /><Text fw={800} size="sm">Server Manager</Text></Group>
+      <Group gap="sm" className="topbar-actions"><Text size="xs" c="dimmed" className="last-sync">{latestScan ? `Last sync ${formatDate(latestScan)}` : 'Waiting for first sync'}</Text><Button size="xs" variant="default" leftSection={<IconRefresh size={15} />} loading={scanning} disabled={!data.servers.some(s => s.enabled)} onClick={() => void scan()}>Sync all</Button><Button size="xs" leftSection={<IconPlus size={15} />} disabled={!data.servers.some(s => s.enabled)} onClick={() => setRequest({ mode: 'create_user', username: '', sudo: false })}>New user</Button></Group>
     </Group></AppShell.Header>
     <AppShell.Navbar className="sidebar" p="md">
       <Stack gap={4} mt="md">{nav.map(item => <button className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); setMobileOpened(false); }}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color="orange" circle ml="auto">{pending}</Badge>}</button>)}</Stack>
@@ -399,7 +358,7 @@ export default function App() {
     </AppShell.Navbar>
     <AppShell.Main className="main-area"><main className="content">
       {fatal && <Alert color="red" mb="md" withCloseButton onClose={() => setFatal('')}>{fatal}</Alert>}
-      {view === 'overview' && <Overview data={data} go={setView} />}
+      {view === 'overview' && <Servers data={data} saved={refresh} />}
       {view === 'users' && <Users data={data} openRequest={setRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}
       {view === 'approvals' && <Approvals data={data} run={actionConfirm} busy={busy} approveAll={approveAll} download={action => void download(action)} />}
       {view === 'audit' && <AuditLog data={data} />}

@@ -1,0 +1,31 @@
+---
+- name: Read Linux server resource usage
+  hosts: managed
+  gather_facts: false
+  tasks:
+    - name: Read uptime
+      ansible.builtin.command: cat /proc/uptime
+      register: uptime_result
+      changed_when: false
+    - name: Read system load
+      ansible.builtin.command: cat /proc/loadavg
+      register: load_result
+      changed_when: false
+    - name: Read memory usage
+      ansible.builtin.command: cat /proc/meminfo
+      register: memory_result
+      changed_when: false
+    - name: Read root filesystem usage
+      ansible.builtin.command: df -Pk /
+      register: disk_result
+      changed_when: false
+    - name: Save status locally
+      ansible.builtin.copy:
+        dest: "{{ status_output_dir }}/{{ inventory_hostname }}.json"
+        mode: "0600"
+        content: >-
+          {{ {'uptime': uptime_result.stdout, 'load': load_result.stdout,
+              'memory': memory_result.stdout, 'disk': disk_result.stdout} | to_json }}
+      delegate_to: localhost
+      vars:
+        ansible_remote_tmp: "{{ status_output_dir }}/.ansible-tmp"
