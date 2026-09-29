@@ -2,12 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type * as React from 'react';
 import {
   ActionIcon, Alert, AppShell, Avatar, Badge, Box, Burger, Button, Card, Center, Checkbox,
-  Divider, Drawer, Group, Loader, Modal, Pagination, Paper, ScrollArea,
+  Divider, Group, Loader, Modal, Pagination, Paper, ScrollArea,
   SegmentedControl, Select, SimpleGrid, Stack, Switch, Table, Text, TextInput, PasswordInput,
   ThemeIcon, Title, Tooltip,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useMediaQuery } from '@mantine/hooks';
 import {
   IconActivity, IconCheck, IconChevronRight, IconDownload,
   IconEdit, IconKey, IconLock, IconPlus, IconRefresh, IconSearch, IconServer,
@@ -18,7 +17,7 @@ import type { Action, Dashboard, Server, User } from './types';
 import Servers from './Servers';
 import ResourceMonitor from './ResourceMonitor';
 
-type View = 'overview' | 'users' | 'approvals' | 'audit';
+type View = 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
 type UserAction = 'disable_user' | 'enable_user' | 'set_sudo' | 'delete_user';
 type RequestDraft = { mode: 'create_user' | UserAction; username: string; server?: string; sudo: boolean };
 type ConfirmDraft = { title: string; message: string; run: () => Promise<void> };
@@ -275,9 +274,7 @@ export default function App() {
   const [fatal, setFatal] = useState('');
   const [view, setView] = useState<View>('overview');
   const [mobileOpened, setMobileOpened] = useState(false);
-  const [monitorOpened, setMonitorOpened] = useState(false);
   const [monitorServerId, setMonitorServerId] = useState<number | null>(null);
-  const wideScreen = useMediaQuery('(min-width: 1200px)');
   const [request, setRequest] = useState<RequestDraft | null>(null);
   const [profile, setProfile] = useState<{ username: string; fullName: string } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmDraft | null>(null);
@@ -346,32 +343,30 @@ export default function App() {
   const latestScan = data.servers.filter(s => s.last_scan_status === 'ok').map(s => s.last_scan_at).filter((v): v is string => !!v).sort().at(-1);
   const nav: { id: View; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Servers', icon: <IconServer size={19} /> },
+    { id: 'monitor', label: 'Monitor', icon: <IconActivity size={19} /> },
     { id: 'users', label: 'Users & access', icon: <IconUsers size={19} /> },
     { id: 'approvals', label: 'Approvals', icon: <IconShieldCheck size={19} /> },
     { id: 'audit', label: 'Activity log', icon: <IconActivity size={19} /> },
   ];
-  const monitor = monitorOpened ? <ResourceMonitor data={data} serverId={monitorServerId} selectServer={setMonitorServerId} close={() => setMonitorOpened(false)} /> : null;
-  return <AppShell navbar={{ width: 230, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} aside={{ width: 370, breakpoint: 1200, collapsed: { desktop: !monitorOpened || !wideScreen, mobile: true } }} header={{ height: 64 }} padding={0}>
+  return <AppShell navbar={{ width: 230, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: 64 }} padding={0}>
     <AppShell.Header className="topbar"><Group h="100%" justify="space-between" px="xl" wrap="nowrap">
       <Group gap="sm" className="topbar-heading"><Burger opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" /><Text fw={800} size="sm">Server Manager</Text></Group>
       <Group gap="sm" className="topbar-actions"><Text size="xs" c="dimmed" className="last-sync">{latestScan ? `Last sync ${formatDate(latestScan)}` : 'Waiting for first sync'}</Text><Button size="xs" variant="default" leftSection={<IconRefresh size={15} />} loading={scanning} disabled={!data.servers.some(s => s.enabled)} onClick={() => void scan()}>Sync all</Button><Button size="xs" leftSection={<IconPlus size={15} />} disabled={!data.servers.some(s => s.enabled)} onClick={() => setRequest({ mode: 'create_user', username: '', sudo: false })}>New user</Button></Group>
     </Group></AppShell.Header>
     <AppShell.Navbar className="sidebar" p="md">
-      <Stack gap={4} mt="md">{nav.map(item => <button className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); setMobileOpened(false); }}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color="orange" circle ml="auto">{pending}</Badge>}</button>)}</Stack>
-      <Divider my="md" color="dark.4" />
-      <button className={`nav-button ${monitorOpened ? 'active' : ''}`} aria-expanded={monitorOpened} onClick={() => { setMonitorOpened(value => !value); setMobileOpened(false); }}><IconActivity size={19} /><span>Live resources</span></button>
+      <Stack gap={4} mt="md">{nav.map(item => <button className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); if (item.id === 'monitor') setMonitorServerId(null); setMobileOpened(false); }}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color="orange" circle ml="auto">{pending}</Badge>}</button>)}</Stack>
       <div className="sidebar-footer"><Divider mb="md" color="dark.4" /><Group gap="sm" mb="md"><Avatar size="sm" color="blue">{data.admin.username.charAt(0).toUpperCase()}</Avatar><div><Text size="sm" fw={700} c="white">{data.admin.username}</Text><Text size="xs" c="gray.5">Administrator</Text></div></Group>
         {!data.admin.desktop_mode && <><button className="sidebar-link" onClick={() => setPasswordOpen(true)}><IconLock size={16} />Change password</button><button className="sidebar-link" onClick={() => void logout()}><IconShieldOff size={16} />Sign out</button></>}
       </div>
     </AppShell.Navbar>
     <AppShell.Main className="main-area"><main className="content">
       {fatal && <Alert color="red" mb="md" withCloseButton onClose={() => setFatal('')}>{fatal}</Alert>}
-      {view === 'overview' && <Servers data={data} saved={refresh} monitor={server => { setMonitorServerId(server.id); setMonitorOpened(true); }} />}
+      {view === 'overview' && <Servers data={data} saved={refresh} monitor={server => { setMonitorServerId(server.id); setView('monitor'); }} />}
+      {view === 'monitor' && <ResourceMonitor data={data} serverId={monitorServerId} selectServer={setMonitorServerId} />}
       {view === 'users' && <Users data={data} openRequest={setRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}
       {view === 'approvals' && <Approvals data={data} run={actionConfirm} busy={busy} approveAll={approveAll} download={action => void download(action)} />}
       {view === 'audit' && <AuditLog data={data} />}
     </main></AppShell.Main>
-    {wideScreen ? <AppShell.Aside className="resource-monitor">{monitor}</AppShell.Aside> : <Drawer opened={monitorOpened} onClose={() => setMonitorOpened(false)} position="right" size="min(390px, 100%)" withCloseButton={false} padding={0} aria-label="Live resources" classNames={{ body: 'monitor-drawer-body' }}>{monitor}</Drawer>}
     <RequestModal draft={request} servers={data.servers} close={() => setRequest(null)} saved={refresh} />
     <ProfileModal profile={profile} close={() => setProfile(null)} saved={refresh} />
     <PasswordModal opened={passwordOpen} close={() => setPasswordOpen(false)} />

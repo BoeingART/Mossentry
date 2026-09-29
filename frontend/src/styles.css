@@ -15,9 +15,6 @@ button { cursor: pointer; }
 .sidebar-link { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 4px; border: 0; background: transparent; color: #b7c5db; text-align: left; font: inherit; font-size: 12px; }
 .sidebar-link:hover { color: white; }
 .main-area { min-width: 0; }
-.resource-monitor { background: #f8fafc; }
-.monitor-heading { border-bottom: 1px solid #e7ebf1; flex-shrink: 0; background: white; }
-.monitor-drawer-body { height: 100dvh; display: flex; flex-direction: column; background: #f8fafc; }
 .monitor-disk { overflow-wrap: anywhere; }
 .monitor-notes { color: #637188; font-size: 12px; }
 .monitor-notes summary { cursor: pointer; }
@@ -52,3 +49,13 @@ button { cursor: pointer; }
   .login-form-panel { padding: 30px; }
   .user-summary-end .mantine-Badge-root { display: none; }
 }
+
+.monitor-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.monitor-user-filter { flex: 1; min-width: min(100%, 260px); max-width: 600px; }
+.resource-chart { min-width: 0; }
+.resource-chart-plot { position: relative; margin-top: 16px; }
+.resource-chart-plot svg { display: block; overflow: visible; }
+.chart-axis-label { font-size: 11px; fill: #738198; font-variant-numeric: tabular-nums; }
+.chart-empty-label { font-size: 12px; fill: #8795a9; }
+.chart-tooltip { position: absolute; top: 24px; padding: 8px 12px; border: 1px solid #e7edf4; border-radius: 8px; background: white; box-shadow: 0 3px 12px #17233b12; pointer-events: none; }
+@media (max-width: 1050px) { .monitor-chart-grid { grid-template-columns: minmax(0, 1fr); } }
