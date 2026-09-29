@@ -1,16 +1,15 @@
-import { Badge, Group, Paper, ScrollArea, Stack, Text } from '@mantine/core';
+import { Group, Paper, ScrollArea, Stack, Text } from '@mantine/core';
 import type { PhysicalDiskGroup } from './types';
 
 export default function PhysicalDiskChart({ disks, loading }: { disks: PhysicalDiskGroup[]; loading: boolean }) {
   return <Paper withBorder radius="lg" p="lg" className="resource-chart">
-    <Text fw={700}>Disk usage</Text>
-    <Text size="xs" c="dimmed" mt={4}>Grouped by physical disks · mounted filesystem usage</Text>
+    <Text fw={700}>Disk</Text>
     <div className="disk-chart-axis" aria-hidden="true">{[0, 25, 50, 75, 100].map(value => <span key={value}>{value}%</span>)}</div>
     <ScrollArea.Autosize mah={295} type="auto"><Stack gap="lg">
       {disks.map(disk => <div key={disk.id} className="disk-chart-row">
         <Group justify="space-between" align="start" gap="xs" mb={7}>
           <div><Text fw={600} size="sm">{disk.devices.map(device => device.name).join(' + ')}</Text>
-            <Text size="xs" c="dimmed">{disk.total_gb.toLocaleString()} GiB physical capacity</Text></div>
+            <Text size="xs" c="dimmed">{disk.total_gb.toLocaleString()} GiB</Text></div>
           <Text size="sm" fw={700}>{disk.percent === null ? 'N/A' : `${disk.percent.toFixed(1)}%`}</Text>
         </Group>
         <div className={`disk-chart-bar ${disk.percent === null ? 'disk-chart-bar-unknown' : ''}`} role={disk.percent === null ? 'img' : 'meter'}
@@ -19,18 +18,15 @@ export default function PhysicalDiskChart({ disks, loading }: { disks: PhysicalD
           {disk.percent !== null && <div className="disk-chart-fill" style={{ width: `${Math.min(100, Math.max(0, disk.percent))}%`, background: disk.percent >= 90 ? '#f59f00' : '#15aabf' }} />}
         </div>
         <Text size="xs" c="dimmed" mt={7}>{disk.status === 'ok'
-          ? `${disk.used_gb?.toLocaleString()} / ${disk.filesystem_total_gb?.toLocaleString()} GiB in mounted filesystems`
-          : disk.status === 'unmounted' ? 'No measured mounted filesystems; usage is unknown.' : 'Mounted filesystem usage is unavailable.'}</Text>
-        {disk.shared && <Badge size="xs" variant="light" color="gray" mt={6}>Shared storage · counted once</Badge>}
+          ? `${disk.used_gb?.toLocaleString()} / ${disk.filesystem_total_gb?.toLocaleString()} GiB`
+          : disk.status === 'unmounted' ? 'Unmounted' : 'Unavailable'}</Text>
         <details className="monitor-notes" style={{ marginTop: 6 }}><summary>Disk details</summary>
           <Stack gap={4} mt={6}>{disk.devices.map(device => <Text key={device.name} size="xs">{device.name} · {device.model || 'Model unavailable'} · {device.total_gb.toLocaleString()} GiB</Text>)}
             <Text size="xs">Mounts: {disk.mounts.join(', ') || 'None measured'}</Text>
-            {disk.shared && <Text size="xs">This storage spans several disks. Filesystem usage cannot be reliably split between individual members.</Text>}
           </Stack>
         </details>
       </div>)}
-      {!disks.length && <Text size="sm" c="dimmed" py="xl" ta="center">{loading ? 'Waiting for physical disk samples' : 'No physical disk usage available'}</Text>}
+      {!disks.length && <Text size="sm" c="dimmed" py="xl" ta="center">{loading ? 'Loading' : 'No data'}</Text>}
     </Stack></ScrollArea.Autosize>
-    <Text size="xs" c="dimmed" mt="md">Partitions and logical volumes are grouped under their backing disks. Unmounted space is not counted as free.</Text>
   </Paper>;
 }

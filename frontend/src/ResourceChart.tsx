@@ -1,13 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Group, Paper, Stack, Text } from '@mantine/core';
+import type { ReactNode } from 'react';
+import { Group, Paper, Text } from '@mantine/core';
 import { chartSegments, timePosition, WINDOW_MS } from './monitorData';
 import type { ChartPoint } from './monitorData';
 
 export type ChartSeries = { id: string; label: string; color: string; points: ChartPoint[]; current: number | null };
 const timeLabel = (time: number) => new Date(time).toLocaleTimeString([], { hour12: false });
 
-export default function ResourceChart({ title, description, series, end, emptyMessage }: {
-  title: string; description: string; series: ChartSeries[]; end: number; emptyMessage: string;
+export default function ResourceChart({ title, control, series, end, emptyMessage }: {
+  title: string; control?: ReactNode; series: ChartSeries[]; end: number; emptyMessage: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(560);
@@ -32,14 +33,14 @@ export default function ResourceChart({ title, description, series, end, emptyMe
     return { label: item.label, color: item.color, point: point && Math.abs(point.time - hoverTime) <= 5_000 ? point : null };
   });
   return <Paper withBorder radius="lg" p="lg" className="resource-chart">
-    <Text fw={700}>{title}</Text><Text size="xs" c="dimmed" mt={4}>{description}</Text>
+    <Group justify="space-between" wrap="nowrap" gap="xs" mih={30}><Text fw={700}>{title}</Text>{control}</Group>
     <div ref={ref} className="resource-chart-plot">
-      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label={`${title}: last 5 minutes, 0 to 100 percent`}
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label={`${title} chart`}
         onPointerLeave={() => setHover(null)} onPointerMove={event => {
           const box = event.currentTarget.getBoundingClientRect();
           setHover(Math.max(0, Math.min(1, ((event.clientX - box.left) * width / box.width - left) / plotWidth)));
         }}>
-        <title>{title} · 0–100% · rolling 5-minute window</title>
+        <title>{title}</title>
         <defs><clipPath id={clipId}><rect x={left} y={top - 3} width={plotWidth} height={bottom - top + 6} /></clipPath></defs>
         {[0, 25, 50, 75, 100].map(value => <g key={value}>
           <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#e7edf4" strokeDasharray={value ? '4 4' : undefined} />
@@ -65,9 +66,9 @@ export default function ResourceChart({ title, description, series, end, emptyMe
         {hovered.map(item => <Text size="xs" key={item.label} c={item.color}>{item.label}: {item.point?.value == null ? 'N/A' : `${item.point.value.toFixed(1)}%`}</Text>)}
       </div>}
     </div>
-    <Stack gap={6}><Group gap="md">{series.map(item => <Group gap={6} key={item.id} wrap="nowrap">
+    <Group gap="md">{series.map(item => <Group gap={6} key={item.id} wrap="nowrap">
       <span style={{ background: item.color, width: 9, height: 9, borderRadius: '50%', flexShrink: 0 }} />
       <Text size="xs">{item.label}</Text><Text size="xs" fw={700}>{item.current === null ? 'N/A' : `${item.current.toFixed(1)}%`}</Text>
-    </Group>)}</Group><Text size="xs" c="dimmed">Last 5 minutes · refresh every 5 seconds</Text></Stack>
+    </Group>)}</Group>
   </Paper>;
 }

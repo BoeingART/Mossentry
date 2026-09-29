@@ -26,28 +26,29 @@ export function gpuPercent(device: GpuDevice | undefined, selected: string[]): n
   if (!device) return null;
   if (!selected.length) return device.percent;
   const processes = device.processes.filter(process => matchesUser(process.username, selected));
-  // Unavailable attribution is a chart gap, never a fabricated idle sample.
+  // Keep unavailable values distinct from measured idle samples.
   if (!processes.length) return device.process_utilization_available ? 0 : null;
   if (processes.some(process => process.sm_percent === null)) return null;
   return processes.reduce((total, process) => total + process.sm_percent!, 0);
 }
 
-export function chartSegments(points: ChartPoint[], end: number): ChartPoint[][] {
-  const segments: ChartPoint[][] = [];
-  let current: ChartPoint[] = [];
-  for (const point of points) {
-    if (point.time < end - WINDOW_MS || point.time > end) continue;
-    if (point.value === null || !Number.isFinite(point.value)) {
-      current = [];
-      continue;
-    }
-    if (!current.length || point.time - current[current.length - 1].time > REFRESH_MS * 2) {
-      current = [];
-      segments.push(current);
-    }
-    current.push({ ...point, value: Math.min(100, Math.max(0, point.value)) });
+export function gpuMemoryPercent(device: GpuDevice | undefined, selected: string[]): number | null {
+  if (!device || device.memory_total_mb === null || device.memory_total_mb <= 0) return null;
+  let used = device.memory_used_mb;
+  if (selected.length) {
+    const processes = device.processes.filter(process => matchesUser(process.username, selected));
+    if (!device.process_memory_available || processes.some(process => process.memory_mb === null)) return null;
+    used = processes.reduce((total, process) => total + process.memory_mb!, 0);
   }
-  return segments;
+  return used === null ? null : 100 * used / device.memory_total_mb;
+}
+
+export function chartSegments(points: ChartPoint[], end: number): ChartPoint[][] {
+  // Join all measured points in the window, skipping missing samples without inserting zeros.
+  const connected = points.filter(point => point.time >= end - WINDOW_MS && point.time <= end
+    && point.value !== null && Number.isFinite(point.value))
+    .map(point => ({ ...point, value: Math.min(100, Math.max(0, point.value!)) }));
+  return connected.length ? [connected] : [];
 }
 
 export function timePosition(time: number, end: number) {
