@@ -161,3 +161,33 @@ class ServerManagementTests(unittest.TestCase):
         self.assertNotIn('private diagnostic', response.text)
         self.assertEqual(self.db.row('SELECT last_scan_status FROM servers WHERE id=?', (server_id,))['last_scan_status'], 'error')
         self.assertEqual(self.db.row('SELECT status FROM actions WHERE id=?', (action_id,))['status'], 'executed')
+
+    def test_monitoring_auth_errors_and_management_independence(self):
+        server_id = self.add_server()
+        path = f'/api/servers/{server_id}/metrics'
+        self.assertEqual(self.client.post(path).status_code, 403)
+        sample = {'checked_at': self.db.now(), 'cpu': {'percent': 25}, 'memory': {}, 'gpu': {}, 'disks': [], 'warnings': []}
+        self.main.operation_lock.acquire()
+        try:
+            with patch.object(self.main.monitoring_service, 'inspect_resources', return_value=sample):
+                before = len(self.db.rows('SELECT * FROM audit_log'))
+                response = self.client.post(path, headers=self.headers)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json(), sample)
+                self.assertEqual(response.headers['cache-control'], 'no-store')
+                self.assertEqual(len(self.db.rows('SELECT * FROM audit_log')), before)
+        finally:
+            self.main.operation_lock.release()
+        with patch.object(self.main.monitoring_service, 'inspect_resources', side_effect=RuntimeError('Permission denied SECRET')):
+            response = self.client.post(path, headers=self.headers)
+            self.assertEqual(response.status_code, 502)
+            self.assertNotIn('SECRET', response.text)
+        with patch.object(self.main.monitoring_service, 'inspect_resources', side_effect=self.main.monitoring_service.SampleBusy):
+            self.assertEqual(self.client.post(path, headers=self.headers).status_code, 409)
+        self.db.execute('UPDATE servers SET enabled=0 WHERE id=?', (server_id,))
+        with patch.object(self.main.monitoring_service, 'inspect_resources') as collect:
+            self.assertEqual(self.client.post(path, headers=self.headers).status_code, 400)
+            self.assertEqual(self.client.post('/api/servers/999999/metrics', headers=self.headers).status_code, 404)
+            collect.assert_not_called()
+        self.client.cookies.clear()
+        self.assertEqual(self.client.post(path, headers=self.headers).status_code, 401)

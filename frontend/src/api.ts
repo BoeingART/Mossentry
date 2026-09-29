@@ -3,7 +3,7 @@ import type { Dashboard } from './types';
 let csrf = '';
 export function setCsrf(value: string) { csrf = value; }
 
-export async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+export async function api<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method,
     headers: {
@@ -12,7 +12,11 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     credentials: 'same-origin',
-  }).catch(() => { throw new Error('Cannot reach the local service. Reopen the app and retry.'); });
+    signal,
+  }).catch((error) => {
+    if (signal?.aborted) throw error;
+    throw new Error('Cannot reach the local service. Reopen the app and retry.');
+  });
   const contentType = response.headers.get('content-type') || '';
   const data = contentType.includes('json') ? await response.json() : await response.text();
   if (!response.ok) {

@@ -14,7 +14,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Re
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import ansible_service
+from . import ansible_service, monitoring_service
 from .config import BASE_DIR, COOKIE_SECURE, DATA_DIR, SESSION_HOURS
 from .db import audit, connect, create_session, execute, get_session, init_db, now, row, rows
 from .models import USERNAME_RE, CreateUserRequest, LoginRequest, PasswordChangeRequest, UserActionRequest, UserProfileUpdate, ServerRequest
@@ -262,6 +262,20 @@ def server_status(server_id: int, request: Request, session: dict[str, Any] = De
         raise HTTPException(502, friendly_error(str(exc))) from exc
     audit(session["admin_id"], "status_checked", server["name"], {}, _client_ip(request))
     return metrics
+
+
+@app.post("/api/servers/{server_id}/metrics")
+def server_metrics(server_id: int, response: Response, session: dict[str, Any] = Depends(csrf_admin)):
+    server = _server(server_id)
+    _validate_servers([server["name"]])
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return monitoring_service.inspect_resources(server)
+    except monitoring_service.SampleBusy as exc:
+        raise HTTPException(409, "A resource sample is already running. Retrying shortly.") from exc
+    except Exception as exc:
+        # Polling must not fill the activity log or acquire the management lock.
+        raise HTTPException(502, friendly_error(str(exc))) from exc
 
 
 def _protect_accounts(username: str, names: list[str]) -> None:

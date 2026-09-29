@@ -29,3 +29,20 @@ export type ServerMetrics = {
   checked_at: string; uptime_seconds: number; load: number[]; memory_total_mb: number; memory_used_mb: number;
   disk_total_gb: number; disk_used_gb: number; disk_percent: number;
 };
+
+export type ResourceMetrics = {
+  checked_at: string;
+  cpu: { percent: number; cores: number; users: { username: string; cpu_percent: number; processes: number }[] };
+  memory: { total_mb: number; used_mb: number; percent: number };
+  disks: { mount: string; filesystem: string; total_gb: number; used_gb: number; percent: number }[];
+  gpu: {
+    status: 'ok' | 'unavailable' | 'error'; message: string;
+    devices: {
+      index: number; uuid: string; name: string; percent: number | null;
+      memory_used_mb: number | null; memory_total_mb: number | null; temperature: number | null;
+      process_memory_available: boolean; process_utilization_available: boolean;
+      processes: { pid: number; username: string | null; sm_percent: number | null; memory_mb: number | null }[];
+    }[];
+  };
+  warnings: string[];
+};

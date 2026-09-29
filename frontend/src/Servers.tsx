@@ -39,7 +39,7 @@ function ServerForm({ server, close, saved }: { server: Server | null; close: ()
   </Modal>;
 }
 
-export default function Servers({ data, saved }: { data: Dashboard; saved: () => Promise<void> }) {
+export default function Servers({ data, saved, monitor }: { data: Dashboard; saved: () => Promise<void>; monitor: (server: Server) => void }) {
   const [search, setSearch] = useState('');
   const [sshDetails, setSshDetails] = useState<number[]>([]);
   const [filter, setFilter] = useState<string | null>('all');
@@ -96,7 +96,7 @@ export default function Servers({ data, saved }: { data: Dashboard; saved: () =>
         {sshDetails.includes(server.id) && <Text size="xs" c="dimmed" mt="xs" style={{ overflowWrap: 'anywhere' }}>{server.ssh_user}@{server.hostname}:{server.port}</Text>}
         <Group justify="space-between" mt="sm"><Text size="sm" c="dimmed">{failed || !server.enabled ? 'Saved accounts' : 'Accounts'}</Text><Text fw={700}>{server.last_scan_at ? count : '—'}</Text></Group>
         <Text size="xs" c="dimmed" mt={4}>Last sync attempt: {date(server.last_scan_at)}</Text>
-        <Group gap={6} mt="sm"><Button size="compact-xs" variant="light" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:test`} onClick={() => void operate(server, 'test')}>Test</Button><Button size="compact-xs" variant="light" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:scan`} onClick={() => void operate(server, 'scan')}>Sync</Button><Button size="compact-xs" variant="default" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:status`} onClick={() => void operate(server, 'status')}>Server status</Button></Group>
+        <Group gap={6} mt="sm"><Button size="compact-xs" variant="light" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:test`} onClick={() => void operate(server, 'test')}>Test</Button><Button size="compact-xs" variant="light" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:scan`} onClick={() => void operate(server, 'scan')}>Sync</Button><Button size="compact-xs" variant="default" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:status`} onClick={() => void operate(server, 'status')}>Status</Button><Button size="compact-xs" variant="light" color="teal" disabled={!server.enabled} onClick={() => monitor(server)}>Live monitor</Button></Group>
       </Card>;
     })}</div> : <Paper withBorder radius="lg" p="xl"><Stack align="center"><IconServer size={34} color="#8795a9" /><Title order={3}>{data.servers.length ? 'No matching servers' : 'Add your first server'}</Title><Text size="sm" c="dimmed">{data.servers.length ? 'Try another search or filter.' : 'Enter its SSH address, login account and private key path to begin.'}</Text>{!data.servers.length && <Button onClick={() => setEditor({ server: null })}>Add server</Button>}</Stack></Paper>}
     <Modal opened={!!syncErrorServer} onClose={() => setSyncErrorServerId(null)} title={`${syncErrorServer?.name || ''} · Sync failed`} centered size="lg">

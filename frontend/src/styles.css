@@ -15,6 +15,12 @@ button { cursor: pointer; }
 .sidebar-link { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 4px; border: 0; background: transparent; color: #b7c5db; text-align: left; font: inherit; font-size: 12px; }
 .sidebar-link:hover { color: white; }
 .main-area { min-width: 0; }
+.resource-monitor { background: #f8fafc; }
+.monitor-heading { border-bottom: 1px solid #e7ebf1; flex-shrink: 0; background: white; }
+.monitor-drawer-body { height: 100dvh; display: flex; flex-direction: column; background: #f8fafc; }
+.monitor-disk { overflow-wrap: anywhere; }
+.monitor-notes { color: #637188; font-size: 12px; }
+.monitor-notes summary { cursor: pointer; }
 .content { width: min(1380px, 100%); margin: 0 auto; padding: 32px; }
 .host-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; align-items: start; }
 .host-card { min-width: 0; transition: transform .15s, box-shadow .15s; }
