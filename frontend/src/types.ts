@@ -30,18 +30,32 @@ export type ServerMetrics = {
   disk_total_gb: number; disk_used_gb: number; disk_percent: number;
 };
 
+export type PhysicalDiskGroup = {
+  id: string;
+  devices: { name: string; model: string; total_gb: number }[];
+  shared: boolean;
+  total_gb: number;
+  filesystem_total_gb: number | null;
+  used_gb: number | null;
+  percent: number | null;
+  mounts: string[];
+  status: 'ok' | 'unmounted' | 'unavailable';
+};
+
 export type ResourceMetrics = {
   checked_at: string;
   cpu: { percent: number; cores: number; users: { username: string; cpu_percent: number; processes: number }[] };
   memory: { total_mb: number; used_mb: number; percent: number };
-  disks: { mount: string; filesystem: string; total_gb: number; used_gb: number; percent: number }[];
+  disks: PhysicalDiskGroup[];
   gpu: {
     status: 'ok' | 'unavailable' | 'error'; message: string;
     devices: {
       index: number; uuid: string; name: string; percent: number | null;
       memory_used_mb: number | null; memory_total_mb: number | null; temperature: number | null;
       process_memory_available: boolean; process_utilization_available: boolean;
-      processes: { pid: number; username: string | null; sm_percent: number | null; memory_mb: number | null }[];
+      process_utilization_status?: 'ok' | 'no_activity' | 'unsupported' | 'unavailable' | 'error';
+      processes: { pid: number; username: string | null; sm_percent: number | null; memory_mb: number | null;
+        kind?: string; name?: string; sm_source?: 'pmon' | 'nvml' | 'no_activity' | 'unavailable' }[];
     }[];
   };
   warnings: string[];

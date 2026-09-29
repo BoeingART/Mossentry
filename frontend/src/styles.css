@@ -59,3 +59,10 @@ button { cursor: pointer; }
 .chart-empty-label { font-size: 12px; fill: #8795a9; }
 .chart-tooltip { position: absolute; top: 24px; padding: 8px 12px; border: 1px solid #e7edf4; border-radius: 8px; background: white; box-shadow: 0 3px 12px #17233b12; pointer-events: none; }
 @media (max-width: 1050px) { .monitor-chart-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.disk-chart-axis { display: flex; justify-content: space-between; margin: 22px 0 16px; font-size: 11px; color: #738198; }
+.disk-chart-row { overflow-wrap: anywhere; }
+.disk-chart-bar { height: 20px; position: relative; overflow: hidden; border-radius: 4px; background: #edf2f7; }
+.disk-chart-bar::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(to right, transparent 0, transparent calc(25% - 1px), #ffffffbb calc(25% - 1px), #ffffffbb 25%); pointer-events: none; }
+.disk-chart-fill { height: 100%; transition: width .2s ease; }
+.disk-chart-bar-unknown { background: repeating-linear-gradient(135deg, #edf2f7, #edf2f7 6px, #f8fafc 6px, #f8fafc 12px); }

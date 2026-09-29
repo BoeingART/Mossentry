@@ -1,23 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Group, Loader, MultiSelect, Paper, Progress, ScrollArea, SimpleGrid, Stack, Table, Text, ThemeIcon, Title } from '@mantine/core';
+import { Alert, Badge, Button, Card, Group, Loader, MultiSelect, Paper, ScrollArea, SimpleGrid, Stack, Table, Text, ThemeIcon, Title } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { IconActivity, IconArrowLeft, IconArrowRight, IconPlayerPause, IconPlayerPlay, IconServer } from '@tabler/icons-react';
 import { api } from './api';
 import type { Dashboard, ResourceMetrics, Server } from './types';
 import ResourceChart from './ResourceChart';
+import PhysicalDiskChart from './PhysicalDiskChart';
 import { appendSample, cpuPercent, gpuPercent, matchesUser, REFRESH_MS, WINDOW_MS } from './monitorData';
 import type { GpuDevice, HistorySample } from './monitorData';
 
 const percent = (value: number | null) => value === null ? 'N/A' : `${value.toFixed(1)}%`;
-const memory = (value: number | null) => value === null ? 'N/A' : `${(value / 1024).toFixed(1)} GiB`;
+const memory = (value: number | null) => value === null ? 'N/A' : value < 1024 ? `${value.toFixed(0)} MiB` : `${(value / 1024).toFixed(1)} GiB`;
 const gpuColors = ['#7950f2', '#e64980', '#0891b2', '#f59f00', '#12b886', '#4263eb', '#ae3ec9', '#d9480f'];
-
-function Meter({ label, value, detail, color = 'teal' }: { label: string; value: number; detail: string; color?: string }) {
-  return <div><Group justify="space-between" gap="xs"><Text size="sm" fw={600}>{label}</Text><Text size="sm" fw={700}>{percent(value)}</Text></Group>
-    <Progress value={Math.min(100, Math.max(0, value))} color={value >= 90 ? 'orange' : color} mt={9} size={7} aria-label={`${label}: ${percent(value)}`} />
-    <Text size="xs" c="dimmed" mt={7}>{detail}</Text>
-  </div>;
-}
 
 function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: string[] }) {
   const [sample, setSample] = useState<ResourceMetrics | null>(null);
@@ -77,7 +71,6 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
   const stale = !!sample && age > 15;
   const status = paused ? 'Paused' : !visible ? 'Hidden · paused' : error ? 'Disconnected' : stale ? 'Stale' : sample ? 'Live' : 'Connecting';
   const filtered = selectedUsers.length > 0;
-  const cpuUsers = sample?.cpu.users.filter(user => matches(user.username)) ?? [];
   const devices = new Map<string, GpuDevice>();
   // Retain lines for recently seen devices even if the latest GPU query failed.
   for (const point of recent) for (const device of point.sample?.gpu.devices ?? []) devices.set(device.uuid, device);
@@ -105,36 +98,33 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
         emptyMessage={paused ? 'Monitoring paused' : 'Waiting for CPU samples'} />
       <ResourceChart title="GPU utilization" description={filtered ? 'Selected users · per-process SM utilization' : 'Device utilization · one line per GPU'} end={clock} series={gpuSeries}
         emptyMessage={sample?.gpu.status === 'unavailable' ? 'GPU monitoring unavailable' : sample ? 'No GPU utilization samples' : 'Waiting for GPU samples'} />
+      <ResourceChart title="Memory utilization" description={sample ? `${memory(sample.memory.used_mb)} / ${memory(sample.memory.total_mb)} · whole server` : 'Whole-server memory usage'} end={clock}
+        series={[{ id: 'memory', label: 'Memory', color: '#12b886', current: sample?.memory.percent ?? null,
+          points: recent.map(point => ({ time: point.time, value: point.sample?.memory.percent ?? null })) }]}
+        emptyMessage={paused ? 'Monitoring paused' : 'Waiting for memory samples'} />
+      <PhysicalDiskChart disks={sample?.disks ?? []} loading={!sample} />
     </div>
     <Group justify="space-between" gap="xs"><Text size="xs" c="dimmed">{sample ? `Last sample received ${age}s ago${stale ? ' · Out of date' : ''}` : 'Connecting and sampling server resources…'}</Text>
       <Text size="xs" c="dimmed">History builds while this page is open · 5-minute window · 0–100%</Text></Group>
     {sample?.gpu.message && <Alert color={sample.gpu.status === 'error' ? 'orange' : 'gray'}>{sample.gpu.message}</Alert>}
     {filtered && <Text size="xs" c="dimmed">GPU process SM samples may overlap. Curves are capped at 100%; legends show the reported sum. N/A leaves a gap and does not mean idle.</Text>}
     {sample && <>
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-        <Paper withBorder p="lg" radius="lg"><Text fw={700} mb="md">CPU by user</Text>
-          <ScrollArea.Autosize mah={240}><Table><Table.Thead><Table.Tr><Table.Th>User</Table.Th><Table.Th>CPU</Table.Th><Table.Th>Processes</Table.Th></Table.Tr></Table.Thead>
-            <Table.Tbody>{cpuUsers.map(user => <Table.Tr key={user.username}><Table.Td>{user.username}</Table.Td><Table.Td>{percent(user.cpu_percent)}</Table.Td><Table.Td>{user.processes}</Table.Td></Table.Tr>)}</Table.Tbody></Table></ScrollArea.Autosize>
-          {!cpuUsers.length && <Text size="sm" c="dimmed" mt="sm">No visible processes for the selected users.</Text>}
-        </Paper>
-        <Paper withBorder p="lg" radius="lg"><Text fw={700} mb="md">Memory & disks</Text><Stack gap="lg">
-          <Meter label="Memory" value={sample.memory.percent} detail={`${memory(sample.memory.used_mb)} / ${memory(sample.memory.total_mb)}`} />
-          {sample.disks.map(disk => <div key={disk.mount} className="monitor-disk"><Meter label={disk.mount} value={disk.percent} detail={`${disk.used_gb} / ${disk.total_gb} GiB · ${disk.filesystem}`} color="cyan" /></div>)}
-          {!sample.disks.length && <Text size="xs" c="dimmed">No filesystem usage available.</Text>}
-        </Stack></Paper>
-      </SimpleGrid>
       {sample.gpu.devices.length > 0 && <div><Title order={3} size="h4" mb="md">GPU processes & memory</Title><SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
         {sample.gpu.devices.map(device => {
           const processes = device.processes.filter(process => matches(process.username));
           const used = filtered ? (device.process_memory_available && processes.every(process => process.memory_mb !== null) ? processes.reduce((sum, process) => sum + process.memory_mb!, 0) : null) : device.memory_used_mb;
           return <Paper key={device.uuid} withBorder p="lg" radius="lg"><Stack gap="sm">
             <Group justify="space-between"><Text fw={600} size="sm">GPU {device.index} · {device.name}</Text>{device.temperature !== null && <Badge color="gray" variant="light">{device.temperature}°C</Badge>}</Group>
-            <Text size="sm">{filtered ? 'Selected compute memory' : 'Device memory'} · {memory(used)} / {memory(device.memory_total_mb)}</Text>
-            <ScrollArea.Autosize mah={220}><Table><Table.Thead><Table.Tr><Table.Th>User / PID</Table.Th><Table.Th>SM</Table.Th><Table.Th>Compute memory</Table.Th></Table.Tr></Table.Thead>
-              <Table.Tbody>{processes.map(process => <Table.Tr key={process.pid}><Table.Td>{process.username ?? 'Unknown owner'} · {process.pid}</Table.Td><Table.Td>{percent(process.sm_percent)}</Table.Td><Table.Td>{memory(process.memory_mb)}</Table.Td></Table.Tr>)}</Table.Tbody></Table></ScrollArea.Autosize>
+            <Text size="sm">{filtered ? 'Selected GPU memory' : 'Device memory'} · {memory(used)} / {memory(device.memory_total_mb)}</Text>
+            <ScrollArea.Autosize mah={220}><Table><Table.Thead><Table.Tr><Table.Th>User / PID</Table.Th><Table.Th>SM</Table.Th><Table.Th>GPU memory</Table.Th></Table.Tr></Table.Thead>
+              <Table.Tbody>{processes.map(process => <Table.Tr key={process.pid}><Table.Td>{process.username ?? 'Unknown owner'} · {process.pid}{process.name && <Text size="xs" c="dimmed">{process.name} · {process.kind === 'G' ? 'Graphics' : process.kind === 'C' ? 'Compute' : process.kind}</Text>}</Table.Td><Table.Td title={process.sm_source === 'no_activity' ? 'NVML reported no non-zero process activity during this sample window.' : undefined}>{percent(process.sm_percent)}</Table.Td><Table.Td>{memory(process.memory_mb)}</Table.Td></Table.Tr>)}</Table.Tbody></Table></ScrollArea.Autosize>
             {!processes.length && <Text size="xs" c="dimmed">No matching GPU processes reported.</Text>}
-            {!device.process_memory_available && <Text size="xs" c="orange.8">Per-process compute memory is unavailable.</Text>}
-            {!device.process_utilization_available && <Text size="xs" c="dimmed">No process SM samples available; the driver or device may not support them.</Text>}
+            {!device.process_memory_available && <Text size="xs" c="orange.8">Per-process GPU memory is unavailable.</Text>}
+            {device.process_utilization_status === 'no_activity' && <Text size="xs" c="dimmed">No non-zero process activity reported in this sample. Idle processes can still hold GPU memory.</Text>}
+            {!device.process_utilization_available && <Text size="xs" c="dimmed">{device.process_utilization_status === 'unsupported'
+              ? 'The driver does not support per-process utilization. Device usage and GPU memory remain available.'
+              : device.process_utilization_status === 'error' ? 'The process monitoring query failed. Device metrics remain available; retrying next sample.'
+              : 'Per-process utilization could not be verified. Device metrics remain available.'}</Text>}
           </Stack></Paper>;
         })}
       </SimpleGrid></div>}
@@ -149,7 +139,7 @@ export default function ResourceMonitor({ data, serverId, selectServer }: { data
     <Group justify="space-between" align="start" mb="lg"><div><Title order={2}>Monitor</Title><Text c="dimmed" size="sm" mt={4}>Choose a server to view CPU, GPU, memory and disk usage.</Text></div><Badge variant="light" size="lg">5s refresh · 5min history</Badge></Group>
     {data.servers.length ? <div className="host-grid">{data.servers.map(server => <Card key={server.id} withBorder radius="lg" p="lg">
       <Group justify="space-between" mb="md"><Group gap="sm"><ThemeIcon variant="light" size={36} radius="md"><IconServer size={20} /></ThemeIcon><Title order={3} size="h4">{server.name}</Title></Group><Badge color={server.enabled ? 'teal' : 'gray'} variant="light">{server.enabled ? 'Enabled' : 'Paused'}</Badge></Group>
-      <Text size="sm" c="dimmed" mb="lg">CPU / GPU trends · Memory · Disks</Text>
+      <Text size="sm" c="dimmed" mb="lg">CPU / GPU / Memory trends · Physical disks</Text>
       <Button variant="light" leftSection={<IconActivity size={16} />} rightSection={<IconArrowRight size={16} />} disabled={!server.enabled} onClick={() => selectServer(server.id)} aria-label={`Monitor ${server.name}`}>Open monitor</Button>
     </Card>)}</div> : <Alert color="gray">Add a server from the Servers page to start monitoring.</Alert>}
   </>;

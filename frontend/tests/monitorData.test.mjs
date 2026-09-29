@@ -62,3 +62,16 @@ test('changing a user filter recomputes CPU and GPU history without mixing whole
   assert.equal(gpuPercent(undefined, []), null);
   assert.equal(gpuPercent({ processes: [{ username: 'alice', sm_percent: null }] }, ['alice']), null);
 });
+
+
+test('confirmed idle users show zero but failed or partial GPU readings stay unavailable', () => {
+  const device = { process_utilization_available: true, processes: [
+    { username: 'alice', sm_percent: 0 }, { username: 'bob', sm_percent: 70 },
+    { username: 'unknown', sm_percent: null },
+  ] };
+  assert.equal(gpuPercent(device, ['alice']), 0);
+  assert.equal(gpuPercent(device, ['missing']), 0);
+  assert.equal(gpuPercent(device, ['alice', 'bob']), 70);
+  assert.equal(gpuPercent(device, ['bob', 'unknown']), null);
+  assert.equal(gpuPercent({ process_utilization_available: false, processes: [] }, ['missing']), null);
+});

@@ -27,7 +27,8 @@ export function gpuPercent(device: GpuDevice | undefined, selected: string[]): n
   if (!selected.length) return device.percent;
   const processes = device.processes.filter(process => matchesUser(process.username, selected));
   // Unavailable attribution is a chart gap, never a fabricated idle sample.
-  if (!processes.length || processes.some(process => process.sm_percent === null)) return null;
+  if (!processes.length) return device.process_utilization_available ? 0 : null;
+  if (processes.some(process => process.sm_percent === null)) return null;
   return processes.reduce((total, process) => total + process.sm_percent!, 0);
 }
 
