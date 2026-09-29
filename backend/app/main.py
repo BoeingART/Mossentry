@@ -8,9 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from . import ansible_service
 from .config import BASE_DIR, COOKIE_SECURE, DATA_DIR, SESSION_HOURS
@@ -21,11 +20,9 @@ from .security import hash_password, verify_password
 app = FastAPI(title="Server Manager", docs_url=None, redoc_url=None)
 DESKTOP_TOKEN = os.environ.get("SRVMGR_DESKTOP_TOKEN", "")
 DESKTOP_CSRF = secrets.token_urlsafe(32)
-app.mount("/static", StaticFiles(directory=BASE_DIR / "app" / "static"), name="static")
-templates = Environment(
-    loader=FileSystemLoader(BASE_DIR / "app" / "templates"),
-    autoescape=select_autoescape(["html", "xml"]),
-)
+FRONTEND_DIR = BASE_DIR / "app" / "frontend"
+if (FRONTEND_DIR / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
 
 
 @app.middleware("http")
@@ -67,11 +64,11 @@ def csrf_admin(
     return session
 
 
-@app.get("/", response_class=HTMLResponse)
-def home(session_id: str | None = Cookie(default=None)) -> HTMLResponse:
-    session = _desktop_admin() if DESKTOP_TOKEN else get_session(session_id)
-    name = "dashboard.html" if session else "login.html"
-    response = HTMLResponse(templates.get_template(name).render(session=session, desktop_mode=bool(DESKTOP_TOKEN)))
+@app.get("/")
+def home() -> FileResponse:
+    if not (FRONTEND_DIR / "index.html").is_file():
+        raise HTTPException(503, "Frontend is not built. Run npm run build")
+    response = FileResponse(FRONTEND_DIR / "index.html", media_type="text/html")
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -143,7 +140,7 @@ def dashboard(session: dict[str, Any] = Depends(current_admin)) -> dict[str, Any
     for log in logs:
         log["details"] = json.loads(log.pop("details_json"))
     return {
-        "admin": {"username": session["username"], "csrf": session["csrf_token"]},
+        "admin": {"username": session["username"], "csrf": session["csrf_token"], "desktop_mode": bool(DESKTOP_TOKEN)},
         "servers": servers, "users": users, "actions": actions, "audit": logs,
     }
 

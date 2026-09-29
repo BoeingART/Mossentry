@@ -104,9 +104,9 @@ function createWindow(origin) {
     title: 'Server Manager',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     ...(process.platform === 'darwin' ? {} : {
-      titleBarOverlay: { color: '#303a58', symbolColor: '#f2f5ff', height: 66 },
+      titleBarOverlay: { color: '#ffffff', symbolColor: '#17233b', height: 64 },
     }),
-    backgroundColor: '#303a58',
+    backgroundColor: '#f5f7fb',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

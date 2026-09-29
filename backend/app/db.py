@@ -29,6 +29,10 @@ def connect() -> Iterator[sqlite3.Connection]:
 
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS admins (
   id INTEGER PRIMARY KEY,
   username TEXT NOT NULL UNIQUE,
@@ -120,13 +124,17 @@ def init_db() -> None:
             conn.execute("ALTER TABLE servers ADD COLUMN public_port_start INTEGER")
         if "public_port_end" not in server_columns:
             conn.execute("ALTER TABLE servers ADD COLUMN public_port_end INTEGER")
-        for name, hostname, port, public_port_start, public_port_end, ssh_user, key_path in DEFAULT_SERVERS:
+        seeded = conn.execute("SELECT 1 FROM settings WHERE key='servers_seeded'").fetchone()
+        # Existing installations keep their inventory; deleted hosts stay deleted on restart.
+        has_servers = conn.execute("SELECT 1 FROM servers LIMIT 1").fetchone()
+        for name, hostname, port, public_port_start, public_port_end, ssh_user, key_path in (() if seeded or has_servers else DEFAULT_SERVERS):
             conn.execute(
                 """INSERT INTO servers(
                     name, hostname, port, public_port_start, public_port_end, ssh_user, key_path
                 ) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(name) DO NOTHING""",
                 (name, hostname, port, public_port_start, public_port_end, ssh_user, str(key_path)),
             )
+        conn.execute("INSERT OR IGNORE INTO settings(key,value) VALUES('servers_seeded','1')")
         conn.execute("PRAGMA optimize")
         count = conn.execute("SELECT COUNT(*) FROM admins").fetchone()[0]
         desktop_mode = bool(os.environ.get("SRVMGR_DESKTOP_TOKEN"))

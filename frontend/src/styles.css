@@ -1,0 +1,47 @@
+:root { font-synthesis: none; }
+html, body, #root { min-height: 100%; }
+body { margin: 0; background: #f5f7fb; }
+button { cursor: pointer; }
+.topbar { background: #fff; border-bottom: 1px solid #e7ebf1; -webkit-app-region: drag; }
+.topbar-actions, .topbar-actions button { -webkit-app-region: no-drag; }
+.electron-mac .topbar-heading { margin-left: 70px; }
+.electron-other .topbar-actions { margin-right: 132px; }
+.sidebar { background: #17233b; border-right: 0; color: white; }
+.nav-button { display: flex; width: 100%; align-items: center; gap: 12px; border: 0; border-radius: 10px; padding: 12px 13px; background: transparent; color: #b7c5db; font: inherit; font-size: 13px; text-align: left; transition: background .15s, color .15s; }
+.nav-button:hover { background: #263854; color: white; }
+.nav-button.active { background: #334d73; color: white; font-weight: 700; }
+.nav-button > span:first-child { display: flex; align-items: center; }
+.sidebar-footer { margin-top: auto; padding: 8px 3px 0; }
+.sidebar-link { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 4px; border: 0; background: transparent; color: #b7c5db; text-align: left; font: inherit; font-size: 12px; }
+.sidebar-link:hover { color: white; }
+.main-area { min-width: 0; }
+.content { width: min(1380px, 100%); margin: 0 auto; padding: 32px; }
+.host-card { transition: transform .15s, box-shadow .15s; }
+.host-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(28, 49, 78, .08); }
+.list-row + .list-row { border-top: 1px solid #edf0f4; }
+.user-group { border-top: 1px solid #edf0f4; }
+.user-group > summary { cursor: pointer; list-style: none; }
+.user-group > summary::-webkit-details-marker { display: none; }
+.user-group[open] > summary { background: #f7faff; }
+.details-chevron { transition: transform .15s; }
+.user-group[open] .details-chevron { transform: rotate(90deg); }
+.pagination-row { border-top: 1px solid #edf0f4; }
+.login-page { display: grid; place-items: center; min-height: 100vh; padding: 24px; background: #e9eff7; }
+.login-shell { display: grid; grid-template-columns: 1fr 1fr; width: min(850px, 100%); min-height: 480px; overflow: hidden; border-radius: 22px; background: white; box-shadow: 0 25px 70px rgba(21, 39, 68, .15); }
+.login-hero { display: flex; flex-direction: column; justify-content: space-between; padding: 48px; background: linear-gradient(150deg, #152744, #294d79); color: white; }
+.login-form-panel { display: flex; flex-direction: column; justify-content: center; padding: 50px; }
+@media (max-width: 800px) {
+  .content { padding: 22px; }
+  .last-sync { display: none; }
+  .electron-mac .topbar-heading { margin-left: 0; }
+  .approval-controls { width: 100%; justify-content: flex-end; }
+}
+@media (max-width: 620px) {
+  .topbar-heading .mantine-Badge-root { display: none; }
+  .topbar-actions button { font-size: 0; padding-inline: 9px; }
+  .topbar-actions button svg { margin: 0; }
+  .login-shell { grid-template-columns: 1fr; }
+  .login-hero { min-height: 190px; padding: 28px; }
+  .login-form-panel { padding: 30px; }
+  .user-summary-end .mantine-Badge-root { display: none; }
+}

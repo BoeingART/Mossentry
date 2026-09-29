@@ -6,3 +6,4 @@ backend/**/__pycache__/
 *.log
 .DS_Store
 server_manager.tar.gz
+backend/app/frontend/

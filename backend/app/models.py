@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import re
+import ipaddress
+from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 
@@ -30,7 +32,7 @@ class CreateUserRequest(BaseModel):
 class UserActionRequest(BaseModel):
     username: str
     servers: list[str] = Field(min_length=1)
-    action: Literal["disable_user", "enable_user", "set_sudo"]
+    action: Literal["disable_user", "enable_user", "set_sudo", "delete_user"]
     sudo: bool | None = None
 
     @field_validator("username")
@@ -49,3 +51,50 @@ class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=12)
 
+
+class ServerRequest(BaseModel):
+    name: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,31}$")
+    hostname: str = Field(min_length=1, max_length=253)
+    port: int = Field(default=22, ge=1, le=65535)
+    ssh_user: str = Field(pattern=r"^[a-z_][a-z0-9_-]{0,31}$")
+    key_path: str = Field(min_length=1, max_length=1024)
+    enabled: bool = True
+    public_port_start: int | None = Field(default=None, ge=1, le=65535)
+    public_port_end: int | None = Field(default=None, ge=1, le=65535)
+
+    @field_validator("hostname")
+    @classmethod
+    def valid_host(cls, value: str) -> str:
+        value = value.strip()
+        try:
+            ipaddress.ip_address(value)
+        except ValueError:
+            if not all(re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label)
+                       for label in value.rstrip(".").split(".")):
+                raise ValueError("Enter a hostname or IP address without a protocol or port")
+        return value
+
+    @field_validator("name")
+    @classmethod
+    def valid_name(cls, value: str) -> str:
+        if value in {"all", "ungrouped", "managed"}:
+            raise ValueError("This server name is reserved")
+        return value
+
+    @field_validator("key_path")
+    @classmethod
+    def valid_key_path(cls, value: str) -> str:
+        if any(ord(char) < 32 for char in value):
+            raise ValueError("Invalid SSH key path")
+        path = Path(value.strip()).expanduser()
+        if not path.is_absolute():
+            raise ValueError("Use an absolute SSH key path or a path starting with ~/")
+        return str(path)
+
+    @model_validator(mode="after")
+    def valid_port_range(self):
+        if (self.public_port_start is None) != (self.public_port_end is None):
+            raise ValueError("Enter both ends of the public port range")
+        if self.public_port_start and self.public_port_end < self.public_port_start:
+            raise ValueError("The public port range ends before it starts")
+        return self

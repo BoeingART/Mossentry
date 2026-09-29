@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -34,13 +35,16 @@ class DesktopModeTests(unittest.TestCase):
                     client.headers["X-Desktop-Token"] = "desktop-test-secret"
                     page = client.get("/")
                     self.assertEqual(page.status_code, 200)
-                    self.assertIn("Managed servers and their latest scan status", page.text)
-                    self.assertNotIn('id="logout"', page.text)
-                    self.assertNotIn('id="password-button"', page.text)
+                    self.assertIn('<div id="root"></div>', page.text)
+                    self.assertIn('/assets/', page.text)
+                    asset = re.search(r'src="(/assets/[^"]+\.js)"', page.text)
+                    self.assertIsNotNone(asset)
+                    self.assertEqual(client.get(asset.group(1)).status_code, 200)
                     self.assertFalse((Path(directory) / "initial_admin_password").exists())
 
                     dashboard = client.get("/api/dashboard")
                     self.assertEqual(dashboard.status_code, 200)
+                    self.assertTrue(dashboard.json()["admin"]["desktop_mode"])
                     csrf = dashboard.json()["admin"]["csrf"]
                     payload = {"username": "alice", "servers": ["gpu1"], "sudo": False}
                     self.assertEqual(client.post("/api/actions/create-user", json=payload).status_code, 403)
