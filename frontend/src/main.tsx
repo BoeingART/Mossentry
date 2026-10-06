@@ -15,11 +15,11 @@ const theme = createTheme({
   autoContrast: true,
   black: '#101322',
   fontFamily,
-  fontSizes: { xs: '0.6875rem', sm: '0.75rem', md: '0.8125rem', lg: '0.9375rem', xl: '1.125rem' },
-  headings: { fontFamily: headingFontFamily, fontWeight: '600', sizes: {
-    h2: { fontSize: '1.625rem', lineHeight: '1.35' },
-    h3: { fontSize: '1rem', lineHeight: '1.5' },
-    h4: { fontSize: '0.9375rem', lineHeight: '1.5' },
+  fontSizes: { xs: '0.75rem', sm: '0.8125rem', md: '0.875rem', lg: '1rem', xl: '1.1875rem' },
+  headings: { fontFamily: headingFontFamily, fontWeight: '700', sizes: {
+    h2: { fontSize: '1.75rem', lineHeight: '1.35' },
+    h3: { fontSize: '1.0625rem', lineHeight: '1.5' },
+    h4: { fontSize: '1rem', lineHeight: '1.5' },
   } },
   defaultRadius: 'md',
   colors: {
@@ -29,9 +29,10 @@ const theme = createTheme({
     gray: ['#fafafa', '#f4f4f5', '#ececee', '#dedee2', '#bcbec4', '#9698a0', '#777b85', '#5b5f6a', '#373c48', '#181e2b'],
   },
   components: {
-    Button: { defaultProps: { radius: 'xl', fw: 500 } },
+    Text: { defaultProps: { fw: 500 } },
+    Button: { defaultProps: { radius: 'xl', fw: 600 } },
     ActionIcon: { defaultProps: { radius: 'xl' } },
-    Badge: { defaultProps: { radius: 'xl', fw: 400, tt: 'none' } },
+    Badge: { defaultProps: { radius: 'xl', fw: 500, tt: 'none' } },
     ThemeIcon: { defaultProps: { radius: 'xl' } },
     TextInput: { defaultProps: { radius: 'xl' } },
     Select: { defaultProps: { radius: 'xl' } },

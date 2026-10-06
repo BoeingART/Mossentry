@@ -97,7 +97,7 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
       <Box p="lg"><Title order={3} size="h4">Server users</Title><Text size="sm" c="dimmed">Expand a user to review accounts and permissions on each host.</Text></Box>
       {shown.length ? shown.map(group => <details className="user-group" key={group.username}>
         <summary><Group justify="space-between" wrap="nowrap" p="md" gap="sm">
-          <Group wrap="nowrap" gap="sm"><Avatar color="blue" radius="xl">{(group.fullName || group.username).charAt(0).toUpperCase()}</Avatar><div><Text fw={500} size="sm">{group.fullName || group.username} {group.fullName && <Text span c="dimmed" fw={400}>({group.username})</Text>}</Text><Text size="xs" c="dimmed">{group.accounts.length} host accounts</Text></div></Group>
+          <Group wrap="nowrap" gap="sm"><Avatar color="blue" radius="xl">{(group.fullName || group.username).charAt(0).toUpperCase()}</Avatar><div><Text fw={600} size="sm">{group.fullName || group.username} {group.fullName && <Text span c="dimmed" fw={500}>({group.username})</Text>}</Text><Text size="xs" c="dimmed">{group.accounts.length} host accounts</Text></div></Group>
           <Group gap="xs" wrap="nowrap" className="user-summary-end">
             {group.accounts.some(a => a.is_sudo) && <Badge color="orange" variant="light">Sudo</Badge>}
             {group.accounts.some(a => a.is_disabled) && <Badge color="red" variant="light">Disabled</Badge>}
@@ -152,7 +152,7 @@ function AuditLog({ data }: { data: Dashboard }) {
   return <><SectionHeading title="Activity log" description="Scans, approvals, executions, and credential downloads" />
     <Card withBorder radius="lg" p={0}><Box p="lg"><Title order={3} size="h4">Audit trail</Title><Text size="sm" c="dimmed">Most recent events across this manager</Text></Box>
       <ScrollArea><Table striped highlightOnHover miw={700} verticalSpacing="md" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>Time</Table.Th><Table.Th>Administrator</Table.Th><Table.Th>Event</Table.Th><Table.Th>Target</Table.Th>{!data.admin.desktop_mode && <Table.Th>Source</Table.Th>}</Table.Tr></Table.Thead><Table.Tbody>
-        {data.audit.map(item => <Table.Tr key={item.id}><Table.Td>{formatDate(item.created_at)}</Table.Td><Table.Td>{item.actor || 'System'}</Table.Td><Table.Td><Text fw={600} size="sm">{eventLabels[item.event] || 'Other activity'}</Text></Table.Td><Table.Td>{item.target === 'all_servers' ? 'All servers' : item.target?.startsWith('action:') ? `Request #${item.target.slice(7)}` : item.target || '—'}</Table.Td>{!data.admin.desktop_mode && <Table.Td>{item.ip_address || '—'}</Table.Td>}</Table.Tr>)}
+        {data.audit.map(item => <Table.Tr key={item.id}><Table.Td>{formatDate(item.created_at)}</Table.Td><Table.Td>{item.actor || 'System'}</Table.Td><Table.Td><Text fw={700} size="sm">{eventLabels[item.event] || 'Other activity'}</Text></Table.Td><Table.Td>{item.target === 'all_servers' ? 'All servers' : item.target?.startsWith('action:') ? `Request #${item.target.slice(7)}` : item.target || '—'}</Table.Td>{!data.admin.desktop_mode && <Table.Td>{item.ip_address || '—'}</Table.Td>}</Table.Tr>)}
       </Table.Tbody></Table></ScrollArea>{!data.audit.length && <Empty text="No activity yet" />}</Card>
   </>;
 }

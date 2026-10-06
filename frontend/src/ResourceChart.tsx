@@ -65,7 +65,7 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
         {hoverTime !== null && <line x1={x(hoverTime)} x2={x(hoverTime)} y1={top} y2={bottom} stroke="#94a3b8" strokeDasharray="3 3" />}
       </svg>
       {hoverTime !== null && populated && <div className="chart-tooltip" style={{ left: hover! > 0.5 ? 50 : undefined, right: hover! > 0.5 ? undefined : 14 }}>
-        <Text size="xs" fw={600}>{timeLabel(hoverTime)}</Text>
+        <Text size="xs" fw={700}>{timeLabel(hoverTime)}</Text>
         {hovered.map(item => <Text size="xs" key={item.label} c={item.color}>{item.label}: {item.point?.value == null ? 'N/A' : formatValue(item.point.value)}</Text>)}
       </div>}
     </div>
