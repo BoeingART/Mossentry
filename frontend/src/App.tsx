@@ -130,7 +130,7 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
       {data.actions.slice((Math.min(page, pages) - 1) * 10, Math.min(page, pages) * 10).map(action => <Card key={action.id} withBorder radius="lg" p="lg" className="approval-row">
         <Group justify="space-between" align="start" gap="md">
           <Group align="start" gap="md"><ThemeIcon variant="light" color={action.action_type === 'create_user' ? 'blue' : 'violet'} size={40} radius="md">{action.action_type === 'create_user' ? <IconUser size={20} /> : <IconKey size={20} />}</ThemeIcon><div>
-            <Group gap="xs"><Text fw={700}>#{action.id} {actionLabels[action.action_type]} · {action.target_user}</Text><Badge color={statusColors[action.status]} variant="light">{statusLabels[action.status]}</Badge></Group>
+            <Group gap="xs"><Text className="approval-title" fw={700}>#{action.id} {actionLabels[action.action_type]} · {action.target_user}</Text><Badge color={statusColors[action.status]} variant="light">{statusLabels[action.status]}</Badge></Group>
             <Text size="sm" c="dimmed" mt={3}>Target: {action.target_server}{action.action_type === 'set_sudo' ? ` · ${action.payload.sudo ? 'Grant sudo' : 'Revoke sudo'}` : ''}{action.action_type === 'create_user' ? ` · ${action.payload.sudo ? 'Sudo user' : 'Standard user'}` : ''}</Text>
             <Text size="xs" c="dimmed" mt={4}>Requested by {action.requested_by_name} · {formatDate(action.requested_at)}</Text>
           </div></Group>

@@ -1,3 +1,4 @@
+@font-face { font-family: "Open Sans"; src: url('./assets/fonts/OpenSans-Variable.ttf') format('truetype'); font-weight: 300 800; font-style: normal; font-display: swap; }
 @font-face { font-family: Poppins; src: url('./assets/fonts/Poppins-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: Poppins; src: url('./assets/fonts/Poppins-Medium.ttf') format('truetype'); font-weight: 500; font-style: normal; font-display: swap; }
 @font-face { font-family: Poppins; src: url('./assets/fonts/Poppins-SemiBold.ttf') format('truetype'); font-weight: 600 900; font-style: normal; font-display: swap; }
@@ -25,6 +26,8 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #64a3d0; outlin
 .page-heading { margin-bottom: 32px; }
 .page-heading h2, h2.page-heading { letter-spacing: -.85px; }
 .page-heading .mantine-Text-root { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.mantine-Modal-title, .mantine-Notification-title, .mantine-Alert-title, .mantine-Table-th,
+.approval-title, .chart-heading > .mantine-Text-root, .resource-chart > .mantine-Text-root:first-child { font-family: var(--mantine-font-family-headings); }
 .mantine-Title-root { color: var(--ink); letter-spacing: -.35px; }
 .mantine-Text-root { overflow-wrap: anywhere; }
 .mantine-Text-root[data-c='dimmed'] { color: var(--muted); }

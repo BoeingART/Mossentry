@@ -8,6 +8,7 @@ import './styles.css';
 import App from './App';
 
 const fontFamily = 'Poppins, "PingFang SC", "Microsoft YaHei", sans-serif';
+const headingFontFamily = '"Open Sans", "PingFang SC", "Microsoft YaHei", sans-serif';
 const theme = createTheme({
   primaryColor: 'blue',
   primaryShade: 3,
@@ -15,7 +16,7 @@ const theme = createTheme({
   black: '#101322',
   fontFamily,
   fontSizes: { xs: '0.6875rem', sm: '0.75rem', md: '0.8125rem', lg: '0.9375rem', xl: '1.125rem' },
-  headings: { fontFamily, fontWeight: '600', sizes: {
+  headings: { fontFamily: headingFontFamily, fontWeight: '600', sizes: {
     h2: { fontSize: '1.625rem', lineHeight: '1.35' },
     h3: { fontSize: '1rem', lineHeight: '1.5' },
     h4: { fontSize: '0.9375rem', lineHeight: '1.5' },
