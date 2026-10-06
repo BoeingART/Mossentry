@@ -12,7 +12,7 @@ npm run setup:backend
 npm start
 ```
 
-`npm start` builds the React interface and launches Electron. Desktop mode opens without an administrator password. To run the project checks:
+`npm start` builds the React interface and launches Electron. Desktop mode opens without an administrator password. The interface has no sign-in screen or account controls. To run the project checks:
 
 ```bash
 npm run setup:test
@@ -30,7 +30,7 @@ cd backend
 ../.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-For interface development, run `npm run dev:ui` in another terminal; Vite proxies `/api` to port 8000. Direct backend use supports administrator password sign-in.
+For interface development, run `npm run dev:ui` in another terminal; Vite proxies `/api` to port 8000. The interface is intended for the desktop app. When developing through Vite against the standalone backend, establish a session with `POST /api/login` first; administrator authentication remains available through the backend API.
 
 ## Host connections and data
 
@@ -65,7 +65,7 @@ The desktop service listens only on a random `127.0.0.1` port and requires a fre
 
 Open **Monitor** in the left navigation to see the server list. Each **Open monitor** button opens that server's main monitoring page; **Monitor** on a Servers card goes directly to the same detail page. **All monitors** returns to the list. Both desktop and narrow windows use the main content area.
 
-CPU, GPU and Memory have two-dimensional line charts with a fixed **0–100%** vertical axis and a rolling **5-minute** horizontal time axis. Each GPU has its own line. Samples start every **5 seconds**, rather than five seconds after the previous response. A slow request skips overlapping ticks. Collection stops while paused, hidden, or on another page. Ordinary failures retry on the same five-second cadence; authentication failures require resuming or reopening after signing in. Charts connect valid points across missing samples and long sampling gaps without inserting zero values; older samples move out of the window. The page omits refresh/window captions and explanatory copy. History accumulates while a server detail page is open; opening another server starts a separate history. Charts use local sample receipt time to avoid differences between server and desktop clocks.
+CPU, GPU and Memory have two-dimensional line charts with a fixed **0–100%** vertical axis and a rolling **5-minute** horizontal time axis. Each GPU has its own line. Samples start every **5 seconds**, rather than five seconds after the previous response. A slow request skips overlapping ticks. Collection stops while paused, hidden, or on another page. Ordinary failures retry on the same five-second cadence; authentication failures require reopening the desktop app before resuming. Charts connect valid points across missing samples and long sampling gaps without inserting zero values; older samples move out of the window. The page omits refresh/window captions and explanatory copy. History accumulates while a server detail page is open; opening another server starts a separate history. Charts use local sample receipt time to avoid differences between server and desktop clocks.
 
 - **CPU** shows a one-second `/proc` counter difference, a recent-sample trend, and optional filtering by effective process owner. The separate CPU-by-user table is omitted. Percentages use the whole host's logical CPU capacity (100% means all CPUs). Processes that disappear during the sample, or whose ownership changes, may be omitted.
 - **GPU** supports NVIDIA hosts with `nvidia-smi`. Each device reports utilization, temperature and framebuffer usage. Per-process SM utilization and framebuffer memory come from `pmon`, including graphics processes such as Xorg. The installed NVML driver library verifies whether missing SM readings mean no activity or an unsupported query; no additional Python package is needed. The GPU chart has horizontal utilization/memory controls. Memory is the used framebuffer percentage of each device's total capacity. Both modes reuse the full visible history; the separate GPU process cards are omitted. Select one or more usernames to restrict CPU curves and GPU utilization/memory totals; clear the selection to return to whole-host/device usage. The user selection is remembered locally and applies to the complete visible chart history.

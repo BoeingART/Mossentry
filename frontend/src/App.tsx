@@ -2,15 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type * as React from 'react';
 import {
   ActionIcon, Alert, AppShell, Avatar, Badge, Box, Burger, Button, Card, Center, Checkbox,
-  Divider, Group, Loader, Modal, Pagination, Paper, ScrollArea,
-  SegmentedControl, Select, SimpleGrid, Stack, Switch, Table, Text, TextInput, PasswordInput,
+  Group, Loader, Modal, Pagination, Paper, ScrollArea,
+  SegmentedControl, Select, SimpleGrid, Stack, Switch, Table, Text, TextInput,
   ThemeIcon, Title, Tooltip,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
   IconActivity, IconCheck, IconChevronRight, IconDownload,
-  IconEdit, IconKey, IconLock, IconPlus, IconRefresh, IconSearch, IconServer,
-  IconShieldCheck, IconShieldOff, IconUser, IconUsers,
+  IconEdit, IconKey, IconPlus, IconRefresh, IconSearch, IconServer,
+  IconShieldCheck, IconUser, IconUsers,
 } from '@tabler/icons-react';
 import { api, downloadCredentials, fetchDashboard, setCsrf } from './api';
 import type { Action, Dashboard, Server, User } from './types';
@@ -55,43 +55,6 @@ function formatDate(value: string | null | undefined) {
 function message(error: unknown) { return error instanceof Error ? error.message : 'Operation failed'; }
 function notify(text: string, error = false) {
   notifications.show({ title: error ? 'Could not complete' : 'Done', message: text, color: error ? 'red' : 'teal' });
-}
-
-function Login({ onSuccess }: { onSuccess: () => void }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  async function submit(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setError('');
-    try { await api('/api/login', 'POST', { username, password }); onSuccess(); }
-    catch (cause) { setError(message(cause)); }
-    finally { setBusy(false); }
-  }
-  return <div className="login-page">
-    <div className="login-shell">
-      <div className="login-hero">
-        <ThemeIcon size={60} radius="xl" variant="light" color="cyan"><IconServer size={31} /></ThemeIcon>
-        <div>
-          <Title order={1} mt="sm">Server Manager</Title>
-          <Text mt="lg" c="blue.1" maw={310}>One place to review hosts, manage Linux accounts, and approve access changes.</Text>
-        </div>
-      </div>
-      <div className="login-form-panel">
-        <Text size="sm" fw={700} c="blue">ADMINISTRATOR ACCESS</Text>
-        <Title order={2} mt="xs">Sign in</Title>
-        <Text c="dimmed" size="sm" mt="xs">Enter your administrator credentials to continue.</Text>
-        <form onSubmit={submit}>
-          <Stack mt="xl" gap="md">
-            <TextInput label="Username" autoComplete="username" value={username} onChange={e => setUsername(e.currentTarget.value)} required autoFocus />
-            <PasswordInput label="Password" autoComplete="current-password" value={password} onChange={e => setPassword(e.currentTarget.value)} required />
-            {error && <Alert color="red" role="alert">{error}</Alert>}
-            <Button type="submit" size="md" loading={busy} fullWidth>Sign in</Button>
-          </Stack>
-        </form>
-      </div>
-    </div>
-  </div>;
 }
 
 function Empty({ text }: { text: string }) {
@@ -186,7 +149,7 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
 }
 
 function AuditLog({ data }: { data: Dashboard }) {
-  return <><SectionHeading title="Activity log" description="Sign-ins, scans, approvals, executions, and credential downloads" />
+  return <><SectionHeading title="Activity log" description="Scans, approvals, executions, and credential downloads" />
     <Card withBorder radius="lg" p={0}><Box p="lg"><Title order={3} size="h4">Audit trail</Title><Text size="sm" c="dimmed">Most recent events across this manager</Text></Box>
       <ScrollArea><Table striped highlightOnHover miw={700} verticalSpacing="md" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>Time</Table.Th><Table.Th>Administrator</Table.Th><Table.Th>Event</Table.Th><Table.Th>Target</Table.Th>{!data.admin.desktop_mode && <Table.Th>Source</Table.Th>}</Table.Tr></Table.Thead><Table.Tbody>
         {data.audit.map(item => <Table.Tr key={item.id}><Table.Td>{formatDate(item.created_at)}</Table.Td><Table.Td>{item.actor || 'System'}</Table.Td><Table.Td><Text fw={600} size="sm">{eventLabels[item.event] || 'Other activity'}</Text></Table.Td><Table.Td>{item.target === 'all_servers' ? 'All servers' : item.target?.startsWith('action:') ? `Request #${item.target.slice(7)}` : item.target || '—'}</Table.Td>{!data.admin.desktop_mode && <Table.Td>{item.ip_address || '—'}</Table.Td>}</Table.Tr>)}
@@ -249,28 +212,9 @@ function ProfileModal({ profile, close, saved }: { profile: { username: string; 
   </Stack></form></Modal>;
 }
 
-function PasswordModal({ opened, close }: { opened: boolean; close: () => void }) {
-  const [current, setCurrent] = useState(''); const [next, setNext] = useState(''); const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
-  async function submit(event: React.FormEvent) {
-    event.preventDefault(); setError('');
-    if (next !== confirm) { setError('The new passwords do not match'); return; }
-    setBusy(true);
-    try { await api('/api/change-password', 'POST', { current_password: current, new_password: next }); close(); setCurrent(''); setNext(''); setConfirm(''); notify('Administrator password updated'); }
-    catch (cause) { setError(message(cause)); } finally { setBusy(false); }
-  }
-  return <Modal opened={opened} onClose={close} title="Change administrator password" centered radius="lg"><form onSubmit={submit}><Stack>
-    <PasswordInput label="Current password" autoComplete="current-password" value={current} onChange={e => setCurrent(e.currentTarget.value)} required />
-    <PasswordInput label="New password" description="At least 12 characters" autoComplete="new-password" value={next} onChange={e => setNext(e.currentTarget.value)} minLength={12} required />
-    <PasswordInput label="Confirm new password" autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.currentTarget.value)} minLength={12} required />
-    {error && <Alert color="red">{error}</Alert>}<Group justify="end"><Button variant="default" onClick={close}>Cancel</Button><Button type="submit" loading={busy}>Save password</Button></Group>
-  </Stack></form></Modal>;
-}
-
 export default function App() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authRequired, setAuthRequired] = useState(false);
   const [fatal, setFatal] = useState('');
   const [view, setView] = useState<View>('overview');
   const [mobileOpened, setMobileOpened] = useState(false);
@@ -278,12 +222,16 @@ export default function App() {
   const [request, setRequest] = useState<RequestDraft | null>(null);
   const [profile, setProfile] = useState<{ username: string; fullName: string } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmDraft | null>(null);
-  const [passwordOpen, setPasswordOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
   const refresh = useCallback(async () => {
-    try { const next = await fetchDashboard(); setData(next); setAuthRequired(false); setFatal(''); }
-    catch (cause) { if ((cause as { status?: number }).status === 401) { setAuthRequired(true); setData(null); setCsrf(''); } else { setFatal(message(cause)); } }
+    try { const next = await fetchDashboard(); setData(next); setFatal(''); }
+    catch (cause) {
+      if ([401, 403].includes((cause as { status?: number }).status ?? 0)) {
+        setData(null); setCsrf('');
+        setFatal('Cannot access the local service. Retry or reopen the desktop app.');
+      } else { setFatal(message(cause)); }
+    }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
@@ -332,12 +280,7 @@ export default function App() {
     try { await downloadCredentials(action.id, action.target_user); notify('Credentials downloaded. This copy cannot be downloaded again.'); await refresh(); }
     catch (cause) { notify(message(cause), true); await refresh(); }
   }
-  async function logout() {
-    try { await api('/api/logout', 'POST'); setData(null); setAuthRequired(true); setCsrf(''); }
-    catch (cause) { notify(message(cause), true); }
-  }
   if (loading) return <Center h="100vh"><Loader /></Center>;
-  if (authRequired) return <Login onSuccess={() => { void refresh(); }} />;
   if (!data) return <Center h="100vh"><Stack align="center"><Alert color="red">{fatal || 'Could not load the dashboard'}</Alert><Button onClick={() => void refresh()}>Retry</Button></Stack></Center>;
   const pending = data.actions.filter(a => a.status === 'pending').length;
   const latestScan = data.servers.filter(s => s.last_scan_status === 'ok').map(s => s.last_scan_at).filter((v): v is string => !!v).sort().at(-1);
@@ -355,9 +298,6 @@ export default function App() {
     </Group></AppShell.Header>
     <AppShell.Navbar className="sidebar" p="md">
       <Stack gap={4} mt="md">{nav.map(item => <button className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); if (item.id === 'monitor') setMonitorServerId(null); setMobileOpened(false); }}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color="orange" circle ml="auto">{pending}</Badge>}</button>)}</Stack>
-      <div className="sidebar-footer"><Divider mb="md" color="dark.4" /><Group gap="sm" mb="md"><Avatar size="sm" color="blue">{data.admin.username.charAt(0).toUpperCase()}</Avatar><div><Text size="sm" fw={700} c="white">{data.admin.username}</Text><Text size="xs" c="gray.5">Administrator</Text></div></Group>
-        {!data.admin.desktop_mode && <><button className="sidebar-link" onClick={() => setPasswordOpen(true)}><IconLock size={16} />Change password</button><button className="sidebar-link" onClick={() => void logout()}><IconShieldOff size={16} />Sign out</button></>}
-      </div>
     </AppShell.Navbar>
     <AppShell.Main className="main-area"><main className="content">
       {fatal && <Alert color="red" mb="md" withCloseButton onClose={() => setFatal('')}>{fatal}</Alert>}
@@ -369,7 +309,6 @@ export default function App() {
     </main></AppShell.Main>
     <RequestModal draft={request} servers={data.servers} close={() => setRequest(null)} saved={refresh} />
     <ProfileModal profile={profile} close={() => setProfile(null)} saved={refresh} />
-    <PasswordModal opened={passwordOpen} close={() => setPasswordOpen(false)} />
     <Modal opened={!!confirm} onClose={() => !busy && setConfirm(null)} title={confirm?.title} centered radius="lg" closeOnClickOutside={!busy} closeOnEscape={!busy}>
       <Stack><Text size="sm">{confirm?.message}</Text><Group justify="end"><Button variant="default" disabled={busy} onClick={() => setConfirm(null)}>Cancel</Button><Button color="blue" loading={busy} onClick={() => void runConfirm()}>{confirm?.title.startsWith('Reject') ? 'Reject' : 'Confirm and run'}</Button></Group></Stack>
     </Modal>
