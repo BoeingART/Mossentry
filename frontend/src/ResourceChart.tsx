@@ -36,7 +36,7 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
     return { label: item.label, color: item.color, point: point && Math.abs(point.time - hoverTime) <= 5_000 ? point : null };
   });
   return <Paper withBorder radius="lg" p="lg" className="resource-chart">
-    <Group justify="space-between" wrap="nowrap" gap="xs" mih={30}><Text fw={700}>{title}</Text>{control}</Group>
+    <Group justify="space-between" wrap="nowrap" gap="xs" mih={30}><Text fw={500}>{title}</Text>{control}</Group>
     <div ref={ref} className="resource-chart-plot">
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label={`${title} chart`}
         onPointerLeave={() => setHover(null)} onPointerMove={event => {
@@ -46,15 +46,15 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
         <title>{title}</title>
         <defs><clipPath id={clipId}><rect x={left} y={top - 3} width={plotWidth} height={bottom - top + 6} /></clipPath></defs>
         {[0, 0.25, 0.5, 0.75, 1].map(fraction => fraction * maximum).map(value => <g key={value}>
-          <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#e7edf4" strokeDasharray={value ? '4 4' : undefined} />
+          <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#e7e8e3" strokeDasharray={value ? '4 4' : undefined} />
           <text x={left - 9} y={y(value) + 4} textAnchor="end" className="chart-axis-label">{formatTick(value)}</text>
         </g>)}
         {Array.from({ length: tickCount + 1 }, (_, index) => {
           const time = end - WINDOW_MS + WINDOW_MS * index / tickCount;
-          return <g key={index}><line x1={x(time)} x2={x(time)} y1={top} y2={bottom} stroke="#f0f3f7" />
+          return <g key={index}><line x1={x(time)} x2={x(time)} y1={top} y2={bottom} stroke="#f1f2ef" />
             <text x={x(time)} y={bottom + 23} textAnchor={index === 0 ? 'start' : index === tickCount ? 'end' : 'middle'} className="chart-axis-label">{timeLabel(time)}</text></g>;
         })}
-        <line x1={left} x2={left} y1={top} y2={bottom} stroke="#cad4e2" />
+        <line x1={left} x2={left} y1={top} y2={bottom} stroke="#d4d6d0" />
         <g clipPath={`url(#${clipId})`}>{segments.map(item => <g key={item.id}>
           {item.segments.map((segment, index) => <g key={index}>
             <polyline points={segment.map(point => `${x(point.time)},${y(point.value!)}`).join(' ')} fill="none" stroke={item.color} strokeWidth={2.3} strokeLinejoin="round" />
@@ -62,7 +62,7 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
           </g>)}
         </g>)}</g>
         {!populated && <text x={left + plotWidth / 2} y={(top + bottom) / 2} textAnchor="middle" className="chart-empty-label">{emptyMessage}</text>}
-        {hoverTime !== null && <line x1={x(hoverTime)} x2={x(hoverTime)} y1={top} y2={bottom} stroke="#94a3b8" strokeDasharray="3 3" />}
+        {hoverTime !== null && <line x1={x(hoverTime)} x2={x(hoverTime)} y1={top} y2={bottom} stroke="#9b9e94" strokeDasharray="3 3" />}
       </svg>
       {hoverTime !== null && populated && <div className="chart-tooltip" style={{ left: hover! > 0.5 ? 50 : undefined, right: hover! > 0.5 ? undefined : 14 }}>
         <Text size="xs" fw={600}>{timeLabel(hoverTime)}</Text>
