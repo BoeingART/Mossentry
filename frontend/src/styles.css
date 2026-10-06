@@ -66,3 +66,5 @@ button { cursor: pointer; }
 .disk-chart-bar::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(to right, transparent 0, transparent calc(25% - 1px), #ffffffbb calc(25% - 1px), #ffffffbb 25%); pointer-events: none; }
 .disk-chart-fill { height: 100%; transition: width .2s ease; }
 .disk-chart-bar-unknown { background: repeating-linear-gradient(135deg, #edf2f7, #edf2f7 6px, #f8fafc 6px, #f8fafc 12px); }
+
+.monitor-network { grid-column: 1 / -1; min-width: 0; }

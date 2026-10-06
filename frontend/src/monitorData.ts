@@ -43,14 +43,26 @@ export function gpuMemoryPercent(device: GpuDevice | undefined, selected: string
   return used === null ? null : 100 * used / device.memory_total_mb;
 }
 
-export function chartSegments(points: ChartPoint[], end: number): ChartPoint[][] {
+export function chartSegments(points: ChartPoint[], end: number, maximum = 100): ChartPoint[][] {
   // Join all measured points in the window, skipping missing samples without inserting zeros.
   const connected = points.filter(point => point.time >= end - WINDOW_MS && point.time <= end
     && point.value !== null && Number.isFinite(point.value))
-    .map(point => ({ ...point, value: Math.min(100, Math.max(0, point.value!)) }));
+    .map(point => ({ ...point, value: Math.min(maximum, Math.max(0, point.value!)) }));
   return connected.length ? [connected] : [];
 }
 
 export function timePosition(time: number, end: number) {
   return (time - (end - WINDOW_MS)) / WINDOW_MS;
+}
+
+export function formatRate(value: number): string {
+  const units = ['B/s', 'KiB/s', 'MiB/s', 'GiB/s', 'TiB/s'];
+  let scaled = Math.max(0, value), unit = 0;
+  while (scaled >= 1024 && unit < units.length - 1) { scaled /= 1024; unit++; }
+  return `${scaled.toFixed(unit ? 1 : 0)} ${units[unit]}`;
+}
+
+export function rateMaximum(values: (number | null)[]): number {
+  const peak = Math.max(1024, ...values.filter((value): value is number => value !== null && Number.isFinite(value)));
+  return 2 ** Math.ceil(Math.log2(peak));
 }

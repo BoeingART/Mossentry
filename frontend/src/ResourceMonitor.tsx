@@ -5,6 +5,7 @@ import { IconActivity, IconArrowLeft, IconArrowRight, IconPlayerPause, IconPlaye
 import { api } from './api';
 import type { Dashboard, ResourceMetrics, Server } from './types';
 import ResourceChart from './ResourceChart';
+import NetworkChart from './NetworkChart';
 import PhysicalDiskChart from './PhysicalDiskChart';
 import { appendSample, cpuPercent, gpuPercent, gpuMemoryPercent, REFRESH_MS, WINDOW_MS } from './monitorData';
 import type { GpuDevice, HistorySample } from './monitorData';
@@ -104,6 +105,7 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
           points: recent.map(point => ({ time: point.time, value: point.sample?.memory.percent ?? null })) }]}
         emptyMessage={paused ? 'Paused' : 'No data'} />
       <PhysicalDiskChart disks={sample?.disks ?? []} loading={!sample} />
+      <div className="monitor-network"><NetworkChart sample={sample} history={recent} end={clock} paused={paused} /></div>
     </div>
   </Stack>;
 }

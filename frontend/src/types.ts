@@ -47,6 +47,10 @@ export type ResourceMetrics = {
   cpu: { percent: number; cores: number; users: { username: string; cpu_percent: number; processes: number }[] };
   memory: { total_mb: number; used_mb: number; percent: number };
   disks: PhysicalDiskGroup[];
+  network?: {
+    status: 'ok' | 'unavailable';
+    interfaces: { name: string; rx_bytes_per_second: number | null; tx_bytes_per_second: number | null }[];
+  };
   gpu: {
     status: 'ok' | 'unavailable' | 'error'; message: string;
     devices: {

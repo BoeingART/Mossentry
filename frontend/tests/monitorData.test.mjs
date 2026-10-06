@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { appendSample, chartSegments, cpuPercent, gpuPercent, gpuMemoryPercent, REFRESH_MS, timePosition, WINDOW_MS } from '../src/monitorData.ts';
+import { appendSample, chartSegments, cpuPercent, gpuPercent, gpuMemoryPercent, formatRate, rateMaximum, REFRESH_MS, timePosition, WINDOW_MS } from '../src/monitorData.ts';
 
 test('five-second sampling retains exactly the rolling five-minute interval', () => {
   assert.equal(REFRESH_MS, 5000);
@@ -91,4 +91,18 @@ test('GPU memory uses device capacity and preserves user filtering and unavailab
   assert.equal(gpuMemoryPercent({ ...device, memory_used_mb: null }, []), null);
   assert.equal(gpuMemoryPercent({ ...device, process_memory_available: false }, ['missing']), null);
   assert.equal(gpuMemoryPercent(undefined, []), null);
+});
+
+
+test('network units and dynamic range preserve rates above 100 across missing samples', () => {
+  assert.equal(formatRate(0), '0 B/s');
+  assert.equal(formatRate(512), '512 B/s');
+  assert.equal(formatRate(1536), '1.5 KiB/s');
+  assert.equal(formatRate(1048576), '1.0 MiB/s');
+  assert.equal(formatRate(1073741824), '1.0 GiB/s');
+  assert.equal(rateMaximum([null, 0, Number.NaN]), 1024);
+  const maximum = rateMaximum([2000000, 1000000]);
+  assert.equal(maximum, 2097152);
+  assert.deepEqual(chartSegments([{ time: 0, value: 1000000 }, { time: 5000, value: null },
+    { time: 15000, value: 2000000 }], 15000, maximum), [[{ time: 0, value: 1000000 }, { time: 15000, value: 2000000 }]]);
 });

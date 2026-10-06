@@ -200,6 +200,53 @@ class ResourceProbeTests(unittest.TestCase):
         self.assertTrue(warnings)
 
 
+class NetworkProbeTests(unittest.TestCase):
+    def test_reads_receive_and_transmit_bytes_without_loopback(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            proc = root / 'netdev'
+            proc.write_text('Inter-| Receive | Transmit\n'
+                            'lo: 999 0 0 0 0 0 0 0 999 0 0 0 0 0 0 0\n'
+                            'eth0: 1048576 25 0 0 0 0 0 0 2048 10 0 0 0 0 0 0\n'
+                            'bad: invalid\n')
+            (root / 'eth0/device').mkdir(parents=True)
+            (root / 'eth0/ifindex').write_text('2')
+            (root / 'eth0/operstate').write_text('up')
+            with patch.object(probe.time, 'monotonic', return_value=10):
+                timestamp, interfaces = probe.network_snapshot(proc, root)
+        self.assertEqual(timestamp, 10)
+        self.assertEqual(interfaces, {'eth0': {'identity': 2, 'rx': 1048576, 'tx': 2048, 'physical': True, 'up': True}})
+
+    def test_rates_use_actual_elapsed_time_and_prefer_active_hardware(self):
+        ethernet = {'identity': 2, 'rx': 1000, 'tx': 2000, 'physical': True, 'up': True}
+        bridge = {**ethernet, 'identity': 3, 'physical': False}
+        before = (10, {'eth0': ethernet, 'br0': bridge})
+        after = (12, {'eth0': {**ethernet, 'rx': 9000, 'tx': 4000}, 'br0': bridge})
+        result = probe.network_usage(before, after)
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(result['interfaces'], [
+            {'name': 'eth0', 'rx_bytes_per_second': 4000, 'tx_bytes_per_second': 1000},
+            {'name': 'br0', 'rx_bytes_per_second': 0, 'tx_bytes_per_second': 0},
+        ])
+
+    def test_counter_resets_new_interfaces_and_replaced_devices_are_unknown(self):
+        device = {'identity': 2, 'rx': 1000, 'tx': 2000, 'physical': True, 'up': True}
+        before = (10, {'eth0': device, 'removed': device})
+        after = (11, {'eth0': {**device, 'rx': 10, 'tx': 3000}, 'new': device})
+        result = probe.network_usage(before, after)['interfaces']
+        self.assertEqual(result[0], {'name': 'eth0', 'rx_bytes_per_second': None, 'tx_bytes_per_second': 1000})
+        self.assertEqual(result[1], {'name': 'new', 'rx_bytes_per_second': None, 'tx_bytes_per_second': None})
+        replaced = probe.network_usage(before, (11, {'eth0': {**device, 'identity': 4}}))['interfaces'][0]
+        self.assertIsNone(replaced['rx_bytes_per_second'])
+        self.assertIsNone(replaced['tx_bytes_per_second'])
+
+    def test_unavailable_counters_do_not_fail_other_metrics_or_report_zero(self):
+        with patch.object(probe.Path, 'read_text', side_effect=PermissionError):
+            self.assertIsNone(probe.network_snapshot())
+        for before, after in [(None, (1, {})), ((1, {}), None), ((1, {}), (1, {}))]:
+            self.assertEqual(probe.network_usage(before, after), {'status': 'unavailable', 'interfaces': []})
+
+
 class NvmlProcessTests(unittest.TestCase):
     def library(self, read):
         return Mock(nvmlInit_v2=Mock(return_value=0),

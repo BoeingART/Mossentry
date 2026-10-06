@@ -88,6 +88,52 @@ def read_optional(path):
         return ''
 
 
+def network_snapshot(proc=Path('/proc/net/dev'), root=Path('/sys/class/net')):
+    try:
+        content = proc.read_text()
+        sampled_at = time.monotonic()
+    except OSError:
+        return None
+    interfaces = {}
+    for line in content.splitlines():
+        if ':' not in line:
+            continue
+        name, values = line.rsplit(':', 1)
+        name, fields = name.strip(), values.split()
+        if name == 'lo' or len(fields) < 16:
+            continue
+        try:
+            received, sent = int(fields[0]), int(fields[8])
+            identity = int((root / name / 'ifindex').read_text())
+            if min(received, sent) < 0:
+                continue
+        except (OSError, ValueError):
+            continue
+        interfaces[name] = {'identity': identity, 'rx': received, 'tx': sent,
+                            'physical': (root / name / 'device').exists(),
+                            'up': read_optional(root / name / 'operstate') == 'up'}
+    return sampled_at, interfaces
+
+
+def network_usage(before, after):
+    if before is None or after is None or after[0] <= before[0]:
+        return {'status': 'unavailable', 'interfaces': []}
+    elapsed = after[0] - before[0]
+    interfaces = []
+    # Prefer an active hardware interface; expose each interface separately so
+    # bridges, bonds and their members cannot double-count a server-wide total.
+    ordered = sorted(after[1].items(), key=lambda pair: (not pair[1]['up'], not pair[1]['physical'], pair[0]))
+    for name, current in ordered:
+        previous = before[1].get(name)
+        valid = previous and previous['identity'] == current['identity']
+        def rate(direction):
+            if not valid or current[direction] < previous[direction]:
+                return None  # Interface replacement or counter reset.
+            return round((current[direction] - previous[direction]) / elapsed, 2)
+        interfaces.append({'name': name, 'rx_bytes_per_second': rate('rx'), 'tx_bytes_per_second': rate('tx')})
+    return {'status': 'ok', 'interfaces': interfaces}
+
+
 def block_topology(root=Path('/sys/class/block')):
     """Resolve partitions and stacked devices to server-visible hardware disks."""
     nodes, physical = {}, {}
@@ -405,7 +451,9 @@ def gpu_usage():
 
 def collect():
     before = cpu_snapshot()
+    network_before = network_snapshot()
     time.sleep(1)
+    network = network_usage(network_before, network_snapshot())
     after = cpu_snapshot()
     cpu = cpu_usage(before, after)
     warnings = []
@@ -427,7 +475,7 @@ def collect():
         warnings.append('Some GPU process owners are unavailable and cannot be included in a user filter.')
     return {'checked_at': datetime.now(timezone.utc).isoformat(), 'cpu': cpu,
             'memory': {'total_mb': round(total / 1024), 'used_mb': round(used / 1024), 'percent': round(100 * used / max(total, 1), 1)},
-            'disks': disk_groups, 'gpu': gpu, 'warnings': warnings}
+            'disks': disk_groups, 'gpu': gpu, 'network': network, 'warnings': warnings}
 
 
 if __name__ == '__main__':

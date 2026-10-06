@@ -5,10 +5,13 @@ import { chartSegments, timePosition, WINDOW_MS } from './monitorData';
 import type { ChartPoint } from './monitorData';
 
 export type ChartSeries = { id: string; label: string; color: string; points: ChartPoint[]; current: number | null };
+const percentLabel = (value: number) => `${value.toFixed(1)}%`;
+const percentTick = (value: number) => `${value}%`;
 const timeLabel = (time: number) => new Date(time).toLocaleTimeString([], { hour12: false });
 
-export default function ResourceChart({ title, control, series, end, emptyMessage }: {
+export default function ResourceChart({ title, control, series, end, emptyMessage, maximum = 100, formatValue = percentLabel, formatTick = percentTick, axisWidth = 46 }: {
   title: string; control?: ReactNode; series: ChartSeries[]; end: number; emptyMessage: string;
+  maximum?: number; formatValue?: (value: number) => string; formatTick?: (value: number) => string; axisWidth?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(560);
@@ -19,11 +22,11 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, []);
-  const left = 46, right = 14, top = 20, bottom = 224, height = 262;
+  const left = axisWidth, right = 14, top = 20, bottom = 224, height = 262;
   const plotWidth = width - left - right;
   const x = (time: number) => left + timePosition(time, end) * plotWidth;
-  const y = (value: number) => bottom - value / 100 * (bottom - top);
-  const segments = series.map(item => ({ ...item, segments: chartSegments(item.points, end) }));
+  const y = (value: number) => bottom - value / maximum * (bottom - top);
+  const segments = series.map(item => ({ ...item, segments: chartSegments(item.points, end, maximum) }));
   const populated = segments.some(item => item.segments.length > 0);
   const tickCount = width < 460 ? 2 : 5;
   const hoverTime = hover === null ? null : end - WINDOW_MS + hover * WINDOW_MS;
@@ -42,9 +45,9 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
         }}>
         <title>{title}</title>
         <defs><clipPath id={clipId}><rect x={left} y={top - 3} width={plotWidth} height={bottom - top + 6} /></clipPath></defs>
-        {[0, 25, 50, 75, 100].map(value => <g key={value}>
+        {[0, 0.25, 0.5, 0.75, 1].map(fraction => fraction * maximum).map(value => <g key={value}>
           <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#e7edf4" strokeDasharray={value ? '4 4' : undefined} />
-          <text x={left - 9} y={y(value) + 4} textAnchor="end" className="chart-axis-label">{value}%</text>
+          <text x={left - 9} y={y(value) + 4} textAnchor="end" className="chart-axis-label">{formatTick(value)}</text>
         </g>)}
         {Array.from({ length: tickCount + 1 }, (_, index) => {
           const time = end - WINDOW_MS + WINDOW_MS * index / tickCount;
@@ -63,12 +66,12 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
       </svg>
       {hoverTime !== null && populated && <div className="chart-tooltip" style={{ left: hover! > 0.5 ? 50 : undefined, right: hover! > 0.5 ? undefined : 14 }}>
         <Text size="xs" fw={600}>{timeLabel(hoverTime)}</Text>
-        {hovered.map(item => <Text size="xs" key={item.label} c={item.color}>{item.label}: {item.point?.value == null ? 'N/A' : `${item.point.value.toFixed(1)}%`}</Text>)}
+        {hovered.map(item => <Text size="xs" key={item.label} c={item.color}>{item.label}: {item.point?.value == null ? 'N/A' : formatValue(item.point.value)}</Text>)}
       </div>}
     </div>
     <Group gap="md">{series.map(item => <Group gap={6} key={item.id} wrap="nowrap">
       <span style={{ background: item.color, width: 9, height: 9, borderRadius: '50%', flexShrink: 0 }} />
-      <Text size="xs">{item.label}</Text><Text size="xs" fw={700}>{item.current === null ? 'N/A' : `${item.current.toFixed(1)}%`}</Text>
+      <Text size="xs">{item.label}</Text><Text size="xs" fw={700}>{item.current === null ? 'N/A' : formatValue(item.current)}</Text>
     </Group>)}</Group>
   </Paper>;
 }
