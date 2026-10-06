@@ -8,7 +8,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-  IconActivity, IconCheck, IconChevronRight, IconDownload,
+  IconActivity, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
   IconEdit, IconKey, IconSearch, IconServer,
   IconShieldCheck, IconUser, IconUsers,
 } from '@tabler/icons-react';
@@ -16,8 +16,9 @@ import { api, downloadCredentials, fetchDashboard, setCsrf } from './api';
 import type { Action, Dashboard, Server, User } from './types';
 import Servers from './Servers';
 import ResourceMonitor from './ResourceMonitor';
+import DashboardPage from './DashboardPage';
 
-type View = 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
+type View = 'dashboard' | 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
 type UserAction = 'disable_user' | 'enable_user' | 'set_sudo' | 'delete_user';
 type RequestDraft = { mode: 'create_user' | UserAction; username: string; server?: string; sudo: boolean };
 type ConfirmDraft = { title: string; message: string; run: () => Promise<void> };
@@ -216,7 +217,7 @@ export default function App() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatal, setFatal] = useState('');
-  const [view, setView] = useState<View>('overview');
+  const [view, setView] = useState<View>('dashboard');
   const [mobileOpened, setMobileOpened] = useState(false);
   const [monitorServerId, setMonitorServerId] = useState<number | null>(null);
   const [request, setRequest] = useState<RequestDraft | null>(null);
@@ -276,6 +277,7 @@ export default function App() {
   if (!data) return <Center h="100vh"><Stack align="center"><Alert color="red">{fatal || 'Could not load the dashboard'}</Alert><Button onClick={() => void refresh()}>Retry</Button></Stack></Center>;
   const pending = data.actions.filter(a => a.status === 'pending').length;
   const nav: { id: View; label: string; icon: React.ReactNode }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: <IconLayoutDashboard size={19} /> },
     { id: 'overview', label: 'Servers', icon: <IconServer size={19} /> },
     { id: 'monitor', label: 'Monitor', icon: <IconActivity size={19} /> },
     { id: 'users', label: 'Users & access', icon: <IconUsers size={19} /> },
@@ -287,10 +289,12 @@ export default function App() {
       <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
     </AppShell.Header>
     <AppShell.Navbar className="sidebar" p="md">
+      <div className="sidebar-brand"><IconServer size={23} /><span>Server Manager</span></div>
       <Stack component="nav" aria-label="Main navigation" gap={8} mt="lg">{nav.map(item => <button type="button" aria-current={view === item.id ? 'page' : undefined} className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); if (item.id === 'monitor') setMonitorServerId(null); setMobileOpened(false); }}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color="gray" circle ml="auto">{pending}</Badge>}</button>)}</Stack>
     </AppShell.Navbar>
     <AppShell.Main className="main-area"><main className="content">
       {fatal && <Alert color="red" mb="md" withCloseButton onClose={() => setFatal('')}>{fatal}</Alert>}
+      {view === 'dashboard' && <DashboardPage data={data} refresh={refresh} openServers={() => setView('overview')} />}
       {view === 'overview' && <Servers data={data} saved={refresh} monitor={server => { setMonitorServerId(server.id); setView('monitor'); }} />}
       {view === 'monitor' && <ResourceMonitor data={data} serverId={monitorServerId} selectServer={setMonitorServerId} />}
       {view === 'users' && <Users data={data} openRequest={setRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}

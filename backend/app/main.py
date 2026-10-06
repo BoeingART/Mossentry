@@ -20,6 +20,7 @@ from .db import audit, connect, create_session, execute, get_session, init_db, n
 from .models import USERNAME_RE, CreateUserRequest, LoginRequest, PasswordChangeRequest, UserActionRequest, UserProfileUpdate, ServerRequest
 from .errors import friendly_error
 from .security import hash_password, verify_password
+from .user_history import statistics
 
 app = FastAPI(title="Server Manager", docs_url=None, redoc_url=None)
 DESKTOP_TOKEN = os.environ.get("SRVMGR_DESKTOP_TOKEN", "")
@@ -135,7 +136,9 @@ def dashboard(session: dict[str, Any] = Depends(current_admin)) -> dict[str, Any
     for server in servers:
         server["last_scan_error"] = friendly_error(server["last_scan_error"])
     users = rows(
-        """SELECT su.*, s.name AS server, COALESCE(up.full_name, '') AS full_name
+        """SELECT su.server_id,su.username,su.uid,su.gid,su.home,su.shell,
+        su.is_sudo,su.is_disabled,su.scanned_at,
+        s.name AS server, COALESCE(up.full_name, '') AS full_name
         FROM server_users su
         JOIN servers s ON s.id=su.server_id
         LEFT JOIN user_profiles up ON up.username=su.username
@@ -161,9 +164,12 @@ def dashboard(session: dict[str, Any] = Depends(current_admin)) -> dict[str, Any
     for log in logs:
         log.pop("details_json")
         log["details"] = {}
+    with connect() as conn:
+        dashboard_statistics = statistics(conn, now())
     return {
         "admin": {"username": session["username"], "csrf": session["csrf_token"], "desktop_mode": bool(DESKTOP_TOKEN)},
         "servers": servers, "users": users, "actions": actions, "audit": logs,
+        "statistics": dashboard_statistics,
     }
 
 

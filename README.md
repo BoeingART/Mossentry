@@ -56,6 +56,17 @@ The desktop service listens only on a random `127.0.0.1` port and requires a fre
 
 ## Management workflows
 
+The app opens on **Dashboard**. Performance plots cumulative unique usernames
+from their recorded creation dates, with all-time and shorter time ranges.
+All synced accounts count, including root, system accounts and SSH management
+accounts; the same username on multiple hosts counts once. Log dates take
+precedence over home-directory birth-time estimates. Accounts without a usable
+full date count in the total but are reported separately from the timeline.
+The local username history survives account deletion and server removal.
+Accounts by server and Access overview show the current cached account lists.
+Old account caches are backfilled into history on startup; sync servers to
+collect missing creation dates and any system accounts older scans omitted.
+
 - **Servers**: test a single SSH connection, sync its accounts, or read uptime, load, memory and root-disk usage. **Sync all** refreshes enabled servers. Pausing a server excludes it from remote operations.
 - **Users & access**: filter by server, create accounts, enable/disable interactive login, grant/revoke sudo membership, edit local display names, and request account deletion. Deletion requires typing the username and approval, keeps the home directory and files, and does not force-terminate sessions. System accounts and SSH management accounts are protected locally and checked again on the remote host.
 - Pending requests must be handled before a server can be edited or removed. Removing a server removes only its local configuration and cached account list; remote accounts and files and local operation history are retained. Connection changes invalidate cached accounts. Remote operations are serialized with configuration changes.
