@@ -54,23 +54,19 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #64a3d0; outlin
 .filter-toolbar { padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); gap: 12px; }
 .filter-toolbar .mantine-TextInput-root { flex: 1; min-width: min(100%, 210px); max-width: 310px; }
 .filter-toolbar > .mantine-Text-root:last-child { margin-left: auto; font-size: 11px; }
-.host-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
-.host-card {
-  min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 296px; column-gap: 32px;
-  padding: 24px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; overflow: visible;
-}
-.host-heading { grid-column: 1; grid-row: 1; }
+.host-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 18px; align-items: stretch; }
+.host-card { min-width: 0; display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--line); border-radius: 14px; }
 .host-heading .mantine-Title-root { font-size: 13px; font-weight: 500; }
-.host-heading > .mantine-Group-root:last-child { margin-left: auto; }
 .host-heading > .mantine-ThemeIcon-root { background: #e5eaf2; }
-.host-card:nth-child(3n+2) .host-heading > .mantine-ThemeIcon-root { background: #faead4; }
-.host-card:nth-child(3n) .host-heading > .mantine-ThemeIcon-root { background: #f1f2f4; }
-.host-accounts { grid-column: 1; margin-left: 52px; margin-top: 8px; }
-.host-accounts .mantine-Text-root { font-size: 11px; }
-.host-sync { grid-column: 1; margin-left: 52px; }
-.host-ssh { grid-column: 1; margin-left: 52px; }
-.server-actions { grid-column: 2; grid-row: 1 / span 4; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-self: center; margin-top: 0; gap: 8px; }
-.server-actions .mantine-Button-root { width: 100%; height: 31px; padding: 0 8px; font-size: 10px; }
+.host-accounts .mantine-Text-root { font-size: 12px; }
+.server-connection { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; flex-shrink: 0; border: 1px solid currentColor; border-radius: 50%; }
+.server-connection.connected { color: #348c72; background: #f0faf7; }
+.server-connection.failed { color: #c34750; background: #fff4f4; }
+.server-connection.unknown { color: #9698a0; background: #fafafa; }
+.server-connection:focus-visible { outline: 2px solid #64a3d0; outline-offset: 3px; }
+.server-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: auto; gap: 8px; }
+.server-actions .mantine-Button-root { width: 100%; height: 32px; padding: 0 8px; border-radius: 8px; font-size: 11px; }
+.server-actions .mantine-Button-root:disabled { color: #bcbec4; background: #fafafa; border-color: #f0f0f3; cursor: not-allowed; }
 .monitor-host-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 22px; }
 .monitor-host-card { padding: 22px; border-radius: 12px; }
 .monitor-host-card .mantine-Title-root { font-size: 14px; font-weight: 500; }
@@ -112,13 +108,9 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #64a3d0; outlin
 .monitor-network { grid-column: 1 / -1; min-width: 0; }
 @media (max-width: 1150px) {
   .content { padding-inline: 30px; }
-  .host-card { grid-template-columns: minmax(0, 1fr) 264px; column-gap: 22px; }
-  .server-actions { gap: 5px; }
   .monitor-chart-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 900px) {
-  .host-card { grid-template-columns: minmax(0, 1fr); }
-  .server-actions { grid-column: 1; grid-row: auto; width: min(100%, 320px); margin-left: 52px; margin-top: 18px; }
   .filter-toolbar .mantine-SegmentedControl-root { max-width: 100%; }
   .approval-controls { width: 100%; justify-content: flex-end; }
 }
@@ -127,7 +119,6 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #64a3d0; outlin
   .page-heading h2, h2.page-heading { font-size: 23px; }
   .filter-toolbar .mantine-TextInput-root { flex-basis: 100%; max-width: none; width: 100%; }
   .filter-toolbar > .mantine-Text-root:last-child { margin-left: 0; }
-  .server-actions { margin-left: 0; width: 100%; }
   .user-group > summary > .mantine-Group-root { padding-inline: 14px; }
   .user-summary-end .mantine-Badge-root { display: none; }
 }
