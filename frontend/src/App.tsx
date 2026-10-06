@@ -9,7 +9,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import {
   IconActivity, IconCheck, IconChevronRight, IconDownload,
-  IconEdit, IconKey, IconPlus, IconRefresh, IconSearch, IconServer,
+  IconEdit, IconKey, IconSearch, IconServer,
   IconShieldCheck, IconUser, IconUsers,
 } from '@tabler/icons-react';
 import { api, downloadCredentials, fetchDashboard, setCsrf } from './api';
@@ -62,7 +62,7 @@ function Empty({ text }: { text: string }) {
 }
 
 function SectionHeading({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) {
-  return <Group justify="space-between" align="start" mb="lg" gap="md">
+  return <Group className="page-heading" justify="space-between" align="center" mb="lg" gap="md">
     <div><Title order={2}>{title}</Title><Text c="dimmed" size="sm" mt={4}>{description}</Text></div>{action}
   </Group>;
 }
@@ -89,7 +89,7 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
   return <>
     <SectionHeading title="Users & access" description="Accounts grouped by Linux username" />
     {data.servers.some(s => s.enabled && ['error', 'failed'].includes(s.last_scan_status || '')) && <Alert color="orange" mb="md">Some servers could not sync. Their displayed accounts may be out of date. Sync those servers before making further changes.</Alert>}
-    <Group mb="lg" justify="space-between" gap="sm">
+    <Group className="filter-toolbar" mb="lg" justify="space-between" gap="sm">
       <TextInput leftSection={<IconSearch size={16} />} placeholder="Search a user or host" value={search} onChange={e => { setSearch(e.currentTarget.value); setPage(1); }} w={{ base: '100%', sm: 290 }} />
       <Select aria-label="Filter by server" value={host} allowDeselect={false} onChange={value => { setHost(value); setPage(1); }} data={[{ value: 'all', label: 'All servers' }, ...data.servers.map(s => ({ value: s.name, label: s.name }))]} /><SegmentedControl value={filter} onChange={value => { setFilter(value); setPage(1); }} data={['Enabled', 'Sudo', 'Disabled', 'All'].map(label => ({ label, value: label.toLowerCase() }))} />
     </Group>
@@ -97,7 +97,7 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
       <Box p="lg"><Title order={3} size="h4">Server users</Title><Text size="sm" c="dimmed">Expand a user to review accounts and permissions on each host.</Text></Box>
       {shown.length ? shown.map(group => <details className="user-group" key={group.username}>
         <summary><Group justify="space-between" wrap="nowrap" p="md" gap="sm">
-          <Group wrap="nowrap" gap="sm"><Avatar color="blue" radius="xl">{(group.fullName || group.username).charAt(0).toUpperCase()}</Avatar><div><Text fw={700} size="sm">{group.fullName || group.username} {group.fullName && <Text span c="dimmed" fw={400}>({group.username})</Text>}</Text><Text size="xs" c="dimmed">{group.accounts.length} host accounts</Text></div></Group>
+          <Group wrap="nowrap" gap="sm"><Avatar color="blue" radius="xl">{(group.fullName || group.username).charAt(0).toUpperCase()}</Avatar><div><Text fw={500} size="sm">{group.fullName || group.username} {group.fullName && <Text span c="dimmed" fw={400}>({group.username})</Text>}</Text><Text size="xs" c="dimmed">{group.accounts.length} host accounts</Text></div></Group>
           <Group gap="xs" wrap="nowrap" className="user-summary-end">
             {group.accounts.some(a => a.is_sudo) && <Badge color="orange" variant="light">Sudo</Badge>}
             {group.accounts.some(a => a.is_disabled) && <Badge color="red" variant="light">Disabled</Badge>}
@@ -111,7 +111,7 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
             const protectedAccount = account.uid < 1000 || ['root', 'srvmgr', 'nobody', server?.ssh_user].includes(account.username);
             return <Table.Tr key={`${account.server}:${account.username}`}>
             <Table.Td><Badge variant="light" color="blue">{account.server}</Badge></Table.Td><Table.Td><Badge variant="light" color={account.is_sudo ? 'orange' : 'gray'}>{account.is_sudo ? 'Sudo' : 'Standard'}</Badge></Table.Td><Table.Td><Badge variant="light" color={account.is_disabled ? 'red' : 'teal'}>{account.is_disabled ? 'Disabled' : 'Enabled'}</Badge></Table.Td>
-            <Table.Td>{protectedAccount ? <Text size="xs" c="dimmed">Protected account</Text> : !server?.enabled ? <Text size="xs" c="dimmed">Server paused</Text> : <Group gap="xs" wrap="nowrap"><Button size="compact-xs" variant="light" color={account.is_disabled ? 'teal' : 'orange'} onClick={() => openRequest({ mode: account.is_disabled ? 'enable_user' : 'disable_user', username: account.username, server: account.server, sudo: false })}>{account.is_disabled ? 'Enable' : 'Disable'}</Button><Button size="compact-xs" variant="light" onClick={() => openRequest({ mode: 'set_sudo', username: account.username, server: account.server, sudo: !account.is_sudo })}>{account.is_sudo ? 'Revoke sudo' : 'Grant sudo'}</Button><Button size="compact-xs" color="red" variant="subtle" onClick={() => openRequest({ mode: 'delete_user', username: account.username, server: account.server, sudo: false })}>Delete</Button></Group>}</Table.Td>
+            <Table.Td>{protectedAccount ? <Text size="xs" c="dimmed">Protected account</Text> : !server?.enabled ? <Text size="xs" c="dimmed">Server paused</Text> : <Group className="account-actions" gap="xs" wrap="nowrap"><Button size="compact-xs" variant="light" color={account.is_disabled ? 'teal' : 'orange'} onClick={() => openRequest({ mode: account.is_disabled ? 'enable_user' : 'disable_user', username: account.username, server: account.server, sudo: false })}>{account.is_disabled ? 'Enable' : 'Disable'}</Button><Button size="compact-xs" variant="light" onClick={() => openRequest({ mode: 'set_sudo', username: account.username, server: account.server, sudo: !account.is_sudo })}>{account.is_sudo ? 'Revoke sudo' : 'Grant sudo'}</Button><Button size="compact-xs" color="red" variant="light" onClick={() => openRequest({ mode: 'delete_user', username: account.username, server: account.server, sudo: false })}>Delete</Button></Group>}</Table.Td>
           </Table.Tr>; })}
         </Table.Tbody></Table></ScrollArea>
       </details>) : <Empty text="No users match your search" />}
@@ -127,7 +127,7 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
   return <>
     <SectionHeading title="Approvals" description="Requests run on a server only after administrator approval." action={<Button leftSection={<IconCheck size={16} />} disabled={!pending || busy} onClick={approveAll}>Approve all {pending ? `(${pending})` : ''}</Button>} />
     <Stack gap="sm">
-      {data.actions.slice((Math.min(page, pages) - 1) * 10, Math.min(page, pages) * 10).map(action => <Card key={action.id} withBorder radius="lg" p="lg">
+      {data.actions.slice((Math.min(page, pages) - 1) * 10, Math.min(page, pages) * 10).map(action => <Card key={action.id} withBorder radius="lg" p="lg" className="approval-row">
         <Group justify="space-between" align="start" gap="md">
           <Group align="start" gap="md"><ThemeIcon variant="light" color={action.action_type === 'create_user' ? 'blue' : 'violet'} size={40} radius="md">{action.action_type === 'create_user' ? <IconUser size={20} /> : <IconKey size={20} />}</ThemeIcon><div>
             <Group gap="xs"><Text fw={700}>#{action.id} {actionLabels[action.action_type]} · {action.target_user}</Text><Badge color={statusColors[action.status]} variant="light">{statusLabels[action.status]}</Badge></Group>
@@ -223,7 +223,6 @@ export default function App() {
   const [profile, setProfile] = useState<{ username: string; fullName: string } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmDraft | null>(null);
   const [busy, setBusy] = useState(false);
-  const [scanning, setScanning] = useState(false);
   const refresh = useCallback(async () => {
     try { const next = await fetchDashboard(); setData(next); setFatal(''); }
     catch (cause) {
@@ -241,13 +240,6 @@ export default function App() {
     return () => clearInterval(timer);
   }, [data?.actions, refresh]);
 
-  async function scan() {
-    setScanning(true);
-    try { const result = await api<{ ok: boolean; users: number; errors: Record<string, string> }>('/api/scan', 'POST');
-      notify(result.ok ? `Sync complete: ${result.users} user records found` : `Some hosts failed to sync: ${Object.keys(result.errors).join(', ')}`, !result.ok);
-      await refresh();
-    } catch (cause) { notify(message(cause), true); } finally { setScanning(false); }
-  }
   function actionConfirm(action: Action, kind: 'approve' | 'reject') {
     setConfirm({ title: kind === 'approve' ? 'Approve and run request?' : 'Reject request?',
       message: kind === 'approve' ? `${actionLabels[action.action_type]} for ${action.target_user} on ${action.target_server}.${action.action_type === 'delete_user' ? ' The account will be deleted; its home directory and files will be kept.' : ' This connects to the target host.'}` : `Reject request #${action.id} for ${action.target_user}?`,
@@ -283,7 +275,6 @@ export default function App() {
   if (loading) return <Center h="100vh"><Loader /></Center>;
   if (!data) return <Center h="100vh"><Stack align="center"><Alert color="red">{fatal || 'Could not load the dashboard'}</Alert><Button onClick={() => void refresh()}>Retry</Button></Stack></Center>;
   const pending = data.actions.filter(a => a.status === 'pending').length;
-  const latestScan = data.servers.filter(s => s.last_scan_status === 'ok').map(s => s.last_scan_at).filter((v): v is string => !!v).sort().at(-1);
   const nav: { id: View; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Servers', icon: <IconServer size={19} /> },
     { id: 'monitor', label: 'Monitor', icon: <IconActivity size={19} /> },
@@ -291,13 +282,12 @@ export default function App() {
     { id: 'approvals', label: 'Approvals', icon: <IconShieldCheck size={19} /> },
     { id: 'audit', label: 'Activity log', icon: <IconActivity size={19} /> },
   ];
-  return <AppShell navbar={{ width: 230, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: 64 }} padding={0}>
-    <AppShell.Header className="topbar"><Group h="100%" justify="space-between" px="xl" wrap="nowrap">
-      <Group gap="sm" className="topbar-heading"><Burger opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" /><Text fw={800} size="sm">Server Manager</Text></Group>
-      <Group gap="sm" className="topbar-actions"><Text size="xs" c="dimmed" className="last-sync">{latestScan ? `Last sync ${formatDate(latestScan)}` : 'Waiting for first sync'}</Text><Button size="xs" variant="default" leftSection={<IconRefresh size={15} />} loading={scanning} disabled={!data.servers.some(s => s.enabled)} onClick={() => void scan()}>Sync all</Button><Button size="xs" leftSection={<IconPlus size={15} />} disabled={!data.servers.some(s => s.enabled)} onClick={() => setRequest({ mode: 'create_user', username: '', sudo: false })}>New user</Button></Group>
-    </Group></AppShell.Header>
+  return <AppShell navbar={{ width: 196, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: { base: 56, sm: 32 } }} padding={0}>
+    <AppShell.Header className="topbar">
+      <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
+    </AppShell.Header>
     <AppShell.Navbar className="sidebar" p="md">
-      <Stack gap={4} mt="md">{nav.map(item => <button className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); if (item.id === 'monitor') setMonitorServerId(null); setMobileOpened(false); }}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color="orange" circle ml="auto">{pending}</Badge>}</button>)}</Stack>
+      <Stack component="nav" aria-label="Main navigation" gap={8} mt="lg">{nav.map(item => <button type="button" aria-current={view === item.id ? 'page' : undefined} className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); if (item.id === 'monitor') setMonitorServerId(null); setMobileOpened(false); }}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color="gray" circle ml="auto">{pending}</Badge>}</button>)}</Stack>
     </AppShell.Navbar>
     <AppShell.Main className="main-area"><main className="content">
       {fatal && <Alert color="red" mb="md" withCloseButton onClose={() => setFatal('')}>{fatal}</Alert>}

@@ -15,7 +15,7 @@ export default function PhysicalDiskChart({ disks, loading }: { disks: PhysicalD
         <div className={`disk-chart-bar ${disk.percent === null ? 'disk-chart-bar-unknown' : ''}`} role={disk.percent === null ? 'img' : 'meter'}
           aria-label={`${disk.devices.map(device => device.name).join(' + ')} mounted usage: ${disk.percent === null ? 'unavailable' : `${disk.percent}%`}`}
           aria-valuemin={disk.percent === null ? undefined : 0} aria-valuemax={disk.percent === null ? undefined : 100} aria-valuenow={disk.percent ?? undefined}>
-          {disk.percent !== null && <div className="disk-chart-fill" style={{ width: `${Math.min(100, Math.max(0, disk.percent))}%`, background: disk.percent >= 90 ? '#f59f00' : '#15aabf' }} />}
+          {disk.percent !== null && <div className="disk-chart-fill" style={{ width: `${Math.min(100, Math.max(0, disk.percent))}%`, background: disk.percent >= 90 ? '#edb16f' : '#b2d7f3' }} />}
         </div>
         <Text size="xs" c="dimmed" mt={7}>{disk.status === 'ok'
           ? `${disk.used_gb?.toLocaleString()} / ${disk.filesystem_total_gb?.toLocaleString()} GiB`
