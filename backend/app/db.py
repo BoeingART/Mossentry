@@ -9,6 +9,7 @@ from typing import Any, Iterator
 
 from .config import DATA_DIR, DB_PATH, DEFAULT_SERVERS, SESSION_HOURS
 from .security import hash_password, token
+from .user_history import remember_users
 
 
 def now() -> str:
@@ -69,6 +70,8 @@ CREATE TABLE IF NOT EXISTS server_users (
   is_sudo INTEGER NOT NULL,
   is_disabled INTEGER NOT NULL,
   scanned_at TEXT NOT NULL,
+  created_at TEXT,
+  created_at_source TEXT,
   PRIMARY KEY (server_id, username)
 );
 CREATE TABLE IF NOT EXISTS user_profiles (
@@ -76,6 +79,13 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   full_name TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL,
   updated_by INTEGER REFERENCES admins(id)
+);
+CREATE TABLE IF NOT EXISTS user_history (
+  username TEXT PRIMARY KEY,
+  created_at TEXT,
+  created_at_source TEXT,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS actions (
   id INTEGER PRIMARY KEY,
@@ -117,6 +127,12 @@ def init_db() -> None:
     (DATA_DIR / "keys").mkdir(mode=0o700, exist_ok=True)
     with connect() as conn:
         conn.executescript(SCHEMA)
+        # Add nullable fields in place for databases from earlier releases.
+        user_columns = {column["name"] for column in conn.execute("PRAGMA table_info(server_users)")}
+        for column in ("created_at", "created_at_source"):
+            if column not in user_columns:
+                conn.execute(f"ALTER TABLE server_users ADD COLUMN {column} TEXT")
+        remember_users(conn)
         seeded = conn.execute("SELECT 1 FROM settings WHERE key='servers_seeded'").fetchone()
         # Existing installations keep their inventory; deleted hosts stay deleted on restart.
         has_servers = conn.execute("SELECT 1 FROM servers LIMIT 1").fetchone()

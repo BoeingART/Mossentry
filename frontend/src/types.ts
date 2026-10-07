@@ -23,6 +23,10 @@ export type Audit = {
 export type Dashboard = {
   admin: { username: string; csrf: string; desktop_mode: boolean };
   servers: Server[]; users: User[]; actions: Action[]; audit: Audit[];
+  statistics: {
+    total_unique_users: number; dated_users: number; undated_users: number; new_users_30d: number;
+    history: { date: string; total: number; added: number }[]; through: string;
+  };
 };
 
 export type ServerMetrics = {

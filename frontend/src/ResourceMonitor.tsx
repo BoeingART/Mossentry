@@ -10,7 +10,11 @@ import PhysicalDiskChart from './PhysicalDiskChart';
 import { appendSample, cpuPercent, gpuPercent, gpuMemoryPercent, REFRESH_MS, WINDOW_MS } from './monitorData';
 import type { GpuDevice, HistorySample } from './monitorData';
 
+<<<<<<< HEAD
 const gpuColors = ['#9785ce', '#bf7898', '#739ca5', '#b99b49', '#7c9c65', '#7186b1', '#a377ad', '#b98361'];
+=======
+const gpuColors = ['#69a4d0', '#edb16f', '#77bfa9', '#9690bd', '#bd889c', '#739b9e', '#b5aa65', '#9a8d82'];
+>>>>>>> codex/minimal-dashboard-ui
 
 function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: string[] }) {
   const [gpuMetric, setGpuMetric] = useState('utilization');
@@ -82,7 +86,7 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
   }));
 
   return <Stack gap="lg">
-    <Paper withBorder p="md" radius="lg"><Group justify="space-between" align="end" gap="md">
+    <Paper className="monitor-toolbar" withBorder p="md" radius="lg"><Group justify="space-between" align="end" gap="md">
       <MultiSelect className="monitor-user-filter" label="CPU / GPU users"
         placeholder={filtered ? 'Add users' : 'All users'} searchable clearable clearButtonProps={{ 'aria-label': 'Show all users', 'aria-hidden': false, tabIndex: 0 }} hidePickedOptions
         data={options} value={selectedUsers} onChange={setSelectedUsers} nothingFoundMessage="No matching users" maxDropdownHeight={190} />
@@ -93,7 +97,11 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
     {error && <Alert color="orange" title="Sample unavailable" role="alert">{error}</Alert>}
     <div className="monitor-chart-grid">
       <ResourceChart title="CPU" end={clock}
+<<<<<<< HEAD
         series={[{ id: 'cpu', label: 'CPU', color: '#aba12d', current: sample ? cpuPercent(sample, selectedUsers) : null,
+=======
+        series={[{ id: 'cpu', label: 'CPU', color: '#69a4d0', current: sample ? cpuPercent(sample, selectedUsers) : null,
+>>>>>>> codex/minimal-dashboard-ui
           points: recent.map(point => ({ time: point.time, value: point.sample ? cpuPercent(point.sample, selectedUsers) : null })) }]}
         emptyMessage={paused ? 'Paused' : 'No data'} />
       <ResourceChart title="GPU" end={clock} series={gpuSeries}
@@ -101,7 +109,7 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
           data={[{ label: 'utilization', value: 'utilization' }, { label: 'memory', value: 'memory' }]} />}
         emptyMessage={sample?.gpu.status === 'unavailable' ? 'Unavailable' : paused ? 'Paused' : 'No data'} />
       <ResourceChart title="Memory" end={clock}
-        series={[{ id: 'memory', label: 'Memory', color: '#7c9c65', current: sample?.memory.percent ?? null,
+        series={[{ id: 'memory', label: 'Memory', color: '#77bfa9', current: sample?.memory.percent ?? null,
           points: recent.map(point => ({ time: point.time, value: point.sample?.memory.percent ?? null })) }]}
         emptyMessage={paused ? 'Paused' : 'No data'} />
       <PhysicalDiskChart disks={sample?.disks ?? []} loading={!sample} />
@@ -112,10 +120,10 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
 
 export default function ResourceMonitor({ data, serverId, selectServer }: { data: Dashboard; serverId: number | null; selectServer: (id: number | null) => void }) {
   if (serverId === null) return <>
-    <div className="page-heading"><Title order={2}>Monitor</Title><Text size="sm" c="dimmed" mt={4}>Live resources across your servers.</Text></div>
-    {data.servers.length ? <div className="host-grid">{data.servers.map(server => <Card key={server.id} withBorder radius="xl" p="lg" className="host-card monitor-host-card">
-      <Group justify="space-between" mb="md"><Group gap="sm"><ThemeIcon variant="light" size={44} radius="xl"><IconServer size={20} /></ThemeIcon><Title order={3} size="h4">{server.name}</Title></Group><Badge color={server.enabled ? 'teal' : 'gray'} variant="light">{server.enabled ? 'Enabled' : 'Paused'}</Badge></Group>
-      <Button variant="default" className="monitor-open" leftSection={<IconActivity size={16} />} rightSection={<IconArrowRight size={16} />} disabled={!server.enabled} onClick={() => selectServer(server.id)} aria-label={`Monitor ${server.name}`}>Open monitor</Button>
+    <Title className="page-heading" order={2} mb="lg">Monitor</Title>
+    {data.servers.length ? <div className="monitor-host-grid">{data.servers.map(server => <Card className="monitor-host-card" key={server.id} withBorder radius="lg" p="lg">
+      <Group justify="space-between" mb="md"><Group gap="sm"><ThemeIcon variant="light" size={40} radius="xl"><IconServer size={20} /></ThemeIcon><Title order={3} size="h4">{server.name}</Title></Group><Badge color={server.enabled ? 'teal' : 'gray'} variant="light">{server.enabled ? 'Enabled' : 'Paused'}</Badge></Group>
+      <Button variant="default" leftSection={<IconActivity size={16} />} rightSection={<IconArrowRight size={16} />} disabled={!server.enabled} onClick={() => selectServer(server.id)} aria-label={`Monitor ${server.name}`}>Open monitor</Button>
     </Card>)}</div> : <Alert color="gray">Add a server from the Servers page to start monitoring.</Alert>}
   </>;
   const server = data.servers.find(item => item.id === serverId);

@@ -21,7 +21,7 @@
     - name: Identify accounts with administrative sudo privilege
       become: true
       ansible.builtin.shell: |
-        getent passwd | awk -F: '$3 >= 1000 || $1 == "root" || $1 == "srvmgr" {print $1}' |
+        getent passwd | awk -F: '{print $1}' |
         while read -r account; do
           if sudo -l -U "$account" /bin/sh >/dev/null 2>&1; then
             echo "$account"
@@ -29,6 +29,18 @@
         done
       register: effective_sudo_result
       changed_when: false
+
+    - name: Read account creation timestamps from logs or home directories
+      become: true
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - -c
+          - "{{ lookup('ansible.builtin.file', playbook_dir + '/user_creation_times.py') }}"
+        stdin: "{{ passwd_result.stdout }}"
+      register: creation_result
+      changed_when: false
+      failed_when: false
 
     - name: Save scan result on control server
       ansible.builtin.copy:
@@ -38,7 +50,9 @@
           {{ {'passwd': passwd_result.stdout,
               'sudo': sudo_result.stdout,
               'wheel': wheel_result.stdout,
-              'effective_sudo': effective_sudo_result.stdout} | to_json }}
+              'effective_sudo': effective_sudo_result.stdout,
+              'creation_times': (creation_result.stdout | from_json)
+                if creation_result.rc | default(1) == 0 else {}} | to_json }}
       delegate_to: localhost
       vars:
         ansible_remote_tmp: "{{ scan_output_dir }}/.ansible-tmp"

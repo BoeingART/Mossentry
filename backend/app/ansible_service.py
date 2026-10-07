@@ -18,6 +18,7 @@ from typing import Any
 
 from .config import ANSIBLE_DIR, DATA_DIR
 from .db import connect, now, row, rows
+from .user_history import remember_users
 
 SAFE_NAME = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 SAFE_HOST = re.compile(r"^[a-zA-Z0-9._-]+$")
@@ -134,16 +135,14 @@ def _parse_scan(name: str, raw: dict[str, Any]) -> list[dict[str, Any]]:
         if len(parts) != 7:
             continue
         username, _, uid, gid, _, home, shell = parts
-        if username == "nobody":
-            continue
         try:
             uid_num, gid_num = int(uid), int(gid)
         except ValueError:
             continue
-        # Human accounts plus root and the automation account are useful to administrators.
-        if uid_num < 1000 and username not in {"root", "srvmgr"}:
-            continue
+        # Dashboard totals include every account, including system and SSH
+        # management accounts. Mutating protected accounts is still blocked.
         disabled_shell = shell.endswith(("/nologin", "/false"))
+        creation = raw.get("creation_times", {}).get(username, {})
         result.append({
             "server": name, "username": username, "uid": uid_num, "gid": gid_num,
             "home": home, "shell": shell,
@@ -151,6 +150,8 @@ def _parse_scan(name: str, raw: dict[str, Any]) -> list[dict[str, Any]]:
             # A locked password is normal in this key-only environment and does
             # not block SSH public-key authentication. nologin/false does.
             "is_disabled": disabled_shell,
+            "created_at": creation.get("created_at"),
+            "created_at_source": creation.get("source"),
         })
     return result
 
@@ -172,13 +173,30 @@ def scan_servers(server_names: list[str] | None = None) -> tuple[list[dict[str, 
                 if output_file.exists():
                     parsed = _parse_scan(name, json.loads(output_file.read_text(encoding="utf-8")))
                     users.extend(parsed)
+                    previous = {
+                        account["username"]: account
+                        for account in conn.execute("SELECT * FROM server_users WHERE server_id=?", (server["id"],))
+                    }
+                    for user in parsed:
+                        old = previous.get(user["username"])
+                        if not old or old["uid"] != user["uid"] or old["home"] != user["home"]:
+                            continue
+                        # Rotating logs or a temporarily unavailable birth time
+                        # must not discard an already discovered timestamp.
+                        if not user["created_at"] or (
+                            user["created_at_source"] == "home_birth"
+                            and old["created_at_source"] in {"auth_log", "journal"}
+                        ):
+                            user["created_at"] = old["created_at"]
+                            user["created_at_source"] = old["created_at_source"]
                     conn.execute("DELETE FROM server_users WHERE server_id=?", (server["id"],))
                     conn.executemany(
-                        """INSERT INTO server_users(server_id,username,uid,gid,home,shell,is_sudo,is_disabled,scanned_at)
-                        VALUES(?,?,?,?,?,?,?,?,?)""",
+                        """INSERT INTO server_users(server_id,username,uid,gid,home,shell,is_sudo,is_disabled,scanned_at,
+                        created_at,created_at_source) VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                         [
                             (server["id"], u["username"], u["uid"], u["gid"], u["home"], u["shell"],
-                             int(u["is_sudo"]), int(u["is_disabled"]), scanned_at)
+                             int(u["is_sudo"]), int(u["is_disabled"]), scanned_at,
+                             u["created_at"], u["created_at_source"])
                             for u in parsed
                         ],
                     )
@@ -193,6 +211,7 @@ def scan_servers(server_names: list[str] | None = None) -> tuple[list[dict[str, 
                         "UPDATE servers SET last_scan_at=?,last_scan_status='error',last_scan_error=? WHERE id=?",
                         (scanned_at, error, server["id"]),
                     )
+            remember_users(conn)
         return users, errors
     finally:
         shutil.rmtree(job_dir, ignore_errors=True)

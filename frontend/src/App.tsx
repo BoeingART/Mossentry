@@ -8,16 +8,17 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-  IconActivity, IconCheck, IconChevronRight, IconDownload, IconHistory,
-  IconEdit, IconKey, IconPlus, IconSearch, IconServer,
+  IconActivity, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
+  IconEdit, IconKey, IconSearch, IconServer,
   IconShieldCheck, IconUser, IconUsers,
 } from '@tabler/icons-react';
 import { api, downloadCredentials, fetchDashboard, setCsrf } from './api';
 import type { Action, Dashboard, Server, User } from './types';
 import Servers from './Servers';
 import ResourceMonitor from './ResourceMonitor';
+import DashboardPage from './DashboardPage';
 
-type View = 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
+type View = 'dashboard' | 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
 type UserAction = 'disable_user' | 'enable_user' | 'set_sudo' | 'delete_user';
 type RequestDraft = { mode: 'create_user' | UserAction; username: string; server?: string; sudo: boolean };
 type ConfirmDraft = { title: string; message: string; run: () => Promise<void> };
@@ -97,7 +98,7 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
       <Box p="lg"><Title order={3} size="h4">Server users</Title><Text size="sm" c="dimmed">Expand a user to review accounts and permissions on each host.</Text></Box>
       {shown.length ? shown.map(group => <details className="user-group" key={group.username}>
         <summary><Group justify="space-between" wrap="nowrap" p="md" gap="sm">
-          <Group wrap="nowrap" gap="sm"><Avatar color="blue" radius="xl">{(group.fullName || group.username).charAt(0).toUpperCase()}</Avatar><div><Text fw={700} size="sm">{group.fullName || group.username} {group.fullName && <Text span c="dimmed" fw={400}>({group.username})</Text>}</Text><Text size="xs" c="dimmed">{group.accounts.length} host accounts</Text></div></Group>
+          <Group wrap="nowrap" gap="sm"><Avatar color="blue" radius="xl">{(group.fullName || group.username).charAt(0).toUpperCase()}</Avatar><div><Text fw={600} size="sm">{group.fullName || group.username} {group.fullName && <Text span c="dimmed" fw={500}>({group.username})</Text>}</Text><Text size="xs" c="dimmed">{group.accounts.length} host accounts</Text></div></Group>
           <Group gap="xs" wrap="nowrap" className="user-summary-end">
             {group.accounts.some(a => a.is_sudo) && <Badge color="orange" variant="light">Sudo</Badge>}
             {group.accounts.some(a => a.is_disabled) && <Badge color="red" variant="light">Disabled</Badge>}
@@ -127,10 +128,10 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
   return <>
     <SectionHeading title="Approvals" description="Requests run on a server only after administrator approval." action={<Button leftSection={<IconCheck size={16} />} disabled={!pending || busy} onClick={approveAll}>Approve all {pending ? `(${pending})` : ''}</Button>} />
     <Stack gap="sm">
-      {data.actions.slice((Math.min(page, pages) - 1) * 10, Math.min(page, pages) * 10).map(action => <Card key={action.id} withBorder radius="lg" p="lg">
+      {data.actions.slice((Math.min(page, pages) - 1) * 10, Math.min(page, pages) * 10).map(action => <Card key={action.id} withBorder radius="lg" p="lg" className="approval-row">
         <Group justify="space-between" align="start" gap="md">
           <Group align="start" gap="md"><ThemeIcon variant="light" color={action.action_type === 'create_user' ? 'blue' : 'violet'} size={40} radius="md">{action.action_type === 'create_user' ? <IconUser size={20} /> : <IconKey size={20} />}</ThemeIcon><div>
-            <Group gap="xs"><Text fw={700}>#{action.id} {actionLabels[action.action_type]} · {action.target_user}</Text><Badge color={statusColors[action.status]} variant="light">{statusLabels[action.status]}</Badge></Group>
+            <Group gap="xs"><Text className="approval-title" fw={700}>#{action.id} {actionLabels[action.action_type]} · {action.target_user}</Text><Badge color={statusColors[action.status]} variant="light">{statusLabels[action.status]}</Badge></Group>
             <Text size="sm" c="dimmed" mt={3}>Target: {action.target_server}{action.action_type === 'set_sudo' ? ` · ${action.payload.sudo ? 'Grant sudo' : 'Revoke sudo'}` : ''}{action.action_type === 'create_user' ? ` · ${action.payload.sudo ? 'Sudo user' : 'Standard user'}` : ''}</Text>
             <Text size="xs" c="dimmed" mt={4}>Requested by {action.requested_by_name} · {formatDate(action.requested_at)}</Text>
           </div></Group>
@@ -152,7 +153,7 @@ function AuditLog({ data }: { data: Dashboard }) {
   return <><SectionHeading title="Activity log" description="Scans, approvals, executions, and credential downloads" />
     <Card withBorder radius="lg" p={0}><Box p="lg"><Title order={3} size="h4">Audit trail</Title><Text size="sm" c="dimmed">Most recent events across this manager</Text></Box>
       <ScrollArea><Table striped highlightOnHover miw={700} verticalSpacing="md" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>Time</Table.Th><Table.Th>Administrator</Table.Th><Table.Th>Event</Table.Th><Table.Th>Target</Table.Th>{!data.admin.desktop_mode && <Table.Th>Source</Table.Th>}</Table.Tr></Table.Thead><Table.Tbody>
-        {data.audit.map(item => <Table.Tr key={item.id}><Table.Td>{formatDate(item.created_at)}</Table.Td><Table.Td>{item.actor || 'System'}</Table.Td><Table.Td><Text fw={600} size="sm">{eventLabels[item.event] || 'Other activity'}</Text></Table.Td><Table.Td>{item.target === 'all_servers' ? 'All servers' : item.target?.startsWith('action:') ? `Request #${item.target.slice(7)}` : item.target || '—'}</Table.Td>{!data.admin.desktop_mode && <Table.Td>{item.ip_address || '—'}</Table.Td>}</Table.Tr>)}
+        {data.audit.map(item => <Table.Tr key={item.id}><Table.Td>{formatDate(item.created_at)}</Table.Td><Table.Td>{item.actor || 'System'}</Table.Td><Table.Td><Text fw={700} size="sm">{eventLabels[item.event] || 'Other activity'}</Text></Table.Td><Table.Td>{item.target === 'all_servers' ? 'All servers' : item.target?.startsWith('action:') ? `Request #${item.target.slice(7)}` : item.target || '—'}</Table.Td>{!data.admin.desktop_mode && <Table.Td>{item.ip_address || '—'}</Table.Td>}</Table.Tr>)}
       </Table.Tbody></Table></ScrollArea>{!data.audit.length && <Empty text="No activity yet" />}</Card>
   </>;
 }
@@ -216,7 +217,12 @@ export default function App() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatal, setFatal] = useState('');
+<<<<<<< HEAD
   const [view, setView] = useState<View>('overview');
+=======
+  const [view, setView] = useState<View>('dashboard');
+  const [mobileOpened, setMobileOpened] = useState(false);
+>>>>>>> codex/minimal-dashboard-ui
   const [monitorServerId, setMonitorServerId] = useState<number | null>(null);
   const [request, setRequest] = useState<RequestDraft | null>(null);
   const [profile, setProfile] = useState<{ username: string; fullName: string } | null>(null);
@@ -275,12 +281,14 @@ export default function App() {
   if (!data) return <Center h="100vh"><Stack align="center"><Alert color="red">{fatal || 'Could not load the dashboard'}</Alert><Button onClick={() => void refresh()}>Retry</Button></Stack></Center>;
   const pending = data.actions.filter(a => a.status === 'pending').length;
   const nav: { id: View; label: string; icon: React.ReactNode }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: <IconLayoutDashboard size={19} /> },
     { id: 'overview', label: 'Servers', icon: <IconServer size={19} /> },
     { id: 'monitor', label: 'Monitor', icon: <IconActivity size={19} /> },
     { id: 'users', label: 'Users & access', icon: <IconUsers size={19} /> },
     { id: 'approvals', label: 'Approvals', icon: <IconShieldCheck size={19} /> },
     { id: 'audit', label: 'Activity log', icon: <IconHistory size={19} /> },
   ];
+<<<<<<< HEAD
   return <div className="app-frame">
     <header className="topbar">
       <nav className="primary-nav" aria-label="Main navigation">
@@ -293,7 +301,19 @@ export default function App() {
       </nav>
     </header>
     <main className="content">
+=======
+  return <AppShell navbar={{ width: 196, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: { base: 56, sm: 32 } }} padding={0}>
+    <AppShell.Header className="topbar">
+      <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
+    </AppShell.Header>
+    <AppShell.Navbar className="sidebar" p="md">
+      <div className="sidebar-brand"><IconServer size={23} /><span>Server Manager</span></div>
+      <Stack component="nav" aria-label="Main navigation" gap={8} mt="lg">{nav.map(item => <button type="button" aria-current={view === item.id ? 'page' : undefined} className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); if (item.id === 'monitor') setMonitorServerId(null); setMobileOpened(false); }}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color="gray" circle ml="auto">{pending}</Badge>}</button>)}</Stack>
+    </AppShell.Navbar>
+    <AppShell.Main className="main-area"><main className="content">
+>>>>>>> codex/minimal-dashboard-ui
       {fatal && <Alert color="red" mb="md" withCloseButton onClose={() => setFatal('')}>{fatal}</Alert>}
+      {view === 'dashboard' && <DashboardPage data={data} refresh={refresh} openServers={() => setView('overview')} />}
       {view === 'overview' && <Servers data={data} saved={refresh} monitor={server => { setMonitorServerId(server.id); setView('monitor'); }} />}
       {view === 'monitor' && <ResourceMonitor data={data} serverId={monitorServerId} selectServer={setMonitorServerId} />}
       {view === 'users' && <Users data={data} openRequest={setRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}

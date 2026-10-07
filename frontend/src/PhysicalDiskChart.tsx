@@ -8,14 +8,14 @@ export default function PhysicalDiskChart({ disks, loading }: { disks: PhysicalD
     <ScrollArea.Autosize mah={295} type="auto"><Stack gap="lg">
       {disks.map(disk => <div key={disk.id} className="disk-chart-row">
         <Group justify="space-between" align="start" gap="xs" mb={7}>
-          <div><Text fw={600} size="sm">{disk.devices.map(device => device.name).join(' + ')}</Text>
+          <div><Text fw={700} size="sm">{disk.devices.map(device => device.name).join(' + ')}</Text>
             <Text size="xs" c="dimmed">{disk.total_gb.toLocaleString()} GiB</Text></div>
           <Text size="sm" fw={700}>{disk.percent === null ? 'N/A' : `${disk.percent.toFixed(1)}%`}</Text>
         </Group>
         <div className={`disk-chart-bar ${disk.percent === null ? 'disk-chart-bar-unknown' : ''}`} role={disk.percent === null ? 'img' : 'meter'}
           aria-label={`${disk.devices.map(device => device.name).join(' + ')} mounted usage: ${disk.percent === null ? 'unavailable' : `${disk.percent}%`}`}
           aria-valuemin={disk.percent === null ? undefined : 0} aria-valuemax={disk.percent === null ? undefined : 100} aria-valuenow={disk.percent ?? undefined}>
-          {disk.percent !== null && <div className="disk-chart-fill" style={{ width: `${Math.min(100, Math.max(0, disk.percent))}%`, background: disk.percent >= 90 ? '#d89464' : '#e8df58' }} />}
+          {disk.percent !== null && <div className="disk-chart-fill" style={{ width: `${Math.min(100, Math.max(0, disk.percent))}%`, background: disk.percent >= 90 ? '#edb16f' : '#b2d7f3' }} />}
         </div>
         <Text size="xs" c="dimmed" mt={7}>{disk.status === 'ok'
           ? `${disk.used_gb?.toLocaleString()} / ${disk.filesystem_total_gb?.toLocaleString()} GiB`

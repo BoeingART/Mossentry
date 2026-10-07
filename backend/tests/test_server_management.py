@@ -40,7 +40,7 @@ class ServerManagementTests(unittest.TestCase):
 
     def test_crud_clears_stale_accounts_and_survives_restart(self):
         server_id = self.add_server()
-        self.db.execute('INSERT INTO server_users VALUES(?,?,?,?,?,?,?,?,?)', (server_id, 'alice', 1001, 1001, '/home/alice', '/bin/bash', 0, 0, self.db.now()))
+        self.db.execute('INSERT INTO server_users(server_id,username,uid,gid,home,shell,is_sudo,is_disabled,scanned_at) VALUES(?,?,?,?,?,?,?,?,?)', (server_id, 'alice', 1001, 1001, '/home/alice', '/bin/bash', 0, 0, self.db.now()))
         response = self.client.put(f'/api/servers/{server_id}', headers=self.headers, json={**self.body, 'hostname': 'new.example.com', 'name': 'new-name', 'enabled': False})
         self.assertEqual(response.status_code, 200)
         self.assertFalse(self.db.rows('SELECT * FROM server_users WHERE server_id=?', (server_id,)))
@@ -64,6 +64,102 @@ class ServerManagementTests(unittest.TestCase):
         self.assertEqual(server['key_path'], str(Path('~/.ssh/id_rsa').expanduser()))
         self.db.init_db()
         self.assertEqual(self.db.row('SELECT key_path FROM servers WHERE id=?', (server_id,))['key_path'], server['key_path'])
+
+    def test_creation_time_migration_preserves_existing_accounts(self):
+        server_id = self.add_server()
+        with self.db.connect() as conn:
+            conn.execute('DROP TABLE server_users')
+            legacy_schema = self.db.SCHEMA.replace('  created_at TEXT,\n  created_at_source TEXT,\n', '')
+            conn.executescript(legacy_schema)
+            conn.execute(
+                'INSERT INTO server_users VALUES(?,?,?,?,?,?,?,?,?)',
+                (server_id, 'alice', 1001, 1001, '/home/alice', '/bin/bash', 0, 0, self.db.now()),
+            )
+        self.db.init_db()
+        self.db.init_db()
+        user = self.db.row('SELECT * FROM server_users WHERE server_id=?', (server_id,))
+        self.assertEqual(user['username'], 'alice')
+        self.assertIsNone(user['created_at'])
+        self.assertIsNone(user['created_at_source'])
+
+    def test_scan_saves_creation_time_privately_and_retains_it_after_log_rotation(self):
+        server_id = self.add_server()
+        raw = {'passwd': 'alice:x:1001:1001::/home/alice:/bin/bash\nbob:x:1002:1002::/srv/bob:/bin/bash',
+               'creation_times': {'alice': {'created_at': '2025-08-09T10:11:12+08:00', 'source': 'auth_log'}}}
+
+        def scan_output(playbook, limit, extra, timeout):
+            self.assertEqual(playbook, 'scan_users.yml')
+            Path(extra['scan_output_dir'], f'{limit}.json').write_text(json.dumps(raw))
+            return self.service.RunResult(True, '')
+
+        with patch.object(self.service, '_run', side_effect=scan_output):
+            response = self.client.post(f'/api/servers/{server_id}/scan', headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertTrue(response.json()['ok'])
+            alice = self.db.row('SELECT * FROM server_users WHERE server_id=? AND username=?', (server_id, 'alice'))
+            self.assertEqual(alice['created_at'], '2025-08-09T10:11:12+08:00')
+            self.assertEqual(alice['created_at_source'], 'auth_log')
+            self.assertIsNone(self.db.row('SELECT created_at FROM server_users WHERE username=?', ('bob',))['created_at'])
+            visible = self.client.get('/api/dashboard').json()['users']
+            self.assertTrue(visible)
+            for user in visible:
+                self.assertNotIn('created_at', user)
+                self.assertNotIn('created_at_source', user)
+            self.assertNotIn('2025-08-09T10:11:12', response.text)
+
+            raw['creation_times'] = {'alice': {'created_at': '2020-01-01T00:00:00Z', 'source': 'home_birth'}}
+            self.service.scan_servers(['test-host'])
+            self.assertEqual(self.db.row('SELECT created_at FROM server_users WHERE username=?', ('alice',))['created_at'], alice['created_at'])
+            raw['creation_times'] = {}
+            self.service.scan_servers(['test-host'])
+            self.assertEqual(self.db.row('SELECT created_at FROM server_users WHERE username=?', ('alice',))['created_at'], alice['created_at'])
+
+            # A changed account identity must not inherit its predecessor's date.
+            raw['passwd'] = raw['passwd'].replace('alice:x:1001:1001', 'alice:x:2001:2001')
+            self.service.scan_servers(['test-host'])
+            self.assertIsNone(self.db.row('SELECT created_at FROM server_users WHERE username=?', ('alice',))['created_at'])
+
+    def test_rescan_upgrades_home_birth_to_log_timestamp(self):
+        self.add_server()
+        raw = {'passwd': 'alice:x:1001:1001::/home/alice:/bin/bash',
+               'creation_times': {'alice': {'created_at': '2024-01-01T00:00:00Z', 'source': 'home_birth'}}}
+
+        def scan_output(playbook, limit, extra, timeout):
+            Path(extra['scan_output_dir'], f'{limit}.json').write_text(json.dumps(raw))
+            return self.service.RunResult(True, '')
+
+        with patch.object(self.service, '_run', side_effect=scan_output):
+            self.service.scan_servers(['test-host'])
+            self.assertEqual(self.db.row('SELECT created_at_source FROM server_users WHERE username=?', ('alice',))['created_at_source'], 'home_birth')
+            raw['creation_times']['alice'] = {'created_at': '2025-08-09T10:11:12Z', 'source': 'journal'}
+            self.service.scan_servers(['test-host'])
+        user = self.db.row('SELECT * FROM server_users WHERE username=?', ('alice',))
+        self.assertEqual(user['created_at'], '2025-08-09T10:11:12Z')
+        self.assertEqual(user['created_at_source'], 'journal')
+
+    def test_dashboard_exposes_aggregated_history_with_all_account_types(self):
+        self.add_server()
+        raw = {'passwd': 'root:x:0:0::/root:/bin/bash\nsrvmgr:x:999:999::/home/srvmgr:/bin/bash\noperator:x:998:998::/home/operator:/bin/bash\nalice:x:1001:1001::/home/alice:/bin/bash',
+               'creation_times': {'root': {'created_at': '2020-01-01T00:00:00Z', 'source': 'home_birth'},
+                                  'alice': {'created_at': '2025-08-09T10:11:12Z', 'source': 'auth_log'}}}
+
+        def scan_output(playbook, limit, extra, timeout):
+            for name in limit.split(','):
+                Path(extra['scan_output_dir'], f'{name}.json').write_text(json.dumps(raw))
+            return self.service.RunResult(True, '')
+
+        with patch.object(self.service, '_run', side_effect=scan_output):
+            self.service.scan_servers(['test-host', 'gpu1'])
+        response = self.client.get('/api/dashboard')
+        self.assertEqual(response.status_code, 200)
+        dashboard = response.json()
+        self.assertEqual(len(dashboard['users']), 8)
+        self.assertEqual(dashboard['statistics']['total_unique_users'], 4)
+        self.assertEqual(dashboard['statistics']['dated_users'], 2)
+        self.assertEqual(dashboard['statistics']['undated_users'], 2)
+        self.assertEqual(dashboard['statistics']['history'][-1]['total'], 2)
+        self.assertEqual(self.client.delete(f"/api/servers/{self.db.row('SELECT id FROM servers WHERE name=?', ('test-host',))['id']}", headers=self.headers).status_code, 200)
+        self.assertEqual(self.client.get('/api/dashboard').json()['statistics'], dashboard['statistics'])
 
     def test_server_validation_and_csrf(self):
         self.assertEqual(self.client.post('/api/servers', json=self.body).status_code, 403)
@@ -90,7 +186,7 @@ class ServerManagementTests(unittest.TestCase):
 
     def test_protected_accounts_and_legacy_approval(self):
         server_id = self.add_server()
-        self.db.execute('INSERT INTO server_users VALUES(?,?,?,?,?,?,?,?,?)', (server_id, 'daemon', 10, 10, '/', '/bin/sh', 0, 0, self.db.now()))
+        self.db.execute('INSERT INTO server_users(server_id,username,uid,gid,home,shell,is_sudo,is_disabled,scanned_at) VALUES(?,?,?,?,?,?,?,?,?)', (server_id, 'daemon', 10, 10, '/', '/bin/sh', 0, 0, self.db.now()))
         for username in ('root', 'operator', 'srvmgr', 'daemon'):
             for action in ('delete_user', 'disable_user', 'set_sudo'):
                 response = self.client.post('/api/actions/user', json={'username': username, 'servers': ['test-host'], 'action': action, 'sudo': False}, headers=self.headers)
