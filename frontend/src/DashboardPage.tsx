@@ -147,10 +147,10 @@ export default function DashboardPage({ data, refresh, openServers, openApproval
         const Icon = metric.icon;
         return <Tag key={metric.id} className={`dashboard-stat${metric.id === 'approvals' ? ' dashboard-stat-button' : ''}`}
           onClick={metric.id === 'approvals' ? openApprovals : undefined}>
-          <span className="dashboard-stat-icon"><Icon size={23} /></span>
-          <div><span className="dashboard-stat-label">{metric.label}</span><div className="dashboard-stat-value"><strong>{count(metric.value)}</strong>
-            {metric.added > 0 && <Tooltip label={metric.description}><span className="dashboard-trend"><IconArrowUpRight size={15} />+{count(metric.added)} in 30 days</span></Tooltip>}
-          </div></div>
+          <span className="dashboard-stat-label">{metric.label}</span>
+          <div className="dashboard-stat-value"><span className="dashboard-stat-icon"><Icon size={23} /></span><strong>{count(metric.value)}</strong>
+            {metric.added > 0 && <Tooltip label={metric.description}><span className="dashboard-trend"><span className="dashboard-trend-change"><IconArrowUpRight size={13} />+{count(metric.added)}</span><span className="dashboard-trend-period">in 30 days</span></span></Tooltip>}
+          </div>
         </Tag>;
       })}
     </div>
