@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ActionIcon, Button, Group, Select, Text, Title, Tooltip } from '@mantine/core';
+import { ActionIcon, Button, Group, ScrollArea, Select, Text, Title, Tooltip } from '@mantine/core';
 import { IconArrowUpRight, IconCalendar, IconChevronRight, IconRefresh, IconServer, IconShieldCheck, IconUsers, IconUserCheck } from '@tabler/icons-react';
 import type { Dashboard } from './types';
 import { accessCounts, dateTime, DAY, growthWindow, smoothPath, totalAt } from './dashboardData';
@@ -9,7 +9,7 @@ const shortDate = (time: number, full = false) => new Intl.DateTimeFormat('en-US
   month: 'short', day: 'numeric', ...(full ? { year: 'numeric' as const } : {}), timeZone: 'UTC',
 }).format(time);
 
-function Performance({ statistics }: { statistics: Dashboard['statistics'] }) {
+function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
   const [range, setRange] = useState('all');
   const [hover, setHover] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -22,7 +22,7 @@ function Performance({ statistics }: { statistics: Dashboard['statistics'] }) {
   }, []);
   const { history, through } = statistics;
   const { start, end, points } = growthWindow(history, through, range);
-  const left = 42, right = width - 14, top = 20, bottom = 224;
+  const left = 50, right = width - 14, top = 20, bottom = 224;
   const largest = Math.max(1, points.at(-1)!.total);
   const power = 10 ** Math.floor(Math.log10(Math.max(1, largest / 4)));
   const step = [1, 2, 5, 10].find(n => n * power >= largest / 4)! * power;
@@ -33,10 +33,10 @@ function Performance({ statistics }: { statistics: Dashboard['statistics'] }) {
   const hoverTime = hover === null ? null : Math.round((start + hover * (end - start)) / DAY) * DAY;
   const hoverTotal = hoverTime === null ? 0 : totalAt(history, hoverTime);
   const added = hoverTime === null ? 0 : history.find(point => dateTime(point.date) === hoverTime)?.added ?? 0;
-  const tickCount = width < 480 ? 3 : 5;
-  return <section className="dashboard-panel performance-panel" aria-labelledby="performance-title">
-    <div className="dashboard-panel-heading"><div><Title order={3} id="performance-title">Performance</Title><Text className="dashboard-caption">Cumulative unique users</Text></div>
-      <Select aria-label="Performance time range" value={range} allowDeselect={false} onChange={value => { setRange(value || 'all'); setHover(null); }}
+  const tickCount = width < 480 ? 2 : 5;
+  return <section className="dashboard-panel user-number-panel" aria-labelledby="user-number-title">
+    <div className="dashboard-panel-heading"><div><Title order={3} id="user-number-title">User number</Title><Text className="dashboard-caption">Cumulative unique users</Text></div>
+      <Select aria-label="User number time range" value={range} allowDeselect={false} onChange={value => { setRange(value || 'all'); setHover(null); }}
         data={[{ value: 'all', label: 'All time' }, { value: '365', label: 'Last year' }, { value: '90', label: 'Last 90 days' }, { value: '30', label: 'Last 30 days' }]} className="dashboard-range" size="xs" />
     </div>
     <div className="growth-chart" ref={ref}>
@@ -69,12 +69,12 @@ function Performance({ statistics }: { statistics: Dashboard['statistics'] }) {
         </>}
       </svg>
       {!history.length && <div className="growth-empty"><IconUsers size={25} stroke={1.5} /><strong>No creation dates yet</strong><span>Sync your servers to build the user timeline.</span></div>}
-      {!!history.length && hoverTime !== null && <div className="growth-tooltip" style={{ left: Math.max(8, Math.min(width - 192, x(hoverTime) + 14)) }} aria-live="polite">
+      {!!history.length && hoverTime !== null && <div className="growth-tooltip" style={{ left: Math.max(8, Math.min(width - 224, x(hoverTime) + 14)) }} aria-live="polite">
         <strong>{shortDate(hoverTime, true)}</strong><div><span><i className="blue" />Unique users</span><b>{count(hoverTotal)}</b></div><div><span><i className="orange" />New that day</span><b>{count(added)}</b></div>
       </div>}
     </div>
     <div className="growth-footer"><span className="chart-key"><i className="blue" />Unique users</span><span>{count(statistics.dated_users)} dated{statistics.undated_users > 0 ? ` · ${count(statistics.undated_users)} without a known date` : ''}</span></div>
-    <p className="dashboard-footnote">Each username is counted once, from its earliest known creation date.</p>
+    <p className="dashboard-footnote">The same username on multiple servers counts as one user, from its earliest known creation date.</p>
   </section>;
 }
 
@@ -83,12 +83,12 @@ function ServerAccounts({ data }: { data: Dashboard }) {
   const maximum = Math.max(1, ...hosts.map(host => host.count));
   return <section className="dashboard-panel" aria-labelledby="host-accounts-title">
     <div className="dashboard-panel-heading"><div><Title order={3} id="host-accounts-title">Accounts by server</Title><Text className="dashboard-caption">All synced accounts on each host</Text></div><span className="dashboard-small-icon"><IconServer size={19} /></span></div>
-    <div className="dashboard-host-bars">{hosts.map((host, index) => <div className="dashboard-host-bar" key={host.id}>
+    <ScrollArea.Autosize mah={225} viewportProps={{ tabIndex: 0, 'aria-label': 'Accounts by server' }}><div className="dashboard-host-bars">{hosts.map((host, index) => <div className="dashboard-host-bar" key={host.id}>
       <div><span>{host.name}</span><b>{count(host.count)}</b></div>
       <div className="dashboard-bar-track" role="img" aria-label={`${host.name}: ${host.count} accounts${host.last_scan_status === 'error' ? ', cached data' : ''}`}>
         <span style={{ width: `${host.count / maximum * 100}%`, background: ['#b2d7f3', '#f1c797', '#a0d7c5'][index % 3] }} />
       </div>
-    </div>)}{!hosts.length && <p className="dashboard-no-data">Add a server to see its accounts.</p>}</div>
+    </div>)}{!hosts.length && <p className="dashboard-no-data">Add a server to see its accounts.</p>}</div></ScrollArea.Autosize>
   </section>;
 }
 
@@ -120,11 +120,11 @@ export default function DashboardPage({ data, refresh, openServers }: { data: Da
       </div>
     </header>
     <div className="dashboard-summary">
-      <div className="dashboard-stat"><span className="dashboard-stat-icon"><IconUsers size={23} /></span><div><span className="dashboard-stat-label">Unique users</span><div className="dashboard-stat-value"><strong>{count(data.statistics.total_unique_users)}</strong><span className="dashboard-trend"><IconArrowUpRight size={14} />{data.statistics.new_users_30d ? `+${count(data.statistics.new_users_30d)} in 30 days` : 'All accounts'}</span></div></div></div>
+      <div className="dashboard-stat"><span className="dashboard-stat-icon"><IconUsers size={23} /></span><div><span className="dashboard-stat-label">Unique users</span><div className="dashboard-stat-value"><strong>{count(data.statistics.total_unique_users)}</strong><span className="dashboard-trend"><IconArrowUpRight size={14} />{data.statistics.new_users_30d ? `+${count(data.statistics.new_users_30d)} in 30 days` : 'Unique usernames'}</span></div></div></div>
       <div className="dashboard-stat"><span className="dashboard-stat-icon"><IconServer size={23} /></span><div><span className="dashboard-stat-label">Enabled servers</span><div className="dashboard-stat-value"><strong>{count(enabled)}</strong><span>{data.servers.length} total</span></div></div></div>
       <div className="dashboard-stat"><span className="dashboard-stat-icon"><IconUserCheck size={23} /></span><div><span className="dashboard-stat-label">Account instances</span><div className="dashboard-stat-value"><strong>{count(data.users.length)}</strong><span>Across all servers</span></div></div></div>
     </div>
-    <Performance statistics={data.statistics} />
+    <UserNumber statistics={data.statistics} />
     <div className="dashboard-chart-grid"><ServerAccounts data={data} /><AccessOverview data={data} /></div>
     <section className="dashboard-server-section" aria-labelledby="server-overview-title"><Group justify="space-between"><Group gap="md"><Title order={3} id="server-overview-title">Server overview</Title><span className="dashboard-caption">{latest ? `Last sync ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(latest))}` : 'Ready to sync'}</span></Group><Button variant="subtle" color="gray" size="xs" rightSection={<IconChevronRight size={15} />} onClick={openServers}>View all</Button></Group>
       {stale && <p className="dashboard-cache-note">Some servers could not sync. Their account totals use the last saved data.</p>}

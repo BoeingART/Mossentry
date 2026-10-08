@@ -1,11 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { MantineProvider, createTheme } from '@mantine/core';
+import { MantineProvider, ScrollArea, createTheme } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import './styles.css';
 import App from './App';
+import ScrollShadows from './ScrollShadows';
 
 const fontFamily = 'Poppins, "PingFang SC", "Microsoft YaHei", sans-serif';
 const headingFontFamily = '"Open Sans", "PingFang SC", "Microsoft YaHei", sans-serif';
@@ -15,11 +16,14 @@ const theme = createTheme({
   autoContrast: true,
   black: '#101322',
   fontFamily,
-  fontSizes: { xs: '0.75rem', sm: '0.8125rem', md: '0.875rem', lg: '1rem', xl: '1.1875rem' },
+  fontSizes: { xs: '0.875rem', sm: '0.9375rem', md: '1rem', lg: '1.125rem', xl: '1.3125rem' },
   headings: { fontFamily: headingFontFamily, fontWeight: '700', sizes: {
-    h2: { fontSize: '1.75rem', lineHeight: '1.35' },
-    h3: { fontSize: '1.0625rem', lineHeight: '1.5' },
-    h4: { fontSize: '1rem', lineHeight: '1.5' },
+    h1: { fontSize: '2.25rem' },
+    h2: { fontSize: '1.875rem', lineHeight: '1.35' },
+    h3: { fontSize: '1.1875rem', lineHeight: '1.5' },
+    h4: { fontSize: '1.125rem', lineHeight: '1.5' },
+    h5: { fontSize: '1.125rem' },
+    h6: { fontSize: '1rem' },
   } },
   defaultRadius: 'md',
   colors: {
@@ -38,7 +42,9 @@ const theme = createTheme({
     Select: { defaultProps: { radius: 'xl' } },
     MultiSelect: { defaultProps: { radius: 'lg' } },
     SegmentedControl: { defaultProps: { radius: 'xl' } },
-    Modal: { defaultProps: { radius: 'lg', overlayProps: { backgroundOpacity: 0.18, blur: 2 } } },
+    ScrollArea: { defaultProps: { type: 'never', scrollbarSize: 0, viewportProps: { tabIndex: 0 } } },
+    ScrollAreaAutosize: { defaultProps: { type: 'never', scrollbarSize: 0, viewportProps: { tabIndex: 0 } } },
+    Modal: { defaultProps: { radius: 'lg', scrollAreaComponent: ScrollArea.Autosize, overlayProps: { backgroundOpacity: 0.18, blur: 2 } } },
   },
 });
 
@@ -50,6 +56,7 @@ createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <MantineProvider theme={theme} defaultColorScheme="light">
       <Notifications position="top-right" />
+      <ScrollShadows />
       <App />
     </MantineProvider>
   </React.StrictMode>,

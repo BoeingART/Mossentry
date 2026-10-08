@@ -10,11 +10,7 @@ import PhysicalDiskChart from './PhysicalDiskChart';
 import { appendSample, cpuPercent, gpuPercent, gpuMemoryPercent, REFRESH_MS, WINDOW_MS } from './monitorData';
 import type { GpuDevice, HistorySample } from './monitorData';
 
-<<<<<<< HEAD
-const gpuColors = ['#9785ce', '#bf7898', '#739ca5', '#b99b49', '#7c9c65', '#7186b1', '#a377ad', '#b98361'];
-=======
 const gpuColors = ['#69a4d0', '#edb16f', '#77bfa9', '#9690bd', '#bd889c', '#739b9e', '#b5aa65', '#9a8d82'];
->>>>>>> codex/minimal-dashboard-ui
 
 function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: string[] }) {
   const [gpuMetric, setGpuMetric] = useState('utilization');
@@ -97,11 +93,7 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
     {error && <Alert color="orange" title="Sample unavailable" role="alert">{error}</Alert>}
     <div className="monitor-chart-grid">
       <ResourceChart title="CPU" end={clock}
-<<<<<<< HEAD
-        series={[{ id: 'cpu', label: 'CPU', color: '#aba12d', current: sample ? cpuPercent(sample, selectedUsers) : null,
-=======
         series={[{ id: 'cpu', label: 'CPU', color: '#69a4d0', current: sample ? cpuPercent(sample, selectedUsers) : null,
->>>>>>> codex/minimal-dashboard-ui
           points: recent.map(point => ({ time: point.time, value: point.sample ? cpuPercent(point.sample, selectedUsers) : null })) }]}
         emptyMessage={paused ? 'Paused' : 'No data'} />
       <ResourceChart title="GPU" end={clock} series={gpuSeries}

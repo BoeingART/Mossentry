@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type * as React from 'react';
 import {
-  ActionIcon, Alert, Avatar, Badge, Box, Button, Card, Center, Checkbox,
+  ActionIcon, Alert, AppShell, Avatar, Badge, Box, Burger, Button, Card, Center, Checkbox,
   Group, Loader, Modal, Pagination, Paper, ScrollArea,
   SegmentedControl, Select, SimpleGrid, Stack, Switch, Table, Text, TextInput,
   ThemeIcon, Title, Tooltip,
@@ -9,7 +9,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import {
   IconActivity, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
-  IconEdit, IconKey, IconSearch, IconServer,
+  IconEdit, IconHistory, IconKey, IconPlus, IconSearch, IconServer,
   IconShieldCheck, IconUser, IconUsers,
 } from '@tabler/icons-react';
 import { api, downloadCredentials, fetchDashboard, setCsrf } from './api';
@@ -217,12 +217,8 @@ export default function App() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatal, setFatal] = useState('');
-<<<<<<< HEAD
-  const [view, setView] = useState<View>('overview');
-=======
   const [view, setView] = useState<View>('dashboard');
   const [mobileOpened, setMobileOpened] = useState(false);
->>>>>>> codex/minimal-dashboard-ui
   const [monitorServerId, setMonitorServerId] = useState<number | null>(null);
   const [request, setRequest] = useState<RequestDraft | null>(null);
   const [profile, setProfile] = useState<{ username: string; fullName: string } | null>(null);
@@ -288,30 +284,17 @@ export default function App() {
     { id: 'approvals', label: 'Approvals', icon: <IconShieldCheck size={19} /> },
     { id: 'audit', label: 'Activity log', icon: <IconHistory size={19} /> },
   ];
-<<<<<<< HEAD
-  return <div className="app-frame">
-    <header className="topbar">
-      <nav className="primary-nav" aria-label="Main navigation">
-        {nav.map(item => <button type="button" className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id}
-          aria-current={view === item.id ? 'page' : undefined}
-          onClick={() => { setView(item.id); if (item.id === 'monitor') setMonitorServerId(null); }}>
-          {item.icon}<span>{item.label}</span>
-          {item.id === 'approvals' && pending > 0 && <Badge size="sm" color="orange" circle>{pending}</Badge>}
-        </button>)}
-      </nav>
-    </header>
-    <main className="content">
-=======
-  return <AppShell navbar={{ width: 196, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: { base: 56, sm: 32 } }} padding={0}>
+  return <AppShell navbar={{ width: 220, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: { base: 56, sm: 32 } }} padding={0}>
     <AppShell.Header className="topbar">
       <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
     </AppShell.Header>
     <AppShell.Navbar className="sidebar" p="md">
+      <ScrollArea h="100%" viewportProps={{ tabIndex: 0, 'aria-label': 'Navigation' }}>
       <div className="sidebar-brand"><IconServer size={23} /><span>Server Manager</span></div>
       <Stack component="nav" aria-label="Main navigation" gap={8} mt="lg">{nav.map(item => <button type="button" aria-current={view === item.id ? 'page' : undefined} className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); if (item.id === 'monitor') setMonitorServerId(null); setMobileOpened(false); }}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color="gray" circle ml="auto">{pending}</Badge>}</button>)}</Stack>
+      </ScrollArea>
     </AppShell.Navbar>
-    <AppShell.Main className="main-area"><main className="content">
->>>>>>> codex/minimal-dashboard-ui
+    <AppShell.Main className="main-area"><ScrollArea key={view} className="page-scroll" h="calc(100dvh - var(--app-shell-header-offset, 0px))" viewportProps={{ tabIndex: 0, 'aria-label': 'Page content' }}><main className="content">
       {fatal && <Alert color="red" mb="md" withCloseButton onClose={() => setFatal('')}>{fatal}</Alert>}
       {view === 'dashboard' && <DashboardPage data={data} refresh={refresh} openServers={() => setView('overview')} />}
       {view === 'overview' && <Servers data={data} saved={refresh} monitor={server => { setMonitorServerId(server.id); setView('monitor'); }} />}
@@ -319,11 +302,11 @@ export default function App() {
       {view === 'users' && <Users data={data} openRequest={setRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}
       {view === 'approvals' && <Approvals data={data} run={actionConfirm} busy={busy} approveAll={approveAll} download={action => void download(action)} />}
       {view === 'audit' && <AuditLog data={data} />}
-    </main>
+    </main></ScrollArea></AppShell.Main>
     <RequestModal draft={request} servers={data.servers} close={() => setRequest(null)} saved={refresh} />
     <ProfileModal profile={profile} close={() => setProfile(null)} saved={refresh} />
     <Modal opened={!!confirm} onClose={() => !busy && setConfirm(null)} title={confirm?.title} centered radius="lg" closeOnClickOutside={!busy} closeOnEscape={!busy}>
       <Stack><Text size="sm">{confirm?.message}</Text><Group justify="end"><Button variant="default" disabled={busy} onClick={() => setConfirm(null)}>Cancel</Button><Button color="blue" loading={busy} onClick={() => void runConfirm()}>{confirm?.title.startsWith('Reject') ? 'Reject' : 'Confirm and run'}</Button></Group></Stack>
     </Modal>
-  </div>;
+  </AppShell>;
 }

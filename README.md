@@ -19,6 +19,10 @@ npm run setup:test
 npm run check
 ```
 
+Scrollable pages, lists, dialogs, and dropdowns use top/bottom edge shadows
+instead of scrollbars. Each shadow disappears when that end is reached.
+Mouse-wheel, touchpad, touch, and keyboard scrolling remain available.
+
 ## Development
 
 `frontend/src` contains the React interface and typed API client. `npm run build` writes the production interface to `backend/app/frontend`, where FastAPI serves it to Electron. That generated directory is ignored by Git.
@@ -56,7 +60,7 @@ The desktop service listens only on a random `127.0.0.1` port and requires a fre
 
 ## Management workflows
 
-The app opens on **Dashboard**. Performance plots cumulative unique usernames
+The app opens on **Dashboard**. **User number** plots cumulative unique usernames
 from their recorded creation dates, with all-time and shorter time ranges.
 All synced accounts count, including root, system accounts and SSH management
 accounts; the same username on multiple hosts counts once. Log dates take
