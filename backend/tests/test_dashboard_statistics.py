@@ -79,6 +79,49 @@ class DashboardStatisticsTests(unittest.TestCase):
         result = statistics(self.conn, '2026-10-06T12:00:00Z')
         self.assertEqual(result['history'], [{'date': '2021-01-01', 'total': 1, 'added': 1}])
 
+    def test_recent_accounts_count_each_host_and_exclude_unknown_or_outside_dates(self):
+        self.account(1, 'alice', '2026-09-06T12:00:00Z')  # Inclusive 30-day boundary.
+        self.account(2, 'alice', '2026-10-06T20:00:00+08:00')  # Inclusive end in UTC.
+        self.account(1, 'old', '2026-09-06T11:59:59Z')
+        self.account(1, 'future', '2026-10-06T12:00:01Z')
+        self.account(1, 'unknown', None)
+        self.account(1, 'naive', '2026-10-06T10:00:00')
+        remember_users(self.conn)
+        result = statistics(self.conn, '2026-10-06T12:00:00Z')
+        self.assertEqual(result['new_users_30d'], 1)
+        self.assertEqual(result['new_accounts_30d'], 2)
+        self.assertEqual(result['new_servers_30d'], 0)
+        self.assertEqual(result['pending_approvals'], 0)
+        self.assertEqual(result['new_pending_approvals_30d'], 0)
+
+    def test_recent_servers_use_addition_events_without_the_activity_list_limit(self):
+        self.conn.executemany(
+            "INSERT INTO audit_log(event,details_json,created_at) VALUES(?, '{}', ?)",
+            [('server_created', '2026-09-06T12:00:00Z'),
+             ('server_created', '2026-10-06T20:00:00+08:00'),
+             ('server_created', '2026-09-06T11:59:59Z'),
+             ('server_created', '2026-10-06T12:00:01Z'),
+             ('server_created', 'invalid')]
+            + [('server_updated', '2026-10-06T12:00:00Z')] * 110,
+        )
+        result = statistics(self.conn, '2026-10-06T12:00:00Z')
+        self.assertEqual(result['new_servers_30d'], 2)
+
+    def test_pending_approvals_count_all_records_and_only_recent_still_pending_requests(self):
+        self.conn.executemany(
+            """INSERT INTO actions(action_type,target_server,target_user,payload_json,
+            requested_by,status,requested_at) VALUES('create_user','host','alice','{}',1,?,?)""",
+            [('pending', '2026-09-06T12:00:00Z')] * 101
+            + [('pending', '2026-10-06T20:00:00+08:00'),
+               ('pending', '2026-09-06T11:59:59Z'),
+               ('pending', '2026-10-06T12:00:01Z'),
+               ('executed', '2026-10-06T12:00:00Z'),
+               ('rejected', '2026-10-06T12:00:00Z')],
+        )
+        result = statistics(self.conn, '2026-10-06T12:00:00Z')
+        self.assertEqual(result['pending_approvals'], 104)
+        self.assertEqual(result['new_pending_approvals_30d'], 102)
+
     def test_scan_parser_includes_system_and_management_accounts(self):
         from app.ansible_service import _parse_scan
         accounts = _parse_scan('host', {'passwd': '\n'.join([

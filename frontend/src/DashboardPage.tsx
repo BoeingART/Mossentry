@@ -122,11 +122,19 @@ function RequestActivity({ data, openApprovals }: { data: Dashboard; openApprova
 export default function DashboardPage({ data, refresh, openServers, openApprovals }: { data: Dashboard; refresh: () => Promise<void>; openServers: () => void; openApprovals: () => void }) {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
-  const pending = data.actions.filter(action => action.status === 'pending').length;
   const hosts = data.servers.filter(server => `${server.name} ${server.hostname}`.toLowerCase().includes(search.toLowerCase()));
-  const enabled = data.servers.filter(server => server.enabled).length;
   const stale = data.servers.some(server => ['error', 'failed'].includes(server.last_scan_status || ''));
   const latest = data.servers.map(server => server.last_scan_at).filter((date): date is string => !!date).sort().at(-1);
+  const metrics = [
+    { id: 'users', label: 'Unique users', value: data.statistics.total_unique_users, added: data.statistics.new_users_30d, icon: IconUsers,
+      description: 'Unique usernames with a known creation date in the past 30 days.' },
+    { id: 'accounts', label: 'Accounts', value: data.users.length, added: data.statistics.new_accounts_30d, icon: IconUserCheck,
+      description: 'Current host accounts with a known creation date in the past 30 days. Each host account counts separately.' },
+    { id: 'servers', label: 'Servers', value: data.servers.length, added: data.statistics.new_servers_30d, icon: IconServer,
+      description: 'Server additions recorded by this manager in the past 30 days.' },
+    { id: 'approvals', label: 'Pending approvals', value: data.statistics.pending_approvals, added: data.statistics.new_pending_approvals_30d, icon: IconClock,
+      description: 'Requests submitted in the past 30 days that are still awaiting approval.' },
+  ];
   return <div className="dashboard-page">
     <header className="dashboard-header"><div><Title order={2}>Dashboard</Title><Text>A clear view of your servers, users, and access.</Text></div>
       <div className="dashboard-header-end"><span>{new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date())}</span><span className="dashboard-calendar"><IconCalendar size={18} /></span>
@@ -134,10 +142,17 @@ export default function DashboardPage({ data, refresh, openServers, openApproval
       </div>
     </header>
     <div className="dashboard-summary">
-      <div className="dashboard-stat"><span className="dashboard-stat-icon"><IconUsers size={23} /></span><div><span className="dashboard-stat-label">Unique users</span><div className="dashboard-stat-value"><strong>{count(data.statistics.total_unique_users)}</strong><span className="dashboard-trend"><IconArrowUpRight size={14} />{data.statistics.new_users_30d ? `+${count(data.statistics.new_users_30d)} in 30 days` : 'Across your workspace'}</span></div></div></div>
-      <div className="dashboard-stat"><span className="dashboard-stat-icon"><IconServer size={23} /></span><div><span className="dashboard-stat-label">Enabled servers</span><div className="dashboard-stat-value"><strong>{count(enabled)}</strong><span>{data.servers.length} total</span></div></div></div>
-      <div className="dashboard-stat"><span className="dashboard-stat-icon"><IconUserCheck size={23} /></span><div><span className="dashboard-stat-label">Account instances</span><div className="dashboard-stat-value"><strong>{count(data.users.length)}</strong><span>Across all servers</span></div></div></div>
-      <button className="dashboard-stat dashboard-stat-button" onClick={openApprovals}><span className="dashboard-stat-icon"><IconClock size={23} /></span><div><span className="dashboard-stat-label">Pending approvals</span><div className="dashboard-stat-value"><strong>{count(pending)}</strong><span>Review requests <IconArrowUpRight size={12} /></span></div></div></button>
+      {metrics.map(metric => {
+        const Tag = metric.id === 'approvals' ? 'button' : 'div';
+        const Icon = metric.icon;
+        return <Tag key={metric.id} className={`dashboard-stat${metric.id === 'approvals' ? ' dashboard-stat-button' : ''}`}
+          onClick={metric.id === 'approvals' ? openApprovals : undefined}>
+          <span className="dashboard-stat-icon"><Icon size={23} /></span>
+          <div><span className="dashboard-stat-label">{metric.label}</span><div className="dashboard-stat-value"><strong>{count(metric.value)}</strong>
+            {metric.added > 0 && <Tooltip label={metric.description}><span className="dashboard-trend"><IconArrowUpRight size={15} />+{count(metric.added)} in 30 days</span></Tooltip>}
+          </div></div>
+        </Tag>;
+      })}
     </div>
     <div className="dashboard-primary-grid"><UserNumber statistics={data.statistics} /><AccessOverview data={data} /></div>
     <div className="dashboard-chart-grid"><ServerAccounts data={data} /><RequestActivity data={data} openApprovals={openApprovals} /></div>

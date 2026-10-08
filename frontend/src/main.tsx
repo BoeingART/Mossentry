@@ -25,7 +25,7 @@ const theme = createTheme({
     h6: { fontSize: '0.875rem' },
   } },
   defaultRadius: 'sm',
-  radius: { xs: '4px', sm: '6px', md: '8px', lg: '10px', xl: '20px' },
+  radius: { xs: '8px', sm: '12px', md: '16px', lg: '20px', xl: '28px' },
   colors: {
     blue: ['#e1f5fe', '#b3e5fc', '#81d4fa', '#4fc3f7', '#29b6f6', '#03a9f4', '#039be5', '#0288d1', '#0277bd', '#01579b'],
     cyan: ['#e0f7fa', '#b2ebf2', '#80deea', '#4dd0e1', '#26c6da', '#00bcd4', '#00acc1', '#0097a7', '#00838f', '#006064'],
@@ -33,10 +33,12 @@ const theme = createTheme({
     gray: ['#f7f9fa', '#eff3f4', '#e5ecee', '#d3dee1', '#b1c0c5', '#889ba2', '#647880', '#4a6068', '#30484f', '#182c32'],
   },
   components: {
+    Card: { defaultProps: { radius: 'lg' } },
+    Paper: { defaultProps: { radius: 'md' } },
     Text: { defaultProps: { fw: 400 } },
     Button: { defaultProps: { radius: 'sm', fw: 500 } },
     ActionIcon: { defaultProps: { radius: 'sm' } },
-    Badge: { defaultProps: { radius: 'sm', fw: 500, tt: 'none' } },
+    Badge: { defaultProps: { radius: 'xl', fw: 500, tt: 'none' } },
     ThemeIcon: { defaultProps: { radius: 'md', variant: 'light' } },
     TextInput: { defaultProps: { radius: 'sm' } },
     Select: { defaultProps: { radius: 'sm' } },

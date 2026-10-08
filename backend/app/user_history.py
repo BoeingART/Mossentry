@@ -44,6 +44,13 @@ def remember_users(conn):
 
 def statistics(conn, current_time):
     end = creation_time(current_time)
+    start = end - timedelta(days=30)
+
+    def recent_count(query):
+        # Use persisted timestamps, never the latest scan time as a creation date.
+        return sum(1 for row in conn.execute(query)
+                   if (date := creation_time(row[0])) is not None and start <= date <= end)
+
     daily = Counter()
     total = 0
     recent = 0
@@ -52,7 +59,7 @@ def statistics(conn, current_time):
         date = creation_time(user['created_at'])
         if date is not None and date <= end:
             daily[date.date().isoformat()] += 1
-            if date >= end - timedelta(days=30):
+            if date >= start:
                 recent += 1
     running = 0
     history = []
@@ -64,6 +71,10 @@ def statistics(conn, current_time):
         'dated_users': running,
         'undated_users': total - running,
         'new_users_30d': recent,
+        'new_accounts_30d': recent_count('SELECT created_at FROM server_users'),
+        'new_servers_30d': recent_count("SELECT created_at FROM audit_log WHERE event='server_created'"),
+        'pending_approvals': conn.execute("SELECT COUNT(*) FROM actions WHERE status='pending'").fetchone()[0],
+        'new_pending_approvals_30d': recent_count("SELECT requested_at FROM actions WHERE status='pending'"),
         'history': history,
         'through': end.date().isoformat(),
     }

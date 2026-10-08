@@ -25,6 +25,7 @@ export type Dashboard = {
   servers: Server[]; users: User[]; actions: Action[]; audit: Audit[];
   statistics: {
     total_unique_users: number; dated_users: number; undated_users: number; new_users_30d: number;
+    new_accounts_30d: number; new_servers_30d: number; pending_approvals: number; new_pending_approvals_30d: number;
     history: { date: string; total: number; added: number }[]; through: string;
   };
 };
