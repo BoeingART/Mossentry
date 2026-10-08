@@ -8,43 +8,43 @@ import './styles.css';
 import App from './App';
 import ScrollShadows from './ScrollShadows';
 
-const fontFamily = 'Poppins, "PingFang SC", "Microsoft YaHei", sans-serif';
-const headingFontFamily = '"Open Sans", "PingFang SC", "Microsoft YaHei", sans-serif';
+const fontFamily = '"Open Sans", "PingFang SC", "Microsoft YaHei", sans-serif';
 const theme = createTheme({
-  primaryColor: 'blue',
-  primaryShade: 3,
+  primaryColor: 'teal',
+  primaryShade: 7,
   autoContrast: true,
-  black: '#101322',
+  black: '#182c32',
   fontFamily,
-  fontSizes: { xs: '0.875rem', sm: '0.9375rem', md: '1rem', lg: '1.125rem', xl: '1.3125rem' },
-  headings: { fontFamily: headingFontFamily, fontWeight: '700', sizes: {
-    h1: { fontSize: '2.25rem' },
-    h2: { fontSize: '1.875rem', lineHeight: '1.35' },
-    h3: { fontSize: '1.1875rem', lineHeight: '1.5' },
-    h4: { fontSize: '1.125rem', lineHeight: '1.5' },
-    h5: { fontSize: '1.125rem' },
-    h6: { fontSize: '1rem' },
+  fontSizes: { xs: '0.75rem', sm: '0.8125rem', md: '0.875rem', lg: '1rem', xl: '1.125rem' },
+  headings: { fontFamily, fontWeight: '600', sizes: {
+    h1: { fontSize: '1.875rem', lineHeight: '1.3' },
+    h2: { fontSize: '1.5rem', lineHeight: '1.4' },
+    h3: { fontSize: '1.0625rem', lineHeight: '1.5' },
+    h4: { fontSize: '1rem', lineHeight: '1.5' },
+    h5: { fontSize: '0.9375rem' },
+    h6: { fontSize: '0.875rem' },
   } },
-  defaultRadius: 'md',
+  defaultRadius: 'sm',
+  radius: { xs: '4px', sm: '6px', md: '8px', lg: '10px', xl: '20px' },
   colors: {
-    blue: ['#f2f8fc', '#e3f0fa', '#cee5f6', '#b2d7f3', '#8abfe4', '#64a3d0', '#4586b5', '#356b92', '#2b5574', '#24465f'],
-    teal: ['#f0faf7', '#def3eb', '#c3e8da', '#9ad8c1', '#76c9ad', '#50af91', '#348c72', '#286f5b', '#22594b', '#1b493d'],
-    orange: ['#fff8ed', '#faecd8', '#f5dbb8', '#f0c68f', '#e8ad69', '#da9147', '#bf742e', '#9c5c23', '#7e4b21', '#663e1e'],
-    gray: ['#fafafa', '#f4f4f5', '#ececee', '#dedee2', '#bcbec4', '#9698a0', '#777b85', '#5b5f6a', '#373c48', '#181e2b'],
+    blue: ['#e1f5fe', '#b3e5fc', '#81d4fa', '#4fc3f7', '#29b6f6', '#03a9f4', '#039be5', '#0288d1', '#0277bd', '#01579b'],
+    cyan: ['#e0f7fa', '#b2ebf2', '#80deea', '#4dd0e1', '#26c6da', '#00bcd4', '#00acc1', '#0097a7', '#00838f', '#006064'],
+    teal: ['#e0f2f1', '#b2dfdb', '#80cbc4', '#4db6ac', '#26a69a', '#009688', '#00897b', '#00796b', '#00695c', '#004d40'],
+    gray: ['#f7f9fa', '#eff3f4', '#e5ecee', '#d3dee1', '#b1c0c5', '#889ba2', '#647880', '#4a6068', '#30484f', '#182c32'],
   },
   components: {
-    Text: { defaultProps: { fw: 500 } },
-    Button: { defaultProps: { radius: 'xl', fw: 600 } },
-    ActionIcon: { defaultProps: { radius: 'xl' } },
-    Badge: { defaultProps: { radius: 'xl', fw: 500, tt: 'none' } },
-    ThemeIcon: { defaultProps: { radius: 'xl' } },
-    TextInput: { defaultProps: { radius: 'xl' } },
-    Select: { defaultProps: { radius: 'xl' } },
-    MultiSelect: { defaultProps: { radius: 'lg' } },
-    SegmentedControl: { defaultProps: { radius: 'xl' } },
+    Text: { defaultProps: { fw: 400 } },
+    Button: { defaultProps: { radius: 'sm', fw: 500 } },
+    ActionIcon: { defaultProps: { radius: 'sm' } },
+    Badge: { defaultProps: { radius: 'sm', fw: 500, tt: 'none' } },
+    ThemeIcon: { defaultProps: { radius: 'md', variant: 'light' } },
+    TextInput: { defaultProps: { radius: 'sm' } },
+    Select: { defaultProps: { radius: 'sm' } },
+    MultiSelect: { defaultProps: { radius: 'sm' } },
+    SegmentedControl: { defaultProps: { radius: 'sm' } },
     ScrollArea: { defaultProps: { type: 'never', scrollbarSize: 0, viewportProps: { tabIndex: 0 } } },
     ScrollAreaAutosize: { defaultProps: { type: 'never', scrollbarSize: 0, viewportProps: { tabIndex: 0 } } },
-    Modal: { defaultProps: { radius: 'lg', scrollAreaComponent: ScrollArea.Autosize, overlayProps: { backgroundOpacity: 0.18, blur: 2 } } },
+    Modal: { defaultProps: { radius: 'lg', scrollAreaComponent: ScrollArea.Autosize, overlayProps: { backgroundOpacity: 0.2, blur: 3 } } },
   },
 });
 

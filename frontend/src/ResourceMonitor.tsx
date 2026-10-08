@@ -10,7 +10,7 @@ import PhysicalDiskChart from './PhysicalDiskChart';
 import { appendSample, cpuPercent, gpuPercent, gpuMemoryPercent, REFRESH_MS, WINDOW_MS } from './monitorData';
 import type { GpuDevice, HistorySample } from './monitorData';
 
-const gpuColors = ['#69a4d0', '#edb16f', '#77bfa9', '#9690bd', '#bd889c', '#739b9e', '#b5aa65', '#9a8d82'];
+const gpuColors = ['#039be5', '#009688', '#00acc1', '#01579b', '#80cbc4', '#00838f', '#81d4fa', '#004d40'];
 
 function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: string[] }) {
   const [gpuMetric, setGpuMetric] = useState('utilization');
@@ -93,7 +93,7 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
     {error && <Alert color="orange" title="Sample unavailable" role="alert">{error}</Alert>}
     <div className="monitor-chart-grid">
       <ResourceChart title="CPU" end={clock}
-        series={[{ id: 'cpu', label: 'CPU', color: '#69a4d0', current: sample ? cpuPercent(sample, selectedUsers) : null,
+        series={[{ id: 'cpu', label: 'CPU', color: '#039be5', current: sample ? cpuPercent(sample, selectedUsers) : null,
           points: recent.map(point => ({ time: point.time, value: point.sample ? cpuPercent(point.sample, selectedUsers) : null })) }]}
         emptyMessage={paused ? 'Paused' : 'No data'} />
       <ResourceChart title="GPU" end={clock} series={gpuSeries}
@@ -101,7 +101,7 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
           data={[{ label: 'utilization', value: 'utilization' }, { label: 'memory', value: 'memory' }]} />}
         emptyMessage={sample?.gpu.status === 'unavailable' ? 'Unavailable' : paused ? 'Paused' : 'No data'} />
       <ResourceChart title="Memory" end={clock}
-        series={[{ id: 'memory', label: 'Memory', color: '#77bfa9', current: sample?.memory.percent ?? null,
+        series={[{ id: 'memory', label: 'Memory', color: '#00acc1', current: sample?.memory.percent ?? null,
           points: recent.map(point => ({ time: point.time, value: point.sample?.memory.percent ?? null })) }]}
         emptyMessage={paused ? 'Paused' : 'No data'} />
       <PhysicalDiskChart disks={sample?.disks ?? []} loading={!sample} />
@@ -112,7 +112,7 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
 
 export default function ResourceMonitor({ data, serverId, selectServer }: { data: Dashboard; serverId: number | null; selectServer: (id: number | null) => void }) {
   if (serverId === null) return <>
-    <Title className="page-heading" order={2} mb="lg">Monitor</Title>
+    <Group className="page-heading" mb="lg"><div><Title order={2}>Resource monitor</Title><Text size="sm" c="dimmed" mt={4}>Choose a server to follow CPU, GPU, memory, and network usage.</Text></div></Group>
     {data.servers.length ? <div className="monitor-host-grid">{data.servers.map(server => <Card className="monitor-host-card" key={server.id} withBorder radius="lg" p="lg">
       <Group justify="space-between" mb="md"><Group gap="sm"><ThemeIcon variant="light" size={40} radius="xl"><IconServer size={20} /></ThemeIcon><Title order={3} size="h4">{server.name}</Title></Group><Badge color={server.enabled ? 'teal' : 'gray'} variant="light">{server.enabled ? 'Enabled' : 'Paused'}</Badge></Group>
       <Button variant="default" leftSection={<IconActivity size={16} />} rightSection={<IconArrowRight size={16} />} disabled={!server.enabled} onClick={() => selectServer(server.id)} aria-label={`Monitor ${server.name}`}>Open monitor</Button>

@@ -8,7 +8,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-  IconActivity, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
+  IconActivity, IconBell, IconPlant2, IconArrowUpRight, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
   IconEdit, IconHistory, IconKey, IconPlus, IconSearch, IconServer,
   IconShieldCheck, IconUser, IconUsers,
 } from '@tabler/icons-react';
@@ -130,7 +130,7 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
     <Stack gap="sm">
       {data.actions.slice((Math.min(page, pages) - 1) * 10, Math.min(page, pages) * 10).map(action => <Card key={action.id} withBorder radius="lg" p="lg" className="approval-row">
         <Group justify="space-between" align="start" gap="md">
-          <Group align="start" gap="md"><ThemeIcon variant="light" color={action.action_type === 'create_user' ? 'blue' : 'violet'} size={40} radius="md">{action.action_type === 'create_user' ? <IconUser size={20} /> : <IconKey size={20} />}</ThemeIcon><div>
+          <Group align="start" gap="md"><ThemeIcon variant="light" color={action.action_type === 'create_user' ? 'blue' : 'cyan'} size={40} radius="md">{action.action_type === 'create_user' ? <IconUser size={20} /> : <IconKey size={20} />}</ThemeIcon><div>
             <Group gap="xs"><Text className="approval-title" fw={700}>#{action.id} {actionLabels[action.action_type]} · {action.target_user}</Text><Badge color={statusColors[action.status]} variant="light">{statusLabels[action.status]}</Badge></Group>
             <Text size="sm" c="dimmed" mt={3}>Target: {action.target_server}{action.action_type === 'set_sudo' ? ` · ${action.payload.sudo ? 'Grant sudo' : 'Revoke sudo'}` : ''}{action.action_type === 'create_user' ? ` · ${action.payload.sudo ? 'Sudo user' : 'Standard user'}` : ''}</Text>
             <Text size="xs" c="dimmed" mt={4}>Requested by {action.requested_by_name} · {formatDate(action.requested_at)}</Text>
@@ -284,19 +284,44 @@ export default function App() {
     { id: 'approvals', label: 'Approvals', icon: <IconShieldCheck size={19} /> },
     { id: 'audit', label: 'Activity log', icon: <IconHistory size={19} /> },
   ];
-  return <AppShell navbar={{ width: 220, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: { base: 56, sm: 32 } }} padding={0}>
+  function navigate(next: View) {
+    setView(next);
+    if (next === 'monitor') setMonitorServerId(null);
+    setMobileOpened(false);
+  }
+  const nativeDesktop = navigator.userAgent.includes('Electron');
+  return <AppShell navbar={{ width: 232, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: nativeDesktop ? 100 : 76 }} padding={0}>
     <AppShell.Header className="topbar">
-      <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
+      <div className="topbar-brand"><span className="brand-mark"><IconPlant2 size={27} stroke={1.6} /></span><span>Server<span className="brand-accent">Manager</span></span></div>
+      <div className="topbar-content">
+        <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
+        <span className="workspace-chip"><IconServer size={17} stroke={1.6} /> Workspace</span>
+        <Select className="global-search" aria-label="Jump to a page" placeholder="Find a page…" leftSection={<IconSearch size={16} />} searchable clearable
+          value={null} onChange={value => { if (value) navigate(value as View); }} data={nav.map(item => ({ value: item.id, label: item.label }))} nothingFoundMessage="No matching pages" />
+        <div className="topbar-account">
+          <Tooltip label={pending ? `${pending} requests awaiting approval` : 'View approvals'}><ActionIcon className="approval-bell" variant="subtle" color="gray" size="lg" aria-label="View pending approvals" onClick={() => navigate('approvals')}><IconBell size={20} stroke={1.5} />{pending > 0 && <span className="notification-dot" />}</ActionIcon></Tooltip>
+          <div className="account-divider" />
+          <Avatar color="teal" radius="xl" size={36}>{data.admin.username.charAt(0).toUpperCase()}</Avatar>
+          <div className="account-label"><strong>{data.admin.username}</strong><span>Administrator</span></div>
+        </div>
+      </div>
     </AppShell.Header>
     <AppShell.Navbar className="sidebar" p="md">
-      <ScrollArea h="100%" viewportProps={{ tabIndex: 0, 'aria-label': 'Navigation' }}>
-      <div className="sidebar-brand"><IconServer size={23} /><span>Server Manager</span></div>
-      <Stack component="nav" aria-label="Main navigation" gap={8} mt="lg">{nav.map(item => <button type="button" aria-current={view === item.id ? 'page' : undefined} className={`nav-button ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); if (item.id === 'monitor') setMonitorServerId(null); setMobileOpened(false); }}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color="gray" circle ml="auto">{pending}</Badge>}</button>)}</Stack>
+      <ScrollArea className="sidebar-scroll" viewportProps={{ tabIndex: 0, 'aria-label': 'Navigation' }}>
+        <span className="nav-section-label">Workspace</span>
+        <Stack component="nav" aria-label="Main navigation" gap={7}>{nav.map((item, index) => <div key={item.id}>
+          {index === 3 && <span className="nav-section-label nav-section-divider">Administration</span>}
+          <button type="button" aria-current={view === item.id ? 'page' : undefined} className={`nav-button ${view === item.id ? 'active' : ''}`} onClick={() => navigate(item.id)}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color={view === 'approvals' ? 'gray' : 'teal'} variant="light" circle ml="auto">{pending}</Badge>}</button>
+        </div>)}</Stack>
       </ScrollArea>
+      <div className="sidebar-footer">
+        <div className="workspace-card"><span className="workspace-card-icon"><IconActivity size={22} stroke={1.5} /></span><strong>Your infrastructure,<br />at a glance.</strong><p>Follow resource usage across your managed servers.</p><Button fullWidth variant="light" rightSection={<IconArrowUpRight size={15} />} onClick={() => navigate('monitor')}>Open monitor</Button></div>
+        <div className={`service-status ${fatal ? 'has-error' : ''}`}><i /><span>{fatal ? 'Service needs attention' : 'Manager connected'}</span><span className="service-status-count">{data.servers.length} hosts</span></div>
+      </div>
     </AppShell.Navbar>
     <AppShell.Main className="main-area"><ScrollArea key={view} className="page-scroll" h="calc(100dvh - var(--app-shell-header-offset, 0px))" viewportProps={{ tabIndex: 0, 'aria-label': 'Page content' }}><main className="content">
       {fatal && <Alert color="red" mb="md" withCloseButton onClose={() => setFatal('')}>{fatal}</Alert>}
-      {view === 'dashboard' && <DashboardPage data={data} refresh={refresh} openServers={() => setView('overview')} />}
+      {view === 'dashboard' && <DashboardPage data={data} refresh={refresh} openServers={() => navigate('overview')} openApprovals={() => navigate('approvals')} />}
       {view === 'overview' && <Servers data={data} saved={refresh} monitor={server => { setMonitorServerId(server.id); setView('monitor'); }} />}
       {view === 'monitor' && <ResourceMonitor data={data} serverId={monitorServerId} selectServer={setMonitorServerId} />}
       {view === 'users' && <Users data={data} openRequest={setRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}

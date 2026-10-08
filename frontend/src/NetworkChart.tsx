@@ -16,8 +16,8 @@ export default function NetworkChart({ sample, history, end, paused }: {
     ...(sample?.network?.interfaces.map(item => item.name) ?? []),
     ...history.flatMap(point => point.sample?.network?.interfaces.map(item => item.name) ?? [])])];
   const directions = [
-    { id: 'rx_bytes_per_second', label: 'Download', color: '#69a4d0' },
-    { id: 'tx_bytes_per_second', label: 'Upload', color: '#edb16f' },
+    { id: 'rx_bytes_per_second', label: 'Download', color: '#039be5' },
+    { id: 'tx_bytes_per_second', label: 'Upload', color: '#009688' },
   ] as const;
   const series = directions.map(direction => ({
     ...direction,
