@@ -187,8 +187,8 @@ function RequestModal({ draft, servers, close, saved }: { draft: RequestDraft | 
   return <Modal opened onClose={() => !busy && close()} closeOnClickOutside={!busy} closeOnEscape={!busy} title={create ? t("New user") : t(actionLabels[draft.mode])} centered radius="lg">
     <form onSubmit={submit}><Stack gap="md">
       {create ? <><TextInput label={t("Linux username")} placeholder={t("e.g. alex")} value={username} onChange={e => setUsername(e.currentTarget.value)} pattern="[a-z_][a-z0-9_-]{0,31}" required /><TextInput label={t("Name or note (optional)")} placeholder={t("e.g. Alex Morgan · Research")} value={fullName} onChange={e => setFullName(e.currentTarget.value)} maxLength={100} />
-        <Checkbox.Group label={t("Allowed hosts")} description={t("An account will be created on each selected host.")} value={selected} onChange={setSelected}><SimpleGrid cols={2} mt="sm">{servers.filter(s => s.enabled).map(server => <Checkbox key={server.id} value={server.name} label={server.name.toUpperCase()} />)}</SimpleGrid></Checkbox.Group>
-        <Switch label={t("Grant sudo access")} description={t("Allow this user to run administrative commands")} checked={sudo} onChange={e => setSudo(e.currentTarget.checked)} />
+        <Checkbox.Group label={t("Allowed hosts")} value={selected} onChange={setSelected}><SimpleGrid cols={2} mt="sm">{servers.filter(s => s.enabled).map(server => <Checkbox key={server.id} value={server.name} label={server.name.toUpperCase()} />)}</SimpleGrid></Checkbox.Group>
+        <Switch label={t("Grant sudo access")} checked={sudo} onChange={e => setSudo(e.currentTarget.checked)} />
         <Alert color="blue" variant="light" icon={<IconKey size={17} />}>{t("Approval generates an Ed25519 key. Credentials can be downloaded once; share them through a secure channel.")}</Alert>
       </> : <><Paper withBorder p="sm"><Text size="xs" c="dimmed">{t("Linux user")}</Text><Text fw={700}>{username}</Text></Paper><Paper withBorder p="sm"><Text size="xs" c="dimmed">{t("Target host")}</Text><Text fw={700}>{draft.server?.toUpperCase()}</Text></Paper>{draft.mode === 'set_sudo' && <Text size="sm">{t("This request will")} {sudo ? t('grant') : t('revoke')} {t("sudo access.")}</Text>}</>}
       {draft.mode === 'delete_user' && <><Alert color="red">{t("This removes the account from")} {draft.server}{t(". Its home directory and files will be kept. End running sessions first. Deletion runs after approval.")}</Alert><TextInput label={t("Type {0} to confirm", { 0: username })} value={deleteName} onChange={e => setDeleteName(e.currentTarget.value)} required /></>}
@@ -210,7 +210,6 @@ function ProfileModal({ profile, close, saved }: { profile: { username: string; 
   return <Modal opened onClose={close} title={t("Edit name or note")} centered radius="lg"><form onSubmit={submit}><Stack>
     <Paper withBorder p="sm"><Text size="xs" c="dimmed">{t("Linux user")}</Text><Text fw={700}>{profile.username}</Text></Paper>
     <TextInput label={t("Name or note (optional)")} value={fullName} onChange={e => setFullName(e.currentTarget.value)} maxLength={100} autoFocus />
-    <Text size="xs" c="dimmed">{t("This profile is shared across the user's accounts on all hosts. Save an empty field to clear it.")}</Text>
     {error && <Alert color="red">{t(error)}</Alert>}
     <Group justify="end"><Button variant="default" onClick={close}>{t("Cancel")}</Button><Button type="submit" loading={busy}>{t("Save")}</Button></Group>
   </Stack></form></Modal>;

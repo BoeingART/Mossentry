@@ -1,6 +1,6 @@
 import { t, locale } from './i18n';
 import { useEffect, useId, useRef, useState } from 'react';
-import { ActionIcon, Badge, Button, Group, ScrollArea, Select, Table, Text, TextInput, Title, Tooltip } from '@mantine/core';
+import { ActionIcon, Badge, Button, Group, ScrollArea, Select, Table, TextInput, Title, Tooltip } from '@mantine/core';
 import { IconArrowUpRight, IconSearch, IconClock, IconCalendar, IconChevronRight, IconRefresh, IconServer, IconShieldCheck, IconUsers, IconUserCheck } from '@tabler/icons-react';
 import type { Dashboard } from './types';
 import { accessCounts, dateTime, DAY, growthWindow, smoothPath, totalAt } from './dashboardData';
@@ -75,7 +75,6 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
       </div>}
     </div>
     <div className="growth-footer"><span className="chart-key"><i className="blue" />{t("Unique users")}</span><span>{count(statistics.dated_users)} {t("dated")}{statistics.undated_users > 0 ? t(" · {0} without a known date", { 0: count(statistics.undated_users) }) : ''}</span></div>
-    <p className="dashboard-footnote">{t("The same username on multiple servers counts as one user, from its earliest known creation date.")}</p>
   </section>;
 }
 
@@ -89,7 +88,7 @@ function ServerAccounts({ data }: { data: Dashboard }) {
       <div className="dashboard-bar-track" role="img" aria-label={t("{0}: {1} accounts{2}", { 0: host.name, 1: host.count, 2: ['error', 'failed'].includes(host.last_scan_status || '') ? ', cached data' : '' })}>
         <span style={{ width: `${host.count / maximum * 100}%`, background: ['#4db6ac', '#4fc3f7', '#4dd0e1'][index % 3] }} />
       </div>
-    </div>)}{!hosts.length && <p className="dashboard-no-data">{t("Add a server to see its accounts.")}</p>}</div></ScrollArea.Autosize>
+    </div>)}{!hosts.length && <p className="dashboard-no-data">{t("No data")}</p>}</div></ScrollArea.Autosize>
   </section>;
 }
 
@@ -106,7 +105,6 @@ function AccessOverview({ data }: { data: Dashboard }) {
       <div className="access-gauge-total"><span>{t("Total unique users")}</span><strong>{count(total)}</strong></div>
     </div>
     <div className="access-gauge-legend"><span><i className="teal" />{t("Sudo access")} <b>{count(sudo)}</b></span><span><i className="cyan" />{t("Standard")} <b>{count(standard)}</b></span></div>
-    <p className="dashboard-footnote">{t("Sudo on any server counts as sudo access.")}</p>
   </section>;
 }
 
@@ -127,14 +125,10 @@ export default function DashboardPage({ data, refresh, openServers, openApproval
   const stale = data.servers.some(server => ['error', 'failed'].includes(server.last_scan_status || ''));
   const latest = data.servers.map(server => server.last_scan_at).filter((date): date is string => !!date).sort().at(-1);
   const metrics = [
-    { id: 'users', label: t("Unique users"), value: data.statistics.total_unique_users, added: data.statistics.new_users_30d, icon: IconUsers,
-      description: t("Unique usernames with a known creation date in the past 30 days.") },
-    { id: 'accounts', label: t("Accounts"), value: data.users.length, added: data.statistics.new_accounts_30d, icon: IconUserCheck,
-      description: t("Current host accounts with a known creation date in the past 30 days. Each host account counts separately.") },
-    { id: 'servers', label: t("Servers"), value: data.servers.length, added: data.statistics.new_servers_30d, icon: IconServer,
-      description: t("Server additions recorded by this manager in the past 30 days.") },
-    { id: 'approvals', label: t("Pending approvals"), value: data.statistics.pending_approvals, added: data.statistics.new_pending_approvals_30d, icon: IconClock,
-      description: t("Requests submitted in the past 30 days that are still awaiting approval.") },
+    { id: 'users', label: t("Unique users"), value: data.statistics.total_unique_users, added: data.statistics.new_users_30d, icon: IconUsers },
+    { id: 'accounts', label: t("Accounts"), value: data.users.length, added: data.statistics.new_accounts_30d, icon: IconUserCheck },
+    { id: 'servers', label: t("Servers"), value: data.servers.length, added: data.statistics.new_servers_30d, icon: IconServer },
+    { id: 'approvals', label: t("Pending approvals"), value: data.statistics.pending_approvals, added: data.statistics.new_pending_approvals_30d, icon: IconClock },
   ];
   return <div className="dashboard-page">
     <header className="dashboard-header"><div><Title order={2}>{t("Dashboard")}</Title></div>
@@ -150,7 +144,7 @@ export default function DashboardPage({ data, refresh, openServers, openApproval
           onClick={metric.id === 'approvals' ? openApprovals : undefined}>
           <span className="dashboard-stat-label">{metric.label}</span>
           <div className="dashboard-stat-value"><span className="dashboard-stat-icon"><Icon size={23} /></span><strong>{count(metric.value)}</strong>
-            {metric.added > 0 && <Tooltip label={metric.description}><span className="dashboard-trend"><span className="dashboard-trend-change"><IconArrowUpRight size={13} />+{count(metric.added)}</span><span className="dashboard-trend-period">{t("in 30 days")}</span></span></Tooltip>}
+            {metric.added > 0 && <span className="dashboard-trend"><span className="dashboard-trend-change"><IconArrowUpRight size={13} />+{count(metric.added)}</span><span className="dashboard-trend-period">{t("in 30 days")}</span></span>}
           </div>
         </Tag>;
       })}
