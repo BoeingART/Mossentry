@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { useEffect, useState } from 'react';
 import { Select } from '@mantine/core';
 import type { ResourceMetrics } from './types';
@@ -16,8 +17,8 @@ export default function NetworkChart({ sample, history, end, paused }: {
     ...(sample?.network?.interfaces.map(item => item.name) ?? []),
     ...history.flatMap(point => point.sample?.network?.interfaces.map(item => item.name) ?? [])])];
   const directions = [
-    { id: 'rx_bytes_per_second', label: 'Download', color: '#039be5' },
-    { id: 'tx_bytes_per_second', label: 'Upload', color: '#009688' },
+    { id: 'rx_bytes_per_second', label: t("Download"), color: '#039be5' },
+    { id: 'tx_bytes_per_second', label: t("Upload"), color: '#009688' },
   ] as const;
   const series = directions.map(direction => ({
     ...direction,
@@ -25,10 +26,10 @@ export default function NetworkChart({ sample, history, end, paused }: {
     points: history.map(point => ({ time: point.time,
       value: point.sample?.network?.interfaces.find(item => item.name === active)?.[direction.id] ?? null })),
   }));
-  return <ResourceChart title="Network" series={series} end={end}
+  return <ResourceChart title={t("Network")} series={series} end={end}
     maximum={rateMaximum(series.flatMap(item => [item.current, ...item.points.map(point => point.value)]))}
     formatValue={formatRate} formatTick={formatRate} axisWidth={92}
-    control={<Select aria-label="Network interface" placeholder="Interface" size="xs" w={170}
+    control={<Select aria-label={t("Network interface")} placeholder={t("Interface")} size="xs" w={170}
       data={names} value={active} onChange={setSelected} allowDeselect={false} disabled={!names.length} />}
-    emptyMessage={sample?.network?.status === 'unavailable' ? 'Unavailable' : paused ? 'Paused' : 'No data'} />;
+    emptyMessage={sample?.network?.status === 'unavailable' ? t("Unavailable") : paused ? t("Paused") : t("No data")} />;
 }

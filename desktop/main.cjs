@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, session } = require('electron');
+const { app, BrowserWindow, dialog, session, ipcMain } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -7,6 +7,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const { setting, userDataDirectory, databasePath } = require('./branding.cjs');
+const { preferenceStore } = require('./preferences.cjs');
 const APP_NAME = 'Mossentry';
 const appIcon = path.join(__dirname, 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 app.setName(APP_NAME);
@@ -81,6 +82,14 @@ async function waitForBackend(port) {
 function stopBackend() {
   if (!backend || backend.exitCode !== null) return;
   try {
+    const appearance = preferenceStore(dataHome);
+    ipcMain.on('mossentry:appearance:get', event => {
+      event.returnValue = event.sender === mainWindow?.webContents ? appearance.get() : {};
+    });
+    ipcMain.handle('mossentry:appearance:set', (event, key, value) => {
+      if (event.sender !== mainWindow?.webContents) throw new Error('Untrusted appearance request');
+      appearance.set(key, value);
+    });
     if (process.platform === 'win32') backend.kill();
     else process.kill(-backend.pid, 'SIGTERM');
   } catch {
@@ -103,6 +112,7 @@ function createWindow(origin) {
     }),
     backgroundColor: '#f5f7fb',
     webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
@@ -118,6 +128,14 @@ function createWindow(origin) {
 
 if (hasInstanceLock) app.whenReady().then(async () => {
   try {
+    const appearance = preferenceStore(dataHome);
+    ipcMain.on('mossentry:appearance:get', event => {
+      event.returnValue = event.sender === mainWindow?.webContents ? appearance.get() : {};
+    });
+    ipcMain.handle('mossentry:appearance:set', (event, key, value) => {
+      if (event.sender !== mainWindow?.webContents) throw new Error('Untrusted appearance request');
+      appearance.set(key, value);
+    });
     if (process.platform === 'darwin') app.dock.setIcon(appIcon);
     app.setAboutPanelOptions({ applicationName: APP_NAME, iconPath: appIcon });
     session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));

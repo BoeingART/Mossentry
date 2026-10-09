@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Group, Paper, Text } from '@mantine/core';
@@ -38,7 +39,7 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
   return <Paper withBorder radius="lg" p="lg" className="resource-chart">
     <Group className="chart-heading" justify="space-between" gap="xs" mih={36}><Text fw={700}>{title}</Text>{control}</Group>
     <div ref={ref} className="resource-chart-plot">
-      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label={`${title} chart`}
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label={t("{0} chart", { 0: title })}
         onPointerLeave={() => setHover(null)} onPointerMove={event => {
           const box = event.currentTarget.getBoundingClientRect();
           setHover(Math.max(0, Math.min(1, ((event.clientX - box.left) * width / box.width - left) / plotWidth)));
@@ -46,7 +47,7 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
         <title>{title}</title>
         <defs><clipPath id={clipId}><rect x={left} y={top - 3} width={plotWidth} height={bottom - top + 6} /></clipPath></defs>
         {[0, 0.25, 0.5, 0.75, 1].map(fraction => fraction * maximum).map(value => <g key={value}>
-          <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#f0f1f3" strokeDasharray={value ? '4 4' : undefined} />
+          <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="var(--chart-grid)" strokeDasharray={value ? '4 4' : undefined} />
           <text x={left - 9} y={y(value) + 4} textAnchor="end" className="chart-axis-label">{formatTick(value)}</text>
         </g>)}
         {Array.from({ length: tickCount + 1 }, (_, index) => {

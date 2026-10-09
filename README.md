@@ -38,6 +38,10 @@ cd backend
 
 For interface development, run `npm run dev:ui` in another terminal; Vite proxies `/api` to port 8000. The interface is intended for the desktop app. When developing through Vite against the standalone backend, establish a session with `POST /api/login` first; administrator authentication remains available through the backend API.
 
+## Appearance and language
+
+The upper-right controls switch between day and night mode and between English and Simplified Chinese. Both choices are saved locally and restored on the next launch. Switching language preserves the current page, form inputs, and monitoring history. Server names, usernames, addresses, and saved data remain as entered.
+
 ## Branding and icons
 
 `icon.svg` is the source artwork for the interface logo and browser favicon. Vite includes it in the built assets served by FastAPI. `desktop/icons/icon.png` supplies the desktop window and macOS Dock icon; `icon.ico` and `icon.icns` provide Windows and macOS application icon resources. Regenerate all desktop formats after editing the SVG with `npm run build:icons`, then restart the app. The name shown in the window, application menu, About panel, and backend is **Mossentry**.

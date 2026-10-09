@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { Dashboard } from './types';
 
 let csrf = '';
@@ -15,21 +16,21 @@ export async function api<T>(path: string, method = 'GET', body?: unknown, signa
     signal,
   }).catch((error) => {
     if (signal?.aborted) throw error;
-    throw new Error('Cannot reach the local service. Reopen the app and retry.');
+    throw new Error(t("Cannot reach the local service. Reopen the app and retry."));
   });
   const contentType = response.headers.get('content-type') || '';
   const data = contentType.includes('json') ? await response.json() : await response.text();
   if (!response.ok) {
     const detail = data?.detail;
-    const labels: Record<string, string> = { name: 'server name', hostname: 'server address', port: 'SSH port', ssh_user: 'SSH login account', key_path: 'private key path', username: 'username', servers: 'server selection', new_password: 'new password' };
-    const message = response.status === 500 ? 'The local service could not complete this operation. Please retry.'
+    const labels: Record<string, string> = { name: t("server name"), hostname: t("server address"), port: t("SSH port"), ssh_user: t("SSH login account"), key_path: t("private key path"), username: t("username"), servers: t("server selection"), new_password: t("new password") };
+    const message = response.status === 500 ? t("The local service could not complete this operation. Please retry.")
       : Array.isArray(detail) ? [...new Set(detail.map(item => {
         if (item.type === 'value_error' && typeof item.msg === 'string') return item.msg.replace(/^Value error, /, '');
         const field = item.loc?.at(-1);
-        return `Check the ${labels[field] || 'entered information'} and try again.`;
+        return t("Check the {0} and try again.", { 0: labels[field] || t("entered information") });
       }))].join(' ')
-      : typeof detail === 'string' ? detail : 'The operation could not finish. Please retry.';
-    const error = new Error(message) as Error & { status?: number };
+      : typeof detail === 'string' ? detail : t("The operation could not finish. Please retry.");
+    const error = new Error(t(message)) as Error & { status?: number };
     error.status = response.status;
     throw error;
   }
@@ -46,7 +47,7 @@ export async function downloadCredentials(actionId: number, username: string) {
   const response = await fetch(`/api/actions/${actionId}/private-key`, { credentials: 'same-origin' });
   if (!response.ok) {
     const data = await response.json().catch(() => null);
-    throw new Error(data?.detail || 'Credentials could not be downloaded');
+    throw new Error(data?.detail || t("Credentials could not be downloaded"));
   }
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
