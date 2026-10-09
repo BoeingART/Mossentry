@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Mossentry — 苔哨</title>
+  <desc id="desc">Flat front-facing MOSS-inspired camera with one red eye above a symmetric green moss tuft. Solid colors, aligned geometry, uniform strokes, transparent background.</desc>
+  <!-- All outlined elements use a 12-unit stroke. The composition is centered on x=256. -->
+  <g stroke="#263D36" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M232 116V84H280V116"/>
+    <path d="M176 116H336L360 140V352L336 376H176L152 352V140Z" fill="#EDF1E7"/>
+  </g>
+  <!-- Optical panel and lens are concentric and use solid fills only. -->
+  <rect x="188" y="156" width="136" height="128" rx="16" fill="#263D36"/>
+  <circle cx="256" cy="220" r="32" fill="#E96556"/>
+  <g stroke="#263D36" stroke-width="12" stroke-linecap="round">
+    <path d="M194 312H254M298 312H318"/>
+  </g>
+  <!-- A single symmetric silhouette replaces the detailed botanical base. -->
+  <path d="M144 432C122 432 108 418 108 400C108 382 122 368 140 368C142 344 174 336 192 352C208 336 240 336 256 360C272 336 304 336 320 352C338 336 370 344 372 368C390 368 404 382 404 400C404 418 390 432 368 432Z" fill="#7FAA69" stroke="#263D36" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Two mirrored branching marks suggest moss at small sizes. -->
+  <g stroke="#263D36" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M196 404V376M180 384L196 396L212 384M316 404V376M300 384L316 396L332 384"/>
+  </g>
+</svg>

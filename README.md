@@ -1,4 +1,4 @@
-# Server Manager
+# Mossentry — a server manager application
 
 Electron desktop application for managing Linux servers over SSH. The interface uses React, Mantine, and TypeScript. A local FastAPI service handles host scans, access requests, approvals, audit events, and one-time credential downloads.
 
