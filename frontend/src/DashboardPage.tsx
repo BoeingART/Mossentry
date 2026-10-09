@@ -1,3 +1,4 @@
+import { dateAxisTicks, numericDate } from './dateFormat';
 import { t, locale } from './i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ActionIcon, Badge, Button, Group, ScrollArea, Select, Table, TextInput, Title, Tooltip } from '@mantine/core';
@@ -6,9 +7,7 @@ import type { Dashboard } from './types';
 import { accessCounts, dateTime, DAY, growthWindow, smoothPath, totalAt } from './dashboardData';
 
 const count = (value: number) => value.toLocaleString(locale());
-const shortDate = (time: number, full = false) => new Intl.DateTimeFormat(locale(), {
-  month: 'short', day: 'numeric', ...(full ? { year: 'numeric' as const } : {}), timeZone: 'UTC',
-}).format(time);
+
 
 function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
   const [range, setRange] = useState('all');
@@ -23,7 +22,7 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
   }, []);
   const { history, through } = statistics;
   const { start, end, points } = growthWindow(history, through, range);
-  const left = 50, right = width - 14, top = 20, bottom = 224;
+  const left = 58, right = width - 14, top = 20, bottom = 224;
   const largest = Math.max(1, points.at(-1)!.total);
   const power = 10 ** Math.floor(Math.log10(Math.max(1, largest / 4)));
   const step = [1, 2, 5, 10].find(n => n * power >= largest / 4)! * power;
@@ -34,7 +33,7 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
   const hoverTime = hover === null ? null : Math.round((start + hover * (end - start)) / DAY) * DAY;
   const hoverTotal = hoverTime === null ? 0 : totalAt(history, hoverTime);
   const added = hoverTime === null ? 0 : history.find(point => dateTime(point.date) === hoverTime)?.added ?? 0;
-  const tickCount = width < 480 ? 2 : 5;
+  const dateTicks = dateAxisTicks(start, end, right - left);
   return <section className="dashboard-panel user-number-panel" aria-labelledby="user-number-title">
     <div className="dashboard-panel-heading"><div><Title order={3} id="user-number-title">{t("User growth")}</Title></div>
       <Select aria-label={t("User number time range")} value={range} allowDeselect={false} onChange={value => { setRange(value || 'all'); setHover(null); }}
@@ -60,8 +59,8 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
           <text x={left - 13} y={y(value) + 4} textAnchor="end" className="chart-axis-label">{Intl.NumberFormat(locale(), { notation: 'compact' }).format(value)}</text>
           <line x1={left} x2={right} y1={y(value)} y2={y(value)} stroke="var(--chart-grid)" />
         </g>)}
-        {Array.from({ length: tickCount + 1 }, (_, index) => <text key={index} x={x(start + (end - start) * index / tickCount)} y={bottom + 29}
-          textAnchor={index === 0 ? 'start' : index === tickCount ? 'end' : 'middle'} className="chart-axis-label">{shortDate(start + (end - start) * index / tickCount, end - start > 365 * DAY)}</text>)}
+        {dateTicks.map((tick, index) => <text key={index} x={x(tick.time)} y={bottom + 29}
+          textAnchor={index === 0 ? 'start' : index === dateTicks.length - 1 ? 'end' : 'middle'} className="chart-axis-label">{tick.label}</text>)}
         {history.length > 0 && <>
           <path d={`${path} L ${right} ${bottom} L ${left} ${bottom} Z`} fill={`url(#${gradient})`} />
           <path d={path} fill="none" stroke="#039be5" strokeWidth={2} strokeLinecap="round" />
@@ -70,8 +69,8 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
         </>}
       </svg>
       {!history.length && <div className="growth-empty"><IconUsers size={25} stroke={1.5} /><strong>{t("No creation dates yet")}</strong></div>}
-      {!!history.length && hoverTime !== null && <div className="growth-tooltip" style={{ left: Math.max(8, Math.min(width - 224, x(hoverTime) + 14)) }} aria-live="polite">
-        <strong>{shortDate(hoverTime, true)}</strong><div><span><i className="blue" />{t("Unique users")}</span><b>{count(hoverTotal)}</b></div><div><span><i className="teal" />{t("New that day")}</span><b>{count(added)}</b></div>
+      {!!history.length && hoverTime !== null && <div className="growth-tooltip" style={{ left: Math.max(8, Math.min(width - 254, x(hoverTime) + 14)) }} aria-live="polite">
+        <strong>{numericDate(hoverTime, { utc: true })}</strong><div><span><i className="blue" />{t("Unique users")}</span><b>{count(hoverTotal)}</b></div><div><span><i className="teal" />{t("New that day")}</span><b>{count(added)}</b></div>
       </div>}
     </div>
     <div className="growth-footer"><span className="chart-key"><i className="blue" />{t("Unique users")}</span><span>{count(statistics.dated_users)} {t("dated")}{statistics.undated_users > 0 ? t(" · {0} without a known date", { 0: count(statistics.undated_users) }) : ''}</span></div>
@@ -132,7 +131,7 @@ export default function DashboardPage({ data, refresh, openServers, openApproval
   ];
   return <div className="dashboard-page">
     <header className="dashboard-header"><div><Title order={2}>{t("Dashboard")}</Title></div>
-      <div className="dashboard-header-end"><span>{new Intl.DateTimeFormat(locale(), { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date())}</span><span className="dashboard-calendar"><IconCalendar size={18} /></span>
+      <div className="dashboard-header-end"><span>{numericDate(new Date())}</span><span className="dashboard-calendar"><IconCalendar size={18} /></span>
         <Tooltip label={t("Refresh dashboard")}><ActionIcon variant="subtle" color="gray" aria-label={t("Refresh dashboard")} loading={refreshing} onClick={async () => { setRefreshing(true); try { await refresh(); } finally { setRefreshing(false); } }}><IconRefresh size={17} /></ActionIcon></Tooltip>
       </div>
     </header>
@@ -151,7 +150,7 @@ export default function DashboardPage({ data, refresh, openServers, openApproval
     </div>
     <div className="dashboard-primary-grid"><UserNumber statistics={data.statistics} /><AccessOverview data={data} /></div>
     <div className="dashboard-chart-grid"><ServerAccounts data={data} /><RequestActivity data={data} openApprovals={openApprovals} /></div>
-    <section className="dashboard-server-section" aria-labelledby="server-overview-title"><Group justify="space-between"><Group gap="md"><Title order={3} id="server-overview-title">{t("Server overview")}</Title><span className="dashboard-caption">{latest ? t("Last sync {0}", { 0: new Intl.DateTimeFormat(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(latest)) }) : t("Ready to sync")}</span></Group><Button variant="subtle" color="gray" size="xs" rightSection={<IconChevronRight size={15} />} onClick={openServers}>{t("View all")}</Button></Group>
+    <section className="dashboard-server-section" aria-labelledby="server-overview-title"><Group justify="space-between"><Group gap="md"><Title order={3} id="server-overview-title">{t("Server overview")}</Title><span className="dashboard-caption">{latest ? t("Last sync {0}", { 0: numericDate(latest, { includeTime: true }) }) : t("Ready to sync")}</span></Group><Button variant="subtle" color="gray" size="xs" rightSection={<IconChevronRight size={15} />} onClick={openServers}>{t("View all")}</Button></Group>
       {stale && <p className="dashboard-cache-note">{t("Some servers could not sync. Their account totals use the last saved data.")}</p>}
       <div className="server-table-toolbar"><TextInput aria-label={t("Search server overview")} placeholder={t("Search servers…")} leftSection={<IconSearch size={16} />} value={search} onChange={event => setSearch(event.currentTarget.value)} /><span className="dashboard-caption">{hosts.length} {t("servers in your workspace")}</span></div>
       <ScrollArea><Table className="dashboard-server-table" miw={620} verticalSpacing="md" horizontalSpacing="md" highlightOnHover><Table.Thead><Table.Tr><Table.Th>{t("Server name")}</Table.Th><Table.Th>{t("SSH port")}</Table.Th><Table.Th>{t("Management")}</Table.Th><Table.Th>{t("Sync status")}</Table.Th><Table.Th ta="right">{t("Accounts")}</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{hosts.slice(0, 5).map((server, index) => {

@@ -1,4 +1,5 @@
-import { t, locale } from './i18n';
+import { numericDate } from './dateFormat';
+import { t } from './i18n';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Modal, NumberInput, Paper, Progress, Select, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip } from '@mantine/core';
@@ -7,7 +8,7 @@ import { notifications } from '@mantine/notifications';
 import { api } from './api';
 import type { Dashboard, Server, ServerMetrics } from './types';
 
-const date = (value: string | null) => value ? new Date(value).toLocaleString(locale()) : t("Not yet synced");
+const date = (value: string | null) => value ? numericDate(value, { includeTime: true }) : t("Not yet synced");
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : t("Please retry the operation");
 const notify = (message: string, error = false) => notifications.show({ title: error ? t("Could not complete") : t("Done"), message: t(message), color: error ? 'red' : 'teal' });
 type Draft = { name: string; hostname: string; port: number | string; ssh_user: string; key_path: string; enabled: boolean };

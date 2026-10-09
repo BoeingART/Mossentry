@@ -28,7 +28,7 @@ export default function NetworkChart({ sample, history, end, paused }: {
   }));
   return <ResourceChart title={t("Network")} series={series} end={end}
     maximum={rateMaximum(series.flatMap(item => [item.current, ...item.points.map(point => point.value)]))}
-    formatValue={formatRate} formatTick={formatRate} axisWidth={92}
+    formatValue={formatRate} formatTick={formatRate} axisWidth={104}
     control={<Select aria-label={t("Network interface")} placeholder={t("Interface")} size="xs" w={170}
       data={names} value={active} onChange={setSelected} allowDeselect={false} disabled={!names.length} />}
     emptyMessage={sample?.network?.status === 'unavailable' ? t("Unavailable") : paused ? t("Paused") : t("No data")} />;

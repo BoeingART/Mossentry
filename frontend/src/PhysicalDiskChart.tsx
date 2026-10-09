@@ -4,7 +4,7 @@ import type { PhysicalDiskGroup } from './types';
 
 export default function PhysicalDiskChart({ disks, loading }: { disks: PhysicalDiskGroup[]; loading: boolean }) {
   return <Paper withBorder radius="lg" p="lg" className="resource-chart">
-    <Text fw={500}>{t("Disk")}</Text>
+    <Text fw={600}>{t("Disk")}</Text>
     <div className="disk-chart-axis" aria-hidden="true">{[0, 25, 50, 75, 100].map(value => <span key={value}>{value}%</span>)}</div>
     <ScrollArea.Autosize mah={295} type="auto"><Stack gap="lg">
       {disks.map(disk => <div key={disk.id} className="disk-chart-row">

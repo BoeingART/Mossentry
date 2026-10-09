@@ -1,4 +1,5 @@
-import { t, locale, useLanguage } from './i18n';
+import { numericDate } from './dateFormat';
+import { t, useLanguage } from './i18n';
 import brandIcon from '../../icon.svg';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type * as React from 'react';
@@ -50,10 +51,7 @@ const pageSize = 12;
 
 function formatDate(value: string | null | undefined) {
   if (!value) return t("Never");
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(locale(), {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  }).format(date);
+  return numericDate(value, { includeTime: true });
 }
 
 function message(error: unknown) { return error instanceof Error ? error.message : t("Operation failed"); }
@@ -98,7 +96,7 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
       <Select aria-label={t("Filter by server")} value={host} allowDeselect={false} onChange={value => { setHost(value); setPage(1); }} data={[{ value: 'all', label: t("All servers") }, ...data.servers.map(s => ({ value: s.name, label: s.name }))]} /><SegmentedControl value={filter} onChange={value => { setFilter(value); setPage(1); }} data={[t("Enabled"), t("Sudo"), t("Disabled"), t("All")].map(label => ({ label, value: label.toLowerCase() }))} />
     </Group>
     <Card withBorder radius="lg" p={0}>
-      <Box p="lg"><Title order={3} size="h4">{t("Server users")}</Title></Box>
+      <Box p="lg"><Title order={3}>{t("Server users")}</Title></Box>
       {shown.length ? shown.map(group => <details className="user-group" key={group.username}>
         <summary><Group justify="space-between" wrap="nowrap" p="md" gap="sm">
           <Group wrap="nowrap" gap="sm"><Avatar color="blue" radius="xl">{(group.fullName || group.username).charAt(0).toUpperCase()}</Avatar><div><Text fw={600} size="sm">{group.fullName || group.username} {group.fullName && <Text span c="dimmed" fw={500}>({group.username})</Text>}</Text><Text size="xs" c="dimmed">{group.accounts.length} {t("host accounts")}</Text></div></Group>
@@ -134,7 +132,7 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
       {data.actions.slice((Math.min(page, pages) - 1) * 10, Math.min(page, pages) * 10).map(action => <Card key={action.id} withBorder radius="lg" p="lg" className="approval-row">
         <Group justify="space-between" align="start" gap="md">
           <Group align="start" gap="md"><ThemeIcon variant="light" color={action.action_type === 'create_user' ? 'blue' : 'cyan'} size={40} radius="md">{action.action_type === 'create_user' ? <IconUser size={20} /> : <IconKey size={20} />}</ThemeIcon><div>
-            <Group gap="xs"><Text className="approval-title" fw={700}>#{action.id} {t(actionLabels[action.action_type])} · {action.target_user}</Text><Badge color={statusColors[action.status]} variant="light">{t(statusLabels[action.status])}</Badge></Group>
+            <Group gap="xs"><Text className="approval-title" fw={600}>#{action.id} {t(actionLabels[action.action_type])} · {action.target_user}</Text><Badge color={statusColors[action.status]} variant="light">{t(statusLabels[action.status])}</Badge></Group>
             <Text size="sm" c="dimmed" mt={3}>{t("Target:")} {action.target_server}{action.action_type === 'set_sudo' ? ` · ${action.payload.sudo ? t("Grant sudo") : t("Revoke sudo")}` : ''}{action.action_type === 'create_user' ? ` · ${action.payload.sudo ? t("Sudo user") : t("Standard user")}` : ''}</Text>
             <Text size="xs" c="dimmed" mt={4}>{t("Requested by")} {action.requested_by_name} · {formatDate(action.requested_at)}</Text>
           </div></Group>
@@ -154,7 +152,7 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
 
 function AuditLog({ data }: { data: Dashboard }) {
   return <><SectionHeading title={t("Activity log")} />
-    <Card withBorder radius="lg" p={0}><Box p="lg"><Title order={3} size="h4">{t("Audit trail")}</Title></Box>
+    <Card withBorder radius="lg" p={0}><Box p="lg"><Title order={3}>{t("Audit trail")}</Title></Box>
       <ScrollArea><Table striped highlightOnHover miw={700} verticalSpacing="md" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>{t("Time")}</Table.Th><Table.Th>{t("Administrator")}</Table.Th><Table.Th>{t("Event")}</Table.Th><Table.Th>{t("Target")}</Table.Th>{!data.admin.desktop_mode && <Table.Th>{t("Source")}</Table.Th>}</Table.Tr></Table.Thead><Table.Tbody>
         {data.audit.map(item => <Table.Tr key={item.id}><Table.Td>{formatDate(item.created_at)}</Table.Td><Table.Td>{item.actor || t("System")}</Table.Td><Table.Td><Text fw={700} size="sm">{t(eventLabels[item.event] || 'Other activity')}</Text></Table.Td><Table.Td>{item.target === 'all_servers' ? t("All servers") : item.target?.startsWith('action:') ? t("Request #{0}", { 0: item.target.slice(7) }) : item.target || '—'}</Table.Td>{!data.admin.desktop_mode && <Table.Td>{item.ip_address || '—'}</Table.Td>}</Table.Tr>)}
       </Table.Tbody></Table></ScrollArea>{!data.audit.length && <Empty text={t("No activity yet")} />}</Card>

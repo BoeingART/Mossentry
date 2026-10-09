@@ -10,7 +10,7 @@ const percentLabel = (value: number) => `${value.toFixed(1)}%`;
 const percentTick = (value: number) => `${value}%`;
 const timeLabel = (time: number) => new Date(time).toLocaleTimeString([], { hour12: false });
 
-export default function ResourceChart({ title, control, series, end, emptyMessage, maximum = 100, formatValue = percentLabel, formatTick = percentTick, axisWidth = 46 }: {
+export default function ResourceChart({ title, control, series, end, emptyMessage, maximum = 100, formatValue = percentLabel, formatTick = percentTick, axisWidth = 54 }: {
   title: string; control?: ReactNode; series: ChartSeries[]; end: number; emptyMessage: string;
   maximum?: number; formatValue?: (value: number) => string; formatTick?: (value: number) => string; axisWidth?: number;
 }) {
@@ -37,7 +37,7 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
     return { label: item.label, color: item.color, point: point && Math.abs(point.time - hoverTime) <= 5_000 ? point : null };
   });
   return <Paper withBorder radius="lg" p="lg" className="resource-chart">
-    <Group className="chart-heading" justify="space-between" gap="xs" mih={36}><Text fw={700}>{title}</Text>{control}</Group>
+    <Group className="chart-heading" justify="space-between" gap="xs" mih={36}><Text fw={600}>{title}</Text>{control}</Group>
     <div ref={ref} className="resource-chart-plot">
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label={t("{0} chart", { 0: title })}
         onPointerLeave={() => setHover(null)} onPointerMove={event => {
