@@ -1,1 +1,1 @@
-"""Server manager application."""
+"""Mossentry server management application."""

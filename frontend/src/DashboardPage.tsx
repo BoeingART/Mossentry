@@ -136,7 +136,7 @@ export default function DashboardPage({ data, refresh, openServers, openApproval
       description: 'Requests submitted in the past 30 days that are still awaiting approval.' },
   ];
   return <div className="dashboard-page">
-    <header className="dashboard-header"><div><Title order={2}>Dashboard</Title><Text>A clear view of your servers, users, and access.</Text></div>
+    <header className="dashboard-header"><div><Title order={2}>Dashboard</Title></div>
       <div className="dashboard-header-end"><span>{new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date())}</span><span className="dashboard-calendar"><IconCalendar size={18} /></span>
         <Tooltip label="Refresh dashboard"><ActionIcon variant="subtle" color="gray" aria-label="Refresh dashboard" loading={refreshing} onClick={async () => { setRefreshing(true); try { await refresh(); } finally { setRefreshing(false); } }}><IconRefresh size={17} /></ActionIcon></Tooltip>
       </div>

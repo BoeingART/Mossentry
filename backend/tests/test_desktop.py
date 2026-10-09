@@ -13,9 +13,9 @@ class DesktopModeTests(unittest.TestCase):
     def test_opens_dashboard_without_password_but_rejects_other_clients(self):
         with tempfile.TemporaryDirectory() as directory:
             with patch.dict(os.environ, {
-                "SRVMGR_DATA_DIR": directory,
-                "SRVMGR_DB_PATH": str(Path(directory) / "desktop.db"),
-                "SRVMGR_DESKTOP_TOKEN": "desktop-test-secret",
+                "MOSSENTRY_DATA_DIR": directory,
+                "MOSSENTRY_DB_PATH": str(Path(directory) / "desktop.db"),
+                "MOSSENTRY_DESKTOP_TOKEN": "desktop-test-secret",
             }):
                 import app.config
                 import app.db
@@ -37,6 +37,12 @@ class DesktopModeTests(unittest.TestCase):
                     self.assertEqual(page.status_code, 200)
                     self.assertIn('<div id="root"></div>', page.text)
                     self.assertIn('/assets/', page.text)
+                    self.assertIn('<title>Mossentry</title>', page.text)
+                    favicon = re.search(r'href="(/assets/[^\"]+\.svg)"', page.text)
+                    self.assertIsNotNone(favicon)
+                    icon = client.get(favicon.group(1))
+                    self.assertEqual(icon.status_code, 200)
+                    self.assertIn('Mossentry', icon.text)
                     asset = re.search(r'src="(/assets/[^"]+\.js)"', page.text)
                     self.assertIsNotNone(asset)
                     self.assertEqual(client.get(asset.group(1)).status_code, 200)

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, Iterator
 
-from .config import DATA_DIR, DB_PATH, DEFAULT_SERVERS, SESSION_HOURS
+from .config import DATA_DIR, DB_PATH, DEFAULT_SERVERS, SESSION_HOURS, setting
 from .security import hash_password, token
 from .user_history import remember_users
 
@@ -146,12 +145,12 @@ def init_db() -> None:
         conn.execute("INSERT OR IGNORE INTO settings(key,value) VALUES('servers_seeded','1')")
         conn.execute("PRAGMA optimize")
         count = conn.execute("SELECT COUNT(*) FROM admins").fetchone()[0]
-        desktop_mode = bool(os.environ.get("SRVMGR_DESKTOP_TOKEN"))
+        desktop_mode = bool(setting("DESKTOP_TOKEN"))
         if count == 0:
-            password = token() if desktop_mode else (os.environ.get("SRVMGR_ADMIN_PASSWORD") or token()[:20])
+            password = token() if desktop_mode else (setting("ADMIN_PASSWORD") or token()[:20])
             conn.execute(
                 "INSERT INTO admins(username, password_hash, created_at) VALUES (?, ?, ?)",
-                (os.environ.get("SRVMGR_ADMIN_USER", "admin"), hash_password(password), now()),
+                (setting("ADMIN_USER", "admin"), hash_password(password), now()),
             )
             if not desktop_mode:
                 password_file = DATA_DIR / "initial_admin_password"

@@ -1,4 +1,6 @@
-# Mossentry — a server manager application
+# Mossentry
+
+<img src="icon.svg" width="112" height="112" alt="Mossentry icon" />
 
 Electron desktop application for managing Linux servers over SSH. The interface uses React, Mantine, and TypeScript. A local FastAPI service handles host scans, access requests, approvals, audit events, and one-time credential downloads.
 
@@ -36,13 +38,17 @@ cd backend
 
 For interface development, run `npm run dev:ui` in another terminal; Vite proxies `/api` to port 8000. The interface is intended for the desktop app. When developing through Vite against the standalone backend, establish a session with `POST /api/login` first; administrator authentication remains available through the backend API.
 
+## Branding and icons
+
+`icon.svg` is the source artwork for the interface logo and browser favicon. Vite includes it in the built assets served by FastAPI. `desktop/icons/icon.png` supplies the desktop window and macOS Dock icon; `icon.ico` and `icon.icns` provide Windows and macOS application icon resources. Regenerate all desktop formats after editing the SVG with `npm run build:icons`, then restart the app. The name shown in the window, application menu, About panel, and backend is **Mossentry**.
+
 ## Host connections and data
 
-Add, edit, pause, or remove servers from the **Servers** page. The five hosts in `backend/app/config.py` seed new installations once; subsequent changes live in SQLite, and removed hosts stay removed after restart. The connection form accepts a hostname or IPv4/IPv6 address, SSH port, login account and an absolute or `~/` private-key path. The default management key is `~/.ssh/id_rsa`; existing servers keep their saved key paths. Set `SRVMGR_SSH_DIR` to use another key directory for the initial server inventory. Keys must have mode `0600`. Each remote host must accept SSH and grant the `srvmgr` account the configured sudo access.
+Add, edit, pause, or remove servers from the **Servers** page. The five hosts in `backend/app/config.py` seed new installations once; subsequent changes live in SQLite, and removed hosts stay removed after restart. The connection form accepts a hostname or IPv4/IPv6 address, SSH port, login account and an absolute or `~/` private-key path. The default management key is `~/.ssh/id_rsa`; existing servers keep their saved key paths. Set `MOSSENTRY_SSH_DIR` to use another key directory for the initial server inventory. Keys must have mode `0600`. Each remote host must accept SSH and grant the `srvmgr` account the configured sudo access.
 
-If sudo needs a password, put one nonempty line in `srvmgr.passwd` in the application data directory with mode `0600`, or set `SRVMGR_BECOME_PASSWORD_FILE` to another file.
+If sudo needs a password, put one nonempty line in `srvmgr.passwd` in the application data directory with mode `0600`, or set `MOSSENTRY_BECOME_PASSWORD_FILE` to another file.
 
-Runtime data lives under `data` in the Electron user-data directory. Set `SRVMGR_USER_DATA_DIR` to choose another parent directory. Existing data from earlier builds is reused automatically when the new data directory is empty.
+Runtime data lives under `data` in the Electron user-data directory. Set `MOSSENTRY_USER_DATA_DIR` to choose another parent directory. New installations use the `Mossentry` user-data directory and `mossentry.db`. Existing databases and their containing directories from earlier builds are reused in place, including SQLite sidecars and saved credentials. The `MOSSENTRY_*` environment variables take precedence; their previous `SRVMGR_*` equivalents remain supported. Remote SSH usernames such as `srvmgr` and the existing `srvmgr.passwd` file keep their operational meaning.
 
 SSH connection-reuse sockets use a private temporary directory under `/tmp`, removed after each operation. This keeps socket paths within macOS limits even when the application data directory has a long name.
 

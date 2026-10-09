@@ -6,25 +6,19 @@ const net = require('node:net');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-app.setName('Server Manager');
+const { setting, userDataDirectory, databasePath } = require('./branding.cjs');
+const APP_NAME = 'Mossentry';
+const appIcon = path.join(__dirname, 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+app.setName(APP_NAME);
+if (process.platform === 'win32') app.setAppUserModelId('Mossentry');
 let backend;
 let mainWindow;
 let quitting = false;
 let backendFailure;
 const desktopToken = crypto.randomBytes(32).toString('hex');
-if (process.env.SRVMGR_USER_DATA_DIR) {
-  const userDataDirectory = path.resolve(process.env.SRVMGR_USER_DATA_DIR);
-  fs.mkdirSync(userDataDirectory, { recursive: true, mode: 0o700 });
-  app.setPath('userData', userDataDirectory);
-} else {
-  // Reuse data created by earlier builds when the new app directory is empty.
-  const previousDirectory = path.join(app.getPath('appData'), 'luo-server-manager-desktop');
-  const currentDatabase = path.join(app.getPath('userData'), 'data', 'server_manager.db');
-  const previousDatabase = path.join(previousDirectory, 'data', 'server_manager.db');
-  if (!fs.existsSync(currentDatabase) && fs.existsSync(previousDatabase)) {
-    app.setPath('userData', previousDirectory);
-  }
-}
+const dataHome = userDataDirectory(app.getPath('appData'));
+fs.mkdirSync(dataHome, { recursive: true, mode: 0o700 });
+app.setPath('userData', dataHome);
 const hasInstanceLock = app.requestSingleInstanceLock();
 
 if (!hasInstanceLock) {
@@ -45,7 +39,7 @@ function backendDirectory() {
 }
 
 function pythonExecutable() {
-  if (process.env.SRVMGR_PYTHON) return process.env.SRVMGR_PYTHON;
+  if (setting('PYTHON')) return setting('PYTHON');
   const local = path.join(__dirname, '..', '.venv', 'bin', 'python');
   if (fs.existsSync(local)) return local;
   return 'python3';
@@ -101,7 +95,8 @@ function createWindow(origin) {
     minWidth: 980,
     minHeight: 650,
     autoHideMenuBar: true,
-    title: 'Server Manager',
+    title: APP_NAME,
+    icon: appIcon,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     ...(process.platform === 'darwin' ? {} : {
       titleBarOverlay: { color: '#ffffff', symbolColor: '#17233b', height: 64 },
@@ -123,6 +118,8 @@ function createWindow(origin) {
 
 if (hasInstanceLock) app.whenReady().then(async () => {
   try {
+    if (process.platform === 'darwin') app.dock.setIcon(appIcon);
+    app.setAboutPanelOptions({ applicationName: APP_NAME, iconPath: appIcon });
     session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     const dataDirectory = path.join(app.getPath('userData'), 'data');
     fs.mkdirSync(dataDirectory, { recursive: true, mode: 0o700 });
@@ -138,9 +135,9 @@ if (hasInstanceLock) app.whenReady().then(async () => {
       cwd: backendDirectory(),
       env: {
         ...process.env,
-        SRVMGR_DATA_DIR: dataDirectory,
-        SRVMGR_DB_PATH: path.join(dataDirectory, 'server_manager.db'),
-        SRVMGR_DESKTOP_TOKEN: desktopToken,
+        MOSSENTRY_DATA_DIR: dataDirectory,
+        MOSSENTRY_DB_PATH: databasePath(dataDirectory),
+        MOSSENTRY_DESKTOP_TOKEN: desktopToken,
       },
       detached: process.platform !== 'win32',
       stdio: ['ignore', 'ignore', 'pipe'],
@@ -152,14 +149,14 @@ if (hasInstanceLock) app.whenReady().then(async () => {
     });
     backend.on('exit', () => {
       if (!quitting && mainWindow) {
-        dialog.showErrorBox('Service stopped', 'The local service exited unexpectedly. Check the terminal output.');
+        dialog.showErrorBox(`${APP_NAME} — Service stopped`, 'The local service exited unexpectedly. Check the terminal output.');
         app.quit();
       }
     });
     await waitForBackend(port);
     createWindow(origin);
   } catch (error) {
-    dialog.showErrorBox('Startup failed', error.message);
+    dialog.showErrorBox(`${APP_NAME} — Startup failed`, error.message);
     app.quit();
   }
 });

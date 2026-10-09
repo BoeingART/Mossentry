@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .config import ANSIBLE_DIR, DATA_DIR
+from .config import ANSIBLE_DIR, DATA_DIR, setting
 from .db import connect, now, row, rows
 from .user_history import remember_users
 
@@ -58,7 +58,7 @@ def _inventory() -> Path:
 
 
 def _become_password() -> str | None:
-    password_path = Path(os.environ.get("SRVMGR_BECOME_PASSWORD_FILE", DATA_DIR / "srvmgr.passwd"))
+    password_path = Path(setting("BECOME_PASSWORD_FILE", DATA_DIR / "srvmgr.passwd"))
     if not password_path.exists():
         return None
     mode = stat.S_IMODE(password_path.stat().st_mode)
@@ -106,7 +106,7 @@ def _run(playbook: str, limit: str, extra: dict[str, Any] | None = None, timeout
         # macOS limits Unix socket paths to 104 bytes. Neither the application
         # data directory nor macOS's per-user TMPDIR is reliably short enough.
         # mkdtemp creates a private (0700), unpredictable directory per run.
-        with tempfile.TemporaryDirectory(prefix="srvmgr-ssh-", dir="/tmp") as control_dir:
+        with tempfile.TemporaryDirectory(prefix="mossentry-ssh-", dir="/tmp") as control_dir:
             env["ANSIBLE_SSH_CONTROL_PATH_DIR"] = control_dir
             env["ANSIBLE_SSH_CONTROL_PATH"] = "%(directory)s/%%C"
             completed = subprocess.run(
@@ -252,7 +252,7 @@ def _generate_key(action_id: int, username: str) -> tuple[Path, str, str]:
     if private_path.exists() or private_path.with_suffix(".pub").exists():
         raise RuntimeError("Key file already exists; refusing to overwrite it")
     completed = subprocess.run(
-        ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", f"{username}@server-manager/action-{action_id}", "-f", str(private_path)],
+        ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", f"{username}@mossentry/action-{action_id}", "-f", str(private_path)],
         capture_output=True, text=True, timeout=20, check=False,
     )
     if completed.returncode != 0:

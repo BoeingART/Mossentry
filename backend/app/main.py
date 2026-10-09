@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import hmac
-import os
 import secrets
 import sqlite3
 from functools import wraps
@@ -15,15 +14,15 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import ansible_service, monitoring_service
-from .config import BASE_DIR, COOKIE_SECURE, DATA_DIR, SESSION_HOURS
+from .config import BASE_DIR, COOKIE_SECURE, DATA_DIR, SESSION_HOURS, setting
 from .db import audit, connect, create_session, execute, get_session, init_db, now, row, rows
 from .models import USERNAME_RE, CreateUserRequest, LoginRequest, PasswordChangeRequest, UserActionRequest, UserProfileUpdate, ServerRequest
 from .errors import friendly_error
 from .security import hash_password, verify_password
 from .user_history import statistics
 
-app = FastAPI(title="Server Manager", docs_url=None, redoc_url=None)
-DESKTOP_TOKEN = os.environ.get("SRVMGR_DESKTOP_TOKEN", "")
+app = FastAPI(title="Mossentry", docs_url=None, redoc_url=None)
+DESKTOP_TOKEN = setting("DESKTOP_TOKEN", "")
 DESKTOP_CSRF = secrets.token_urlsafe(32)
 FRONTEND_DIR = BASE_DIR / "app" / "frontend"
 operation_lock = Lock()

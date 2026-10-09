@@ -19,8 +19,9 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 /* Application frame */
 .topbar { display: flex; align-items: stretch; background: #fff; border-bottom: 1px solid var(--line); -webkit-app-region: drag; }
 .topbar-brand { width: 232px; padding: 0 23px; display: flex; align-items: center; gap: 9px; flex-shrink: 0; border-right: 1px solid var(--line); font-size: 19px; font-weight: 600; letter-spacing: -.65px; white-space: nowrap; }
-.brand-mark { color: var(--teal); display: flex; }
-.brand-accent { color: var(--teal); font-weight: 400; }
+.brand-mark { display: block; width: 42px; height: 42px; object-fit: contain; flex-shrink: 0; }
+.brand-name { color: #000; font-weight: 400; }
+.brand-accent { color: var(--teal); font-weight: 700; }
 .topbar-content { flex: 1; display: flex; align-items: center; gap: 24px; min-width: 0; padding: 0 30px; }
 .topbar button, .topbar input, .topbar .mantine-Select-root { -webkit-app-region: no-drag; }
 .workspace-chip { display: inline-flex; align-items: center; gap: 9px; background: #e0f2f1; color: #00796b; padding: 9px 13px; border: 1px solid #c8e6e3; border-radius: var(--mantine-radius-sm); font-size: 12px; white-space: nowrap; }

@@ -1,6 +1,6 @@
 {
-  "name": "server-manager-desktop",
-  "productName": "Server Manager",
+  "name": "mossentry",
+  "productName": "Mossentry",
   "version": "0.1.0",
   "private": true,
   "description": "Desktop manager for SSH hosts and access requests",
@@ -8,10 +8,12 @@
   "scripts": {
     "setup:backend": "python3.12 -m venv .venv && .venv/bin/python -m pip install -r backend/requirements.txt",
     "setup:test": ".venv/bin/python -m pip install -r backend/requirements-dev.txt",
+    "build:icons": "electron desktop/generate-icons.cjs",
+    "test:desktop": "node --test desktop/tests/*.test.cjs",
     "build": "tsc --noEmit && vite build",
     "start": "npm run build && electron .",
     "dev:ui": "vite --host 127.0.0.1",
-    "check": "npm run build && npm run test:monitor && node --check desktop/main.cjs && .venv/bin/python -m compileall -q backend/app && cd backend && ../.venv/bin/python -m unittest discover -s tests -v",
+    "check": "npm run build && npm run test:monitor && npm run test:desktop && node --check desktop/main.cjs && .venv/bin/python -m compileall -q backend/app && cd backend && ../.venv/bin/python -m unittest discover -s tests -v",
     "test:monitor": "node --experimental-strip-types --test frontend/tests/*.test.mjs"
   },
   "devDependencies": {

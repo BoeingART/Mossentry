@@ -1,3 +1,4 @@
+import brandIcon from '../../icon.svg';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type * as React from 'react';
 import {
@@ -8,7 +9,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-  IconActivity, IconBell, IconPlant2, IconArrowUpRight, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
+  IconActivity, IconBell, IconArrowUpRight, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
   IconEdit, IconHistory, IconKey, IconPlus, IconSearch, IconServer,
   IconShieldCheck, IconUser, IconUsers,
 } from '@tabler/icons-react';
@@ -151,7 +152,7 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
 
 function AuditLog({ data }: { data: Dashboard }) {
   return <><SectionHeading title="Activity log" description="Scans, approvals, executions, and credential downloads" />
-    <Card withBorder radius="lg" p={0}><Box p="lg"><Title order={3} size="h4">Audit trail</Title><Text size="sm" c="dimmed">Most recent events across this manager</Text></Box>
+    <Card withBorder radius="lg" p={0}><Box p="lg"><Title order={3} size="h4">Audit trail</Title><Text size="sm" c="dimmed">Most recent events in Mossentry</Text></Box>
       <ScrollArea><Table striped highlightOnHover miw={700} verticalSpacing="md" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>Time</Table.Th><Table.Th>Administrator</Table.Th><Table.Th>Event</Table.Th><Table.Th>Target</Table.Th>{!data.admin.desktop_mode && <Table.Th>Source</Table.Th>}</Table.Tr></Table.Thead><Table.Tbody>
         {data.audit.map(item => <Table.Tr key={item.id}><Table.Td>{formatDate(item.created_at)}</Table.Td><Table.Td>{item.actor || 'System'}</Table.Td><Table.Td><Text fw={700} size="sm">{eventLabels[item.event] || 'Other activity'}</Text></Table.Td><Table.Td>{item.target === 'all_servers' ? 'All servers' : item.target?.startsWith('action:') ? `Request #${item.target.slice(7)}` : item.target || '—'}</Table.Td>{!data.admin.desktop_mode && <Table.Td>{item.ip_address || '—'}</Table.Td>}</Table.Tr>)}
       </Table.Tbody></Table></ScrollArea>{!data.audit.length && <Empty text="No activity yet" />}</Card>
@@ -292,7 +293,7 @@ export default function App() {
   const nativeDesktop = navigator.userAgent.includes('Electron');
   return <AppShell navbar={{ width: 232, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: nativeDesktop ? 100 : 76 }} padding={0}>
     <AppShell.Header className="topbar">
-      <div className="topbar-brand"><span className="brand-mark"><IconPlant2 size={27} stroke={1.6} /></span><span>Server<span className="brand-accent">Manager</span></span></div>
+      <div className="topbar-brand"><img className="brand-mark" src={brandIcon} width={42} height={42} alt="" /><span className="brand-name"><span className="brand-accent">Moss</span>entry</span></div>
       <div className="topbar-content">
         <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
         <span className="workspace-chip"><IconServer size={17} stroke={1.6} /> Workspace</span>
@@ -316,7 +317,7 @@ export default function App() {
       </ScrollArea>
       <div className="sidebar-footer">
         <div className="workspace-card"><span className="workspace-card-icon"><IconActivity size={22} stroke={1.5} /></span><strong>Your infrastructure,<br />at a glance.</strong><p>Follow resource usage across your managed servers.</p><Button fullWidth variant="light" rightSection={<IconArrowUpRight size={15} />} onClick={() => navigate('monitor')}>Open monitor</Button></div>
-        <div className={`service-status ${fatal ? 'has-error' : ''}`}><i /><span>{fatal ? 'Service needs attention' : 'Manager connected'}</span><span className="service-status-count">{data.servers.length} hosts</span></div>
+        <div className={`service-status ${fatal ? 'has-error' : ''}`}><i /><span>{fatal ? 'Service needs attention' : 'Mossentry connected'}</span><span className="service-status-count">{data.servers.length} hosts</span></div>
       </div>
     </AppShell.Navbar>
     <AppShell.Main className="main-area"><ScrollArea key={view} className="page-scroll" h="calc(100dvh - var(--app-shell-header-offset, 0px))" viewportProps={{ tabIndex: 0, 'aria-label': 'Page content' }}><main className="content">
