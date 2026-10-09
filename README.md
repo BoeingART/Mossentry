@@ -42,6 +42,10 @@ For interface development, run `npm run dev:ui` in another terminal; Vite proxie
 
 The upper-right controls switch between day and night mode and between English and Simplified Chinese. Both choices are saved locally and restored on the next launch. Switching language preserves the current page, form inputs, and monitoring history. Server names, usernames, addresses, and saved data remain as entered.
 
+## Typography
+
+Poppins is used for headings, section and card titles, modal titles, and the wordmark. Outfit is used for body copy, controls, tables, and chart text. Both families ship locally, with no font requests to external services at runtime. Poppins includes weights 400–700; Outfit includes variable weights 100–900. These fonts do not include Chinese glyphs, so Chinese characters use the operating system’s glyph fallback. Font licenses are in `frontend/public/fonts`; Outfit comes from the [Google Fonts repository](https://github.com/google/fonts/tree/main/ofl/outfit).
+
 ## Branding and icons
 
 `icon.svg` is the source artwork for the interface logo and browser favicon. Vite includes it in the built assets served by FastAPI. `desktop/icons/icon.png` supplies the desktop window and macOS Dock icon; `icon.ico` and `icon.icns` provide Windows and macOS application icon resources. Regenerate all desktop formats after editing the SVG with `npm run build:icons`, then restart the app. The name shown in the window, application menu, About panel, and backend is **Mossentry**.

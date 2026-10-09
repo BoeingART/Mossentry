@@ -65,9 +65,9 @@ function Empty({ text }: { text: string }) {
   return <Center py="xl"><Text c="dimmed" size="sm">{text}</Text></Center>;
 }
 
-function SectionHeading({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) {
+function SectionHeading({ title, action }: { title: string; action?: React.ReactNode }) {
   return <Group className="page-heading" justify="space-between" align="center" mb="lg" gap="md">
-    <div><Title order={2}>{title}</Title><Text c="dimmed" size="sm" mt={4}>{description}</Text></div>{action}
+    <Title order={2}>{title}</Title>{action}
   </Group>;
 }
 
@@ -91,14 +91,14 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
   const pages = Math.max(1, Math.ceil(groups.length / pageSize));
   const shown = groups.slice((Math.min(page, pages) - 1) * pageSize, Math.min(page, pages) * pageSize);
   return <>
-    <SectionHeading title={t("Users & access")} description={t("Accounts grouped by Linux username")} action={<Button leftSection={<IconPlus size={16} />} disabled={!data.servers.some(s => s.enabled)} onClick={() => openRequest({ mode: 'create_user', username: '', sudo: false })}>{t("New user")}</Button>} />
+    <SectionHeading title={t("Users & access")} action={<Button leftSection={<IconPlus size={16} />} disabled={!data.servers.some(s => s.enabled)} onClick={() => openRequest({ mode: 'create_user', username: '', sudo: false })}>{t("New user")}</Button>} />
     {data.servers.some(s => s.enabled && ['error', 'failed'].includes(s.last_scan_status || '')) && <Alert color="orange" mb="md">{t("Some servers could not sync. Their displayed accounts may be out of date. Sync those servers before making further changes.")}</Alert>}
     <Group className="filter-toolbar" mb="lg" justify="space-between" gap="sm">
       <TextInput leftSection={<IconSearch size={16} />} placeholder={t("Search a user or host")} value={search} onChange={e => { setSearch(e.currentTarget.value); setPage(1); }} w={{ base: '100%', sm: 290 }} />
       <Select aria-label={t("Filter by server")} value={host} allowDeselect={false} onChange={value => { setHost(value); setPage(1); }} data={[{ value: 'all', label: t("All servers") }, ...data.servers.map(s => ({ value: s.name, label: s.name }))]} /><SegmentedControl value={filter} onChange={value => { setFilter(value); setPage(1); }} data={[t("Enabled"), t("Sudo"), t("Disabled"), t("All")].map(label => ({ label, value: label.toLowerCase() }))} />
     </Group>
     <Card withBorder radius="lg" p={0}>
-      <Box p="lg"><Title order={3} size="h4">{t("Server users")}</Title><Text size="sm" c="dimmed">{t("Expand a user to review accounts and permissions on each host.")}</Text></Box>
+      <Box p="lg"><Title order={3} size="h4">{t("Server users")}</Title></Box>
       {shown.length ? shown.map(group => <details className="user-group" key={group.username}>
         <summary><Group justify="space-between" wrap="nowrap" p="md" gap="sm">
           <Group wrap="nowrap" gap="sm"><Avatar color="blue" radius="xl">{(group.fullName || group.username).charAt(0).toUpperCase()}</Avatar><div><Text fw={600} size="sm">{group.fullName || group.username} {group.fullName && <Text span c="dimmed" fw={500}>({group.username})</Text>}</Text><Text size="xs" c="dimmed">{group.accounts.length} {t("host accounts")}</Text></div></Group>
@@ -129,7 +129,7 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
   const pending = data.actions.filter(a => a.status === 'pending').length;
   const pages = Math.max(1, Math.ceil(data.actions.length / 10));
   return <>
-    <SectionHeading title={t("Approvals")} description={t("Requests run on a server only after administrator approval.")} action={<Button leftSection={<IconCheck size={16} />} disabled={!pending || busy} onClick={approveAll}>{t("Approve all")} {pending ? `(${pending})` : ''}</Button>} />
+    <SectionHeading title={t("Approvals")} action={<Button leftSection={<IconCheck size={16} />} disabled={!pending || busy} onClick={approveAll}>{t("Approve all")} {pending ? `(${pending})` : ''}</Button>} />
     <Stack gap="sm">
       {data.actions.slice((Math.min(page, pages) - 1) * 10, Math.min(page, pages) * 10).map(action => <Card key={action.id} withBorder radius="lg" p="lg" className="approval-row">
         <Group justify="space-between" align="start" gap="md">
@@ -153,8 +153,8 @@ function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard;
 }
 
 function AuditLog({ data }: { data: Dashboard }) {
-  return <><SectionHeading title={t("Activity log")} description={t("Scans, approvals, executions, and credential downloads")} />
-    <Card withBorder radius="lg" p={0}><Box p="lg"><Title order={3} size="h4">{t("Audit trail")}</Title><Text size="sm" c="dimmed">{t("Most recent events in Mossentry")}</Text></Box>
+  return <><SectionHeading title={t("Activity log")} />
+    <Card withBorder radius="lg" p={0}><Box p="lg"><Title order={3} size="h4">{t("Audit trail")}</Title></Box>
       <ScrollArea><Table striped highlightOnHover miw={700} verticalSpacing="md" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>{t("Time")}</Table.Th><Table.Th>{t("Administrator")}</Table.Th><Table.Th>{t("Event")}</Table.Th><Table.Th>{t("Target")}</Table.Th>{!data.admin.desktop_mode && <Table.Th>{t("Source")}</Table.Th>}</Table.Tr></Table.Thead><Table.Tbody>
         {data.audit.map(item => <Table.Tr key={item.id}><Table.Td>{formatDate(item.created_at)}</Table.Td><Table.Td>{item.actor || t("System")}</Table.Td><Table.Td><Text fw={700} size="sm">{t(eventLabels[item.event] || 'Other activity')}</Text></Table.Td><Table.Td>{item.target === 'all_servers' ? t("All servers") : item.target?.startsWith('action:') ? t("Request #{0}", { 0: item.target.slice(7) }) : item.target || '—'}</Table.Td>{!data.admin.desktop_mode && <Table.Td>{item.ip_address || '—'}</Table.Td>}</Table.Tr>)}
       </Table.Tbody></Table></ScrollArea>{!data.audit.length && <Empty text={t("No activity yet")} />}</Card>
@@ -299,9 +299,6 @@ export default function App() {
       <div className="topbar-brand"><img className="brand-mark" src={brandIcon} width={42} height={42} alt="" /><span className="brand-name"><span className="brand-accent">Moss</span>entry</span></div>
       <div className="topbar-content">
         <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label={t("Toggle navigation")} />
-        <span className="workspace-chip"><IconServer size={17} stroke={1.6} /> {t("Workspace")}</span>
-        <Select className="global-search" aria-label={t("Jump to a page")} placeholder={t("Find a page…")} leftSection={<IconSearch size={16} />} searchable clearable
-          value={null} onChange={value => { if (value) navigate(value as View); }} data={nav.map(item => ({ value: item.id, label: item.label }))} nothingFoundMessage={t("No matching pages")} />
         <div className="topbar-actions">
           <Tooltip label={pending ? t("{0} requests awaiting approval", { 0: pending }) : t("View approvals")}><ActionIcon className="approval-bell" variant="subtle" color="gray" size="lg" aria-label={t("View pending approvals")} onClick={() => navigate('approvals')}><IconBell size={20} stroke={1.5} />{pending > 0 && <span className="notification-dot" />}</ActionIcon></Tooltip>
           <AppearanceControls />
@@ -317,7 +314,7 @@ export default function App() {
         </div>)}</Stack>
       </ScrollArea>
       <div className="sidebar-footer">
-        <div className="workspace-card"><span className="workspace-card-icon"><IconActivity size={22} stroke={1.5} /></span><strong>{t("Your infrastructure,")}<br />{t("at a glance.")}</strong><p>{t("Follow resource usage across your managed servers.")}</p><Button fullWidth variant="light" rightSection={<IconArrowUpRight size={15} />} onClick={() => navigate('monitor')}>{t("Open monitor")}</Button></div>
+        <div className="workspace-card"><span className="workspace-card-icon"><IconActivity size={22} stroke={1.5} /></span><strong>{t("Your infrastructure,")}<br />{t("at a glance.")}</strong><Button fullWidth variant="light" rightSection={<IconArrowUpRight size={15} />} onClick={() => navigate('monitor')}>{t("Open monitor")}</Button></div>
         <div className={`service-status ${fatal ? 'has-error' : ''}`}><i /><span>{fatal ? t("Service needs attention") : t("Mossentry connected")}</span><span className="service-status-count">{data.servers.length} {t("hosts")}</span></div>
       </div>
     </AppShell.Navbar>

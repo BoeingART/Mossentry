@@ -9,15 +9,16 @@ import App from './App';
 import { colorSchemeManager } from './preferences';
 import ScrollShadows from './ScrollShadows';
 
-const fontFamily = '"Open Sans", "PingFang SC", "Microsoft YaHei", sans-serif';
+const fontFamily = 'var(--font-body)';
 const theme = createTheme({
   primaryColor: 'teal',
   primaryShade: 7,
   autoContrast: true,
   black: '#182c32',
   fontFamily,
+  fontFamilyMonospace: fontFamily,
   fontSizes: { xs: '0.75rem', sm: '0.8125rem', md: '0.875rem', lg: '1rem', xl: '1.125rem' },
-  headings: { fontFamily, fontWeight: '600', sizes: {
+  headings: { fontFamily: 'var(--font-heading)', fontWeight: '600', sizes: {
     h1: { fontSize: '1.875rem', lineHeight: '1.3' },
     h2: { fontSize: '1.5rem', lineHeight: '1.4' },
     h3: { fontSize: '1.0625rem', lineHeight: '1.5' },

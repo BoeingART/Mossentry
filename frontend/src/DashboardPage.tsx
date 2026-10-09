@@ -36,7 +36,7 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
   const added = hoverTime === null ? 0 : history.find(point => dateTime(point.date) === hoverTime)?.added ?? 0;
   const tickCount = width < 480 ? 2 : 5;
   return <section className="dashboard-panel user-number-panel" aria-labelledby="user-number-title">
-    <div className="dashboard-panel-heading"><div><Title order={3} id="user-number-title">{t("User growth")}</Title><Text className="dashboard-caption">{t("Cumulative unique users")}</Text></div>
+    <div className="dashboard-panel-heading"><div><Title order={3} id="user-number-title">{t("User growth")}</Title></div>
       <Select aria-label={t("User number time range")} value={range} allowDeselect={false} onChange={value => { setRange(value || 'all'); setHover(null); }}
         data={[{ value: 'all', label: t("All time") }, { value: '365', label: t("Last year") }, { value: '90', label: t("Last 90 days") }, { value: '30', label: t("Last 30 days") }]} className="dashboard-range" size="xs" />
     </div>
@@ -69,7 +69,7 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
             <circle cx={x(hoverTime)} cy={y(hoverTotal)} r={4} fill="#039be5" stroke="#fff" strokeWidth={2} /></>}
         </>}
       </svg>
-      {!history.length && <div className="growth-empty"><IconUsers size={25} stroke={1.5} /><strong>{t("No creation dates yet")}</strong><span>{t("Sync your servers to build the user timeline.")}</span></div>}
+      {!history.length && <div className="growth-empty"><IconUsers size={25} stroke={1.5} /><strong>{t("No creation dates yet")}</strong></div>}
       {!!history.length && hoverTime !== null && <div className="growth-tooltip" style={{ left: Math.max(8, Math.min(width - 224, x(hoverTime) + 14)) }} aria-live="polite">
         <strong>{shortDate(hoverTime, true)}</strong><div><span><i className="blue" />{t("Unique users")}</span><b>{count(hoverTotal)}</b></div><div><span><i className="teal" />{t("New that day")}</span><b>{count(added)}</b></div>
       </div>}
@@ -83,7 +83,7 @@ function ServerAccounts({ data }: { data: Dashboard }) {
   const hosts = data.servers.map(server => ({ ...server, count: data.users.filter(user => user.server === server.name).length }));
   const maximum = Math.max(1, ...hosts.map(host => host.count));
   return <section className="dashboard-panel" aria-labelledby="host-accounts-title">
-    <div className="dashboard-panel-heading"><div><Title order={3} id="host-accounts-title">{t("Accounts by server")}</Title><Text className="dashboard-caption">{t("All synced accounts on each host")}</Text></div><span className="dashboard-small-icon"><IconServer size={19} /></span></div>
+    <div className="dashboard-panel-heading"><div><Title order={3} id="host-accounts-title">{t("Accounts by server")}</Title></div><span className="dashboard-small-icon"><IconServer size={19} /></span></div>
     <ScrollArea.Autosize mah={225} viewportProps={{ tabIndex: 0, 'aria-label': t("Accounts by server") }}><div className="dashboard-host-bars">{hosts.map((host, index) => <div className="dashboard-host-bar" key={host.id}>
       <div><span>{host.name}</span><b>{count(host.count)}</b></div>
       <div className="dashboard-bar-track" role="img" aria-label={t("{0}: {1} accounts{2}", { 0: host.name, 1: host.count, 2: ['error', 'failed'].includes(host.last_scan_status || '') ? ', cached data' : '' })}>
@@ -96,7 +96,7 @@ function ServerAccounts({ data }: { data: Dashboard }) {
 function AccessOverview({ data }: { data: Dashboard }) {
   const { total, sudo, standard } = accessCounts(data.users);
   return <section className="dashboard-panel access-panel" aria-labelledby="access-overview-title">
-    <div className="dashboard-panel-heading"><div><Title order={3} id="access-overview-title">{t("Access overview")}</Title><Text className="dashboard-caption">{t("Permissions across your workspace")}</Text></div><span className="dashboard-small-icon"><IconShieldCheck size={19} /></span></div>
+    <div className="dashboard-panel-heading"><div><Title order={3} id="access-overview-title">{t("Access overview")}</Title></div><span className="dashboard-small-icon"><IconShieldCheck size={19} /></span></div>
     <div className="access-gauge">
       <svg viewBox="0 0 200 118" role="img" aria-label={t("{0} users with sudo access, {1} standard users", { 0: sudo, 1: standard })}>
         <path d="M 13 100 A 87 87 0 0 1 187 100" stroke="var(--surface-soft)" strokeWidth={7} fill="none" />
@@ -114,9 +114,9 @@ function RequestActivity({ data, openApprovals }: { data: Dashboard; openApprova
   const labels = { create_user: t("Create user"), delete_user: t("Delete user"), disable_user: t("Disable sign-in"), enable_user: t("Enable sign-in"), set_sudo: t("Change sudo access") };
   const states = { pending: t("Pending"), approved: t("Running"), executed: t("Completed"), failed: t("Failed"), rejected: t("Rejected") };
   return <section className="dashboard-panel" aria-labelledby="request-activity-title">
-    <div className="dashboard-panel-heading"><div><Title order={3} id="request-activity-title">{t("Recent requests")}</Title><Text className="dashboard-caption">{t("User and access changes")}</Text></div><Tooltip label={t("View all requests")}><ActionIcon variant="default" aria-label={t("View all requests")} onClick={openApprovals}><IconArrowUpRight size={17} /></ActionIcon></Tooltip></div>
+    <div className="dashboard-panel-heading"><div><Title order={3} id="request-activity-title">{t("Recent requests")}</Title></div><Tooltip label={t("View all requests")}><ActionIcon variant="default" aria-label={t("View all requests")} onClick={openApprovals}><IconArrowUpRight size={17} /></ActionIcon></Tooltip></div>
     <div className="request-activity-list">{data.actions.slice(0, 4).map(action => <div className="request-activity-row" key={action.id}><span className="request-activity-icon"><IconShieldCheck size={18} stroke={1.5} /></span><div className="request-activity-copy"><strong>{labels[action.action_type]}</strong><span>{action.target_user} · {action.target_server}</span></div><Badge variant="light" color={action.status === 'failed' ? 'red' : action.status === 'pending' ? 'orange' : action.status === 'rejected' ? 'gray' : 'teal'}>{states[action.status]}</Badge></div>)}</div>
-    {!data.actions.length && <div className="dashboard-empty-state"><IconShieldCheck size={30} stroke={1.3} /><strong>{t("No requests yet")}</strong><span>{t("New access requests will appear here.")}</span></div>}
+    {!data.actions.length && <div className="dashboard-empty-state"><IconShieldCheck size={30} stroke={1.3} /><strong>{t("No requests yet")}</strong></div>}
   </section>;
 }
 

@@ -113,7 +113,7 @@ function MonitorSession({ server, knownUsers }: { server: Server; knownUsers: st
 
 export default function ResourceMonitor({ data, serverId, selectServer }: { data: Dashboard; serverId: number | null; selectServer: (id: number | null) => void }) {
   if (serverId === null) return <>
-    <Group className="page-heading" mb="lg"><div><Title order={2}>{t("Resource monitor")}</Title><Text size="sm" c="dimmed" mt={4}>{t("Choose a server to follow CPU, GPU, memory, and network usage.")}</Text></div></Group>
+    <Group className="page-heading" mb="lg"><div><Title order={2}>{t("Resource monitor")}</Title></div></Group>
     {data.servers.length ? <div className="monitor-host-grid">{data.servers.map(server => <Card className="monitor-host-card" key={server.id} withBorder radius="lg" p="lg">
       <Group justify="space-between" mb="md"><Group gap="sm"><ThemeIcon variant="light" size={40} radius="xl"><IconServer size={20} /></ThemeIcon><Title order={3} size="h4">{server.name}</Title></Group><Badge color={server.enabled ? 'teal' : 'gray'} variant="light">{server.enabled ? t("Enabled") : t("Paused")}</Badge></Group>
       <Button variant="default" leftSection={<IconActivity size={16} />} rightSection={<IconArrowRight size={16} />} disabled={!server.enabled} onClick={() => selectServer(server.id)} aria-label={t("Monitor {0}", { 0: server.name })}>{t("Open monitor")}</Button>
