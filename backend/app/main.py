@@ -313,10 +313,12 @@ def server_metrics(server_id: int, response: Response, session: dict[str, Any] =
 
 
 def _protect_accounts(username: str, names: list[str]) -> None:
+    if username in {"srvmgr", "sync"}:
+        return
     for name in names:
         server = row("SELECT * FROM servers WHERE name=?", (name,))
         account = row("SELECT uid FROM server_users WHERE server_id=? AND username=?", (server["id"], username))
-        if username in {"root", "srvmgr", "nobody", server["ssh_user"]} or (account and account["uid"] < 1000):
+        if username in {"root", "nobody", server["ssh_user"]} or (account and account["uid"] < 1000):
             raise HTTPException(400, "System and SSH management accounts are protected")
 
 

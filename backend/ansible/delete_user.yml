@@ -13,8 +13,8 @@
       ansible.builtin.assert:
         that:
           - managed_username is match('^[a-z_][a-z0-9_-]{0,31}$')
-          - managed_username not in ['root', 'srvmgr', 'nobody', ansible_user]
-          - target_account.stdout.split(':')[2] | int >= 1000
+          - managed_username in ['srvmgr', 'sync'] or managed_username not in ['root', 'nobody', ansible_user]
+          - managed_username in ['srvmgr', 'sync'] or target_account.stdout.split(':')[2] | int >= 1000
     - name: Delete account and keep home directory
       ansible.builtin.user:
         name: "{{ managed_username }}"

@@ -240,14 +240,30 @@ class ServerManagementTests(unittest.TestCase):
     def test_protected_accounts_and_legacy_approval(self):
         server_id = self.add_server()
         self.db.execute('INSERT INTO server_users(server_id,username,uid,gid,home,shell,is_sudo,is_disabled,scanned_at) VALUES(?,?,?,?,?,?,?,?,?)', (server_id, 'daemon', 10, 10, '/', '/bin/sh', 0, 0, self.db.now()))
-        for username in ('root', 'operator', 'srvmgr', 'daemon'):
-            for action in ('delete_user', 'disable_user', 'set_sudo'):
+        for username in ('root', 'operator', 'nobody', 'daemon'):
+            for action in ('delete_user', 'disable_user', 'enable_user', 'set_sudo'):
                 response = self.client.post('/api/actions/user', json={'username': username, 'servers': ['test-host'], 'action': action, 'sudo': False}, headers=self.headers)
                 self.assertEqual(response.status_code, 400)
         action_id = self.db.execute('INSERT INTO actions(action_type,target_server,target_user,payload_json,requested_by,requested_at) VALUES(?,?,?,?,?,?)', ('delete_user', 'test-host', 'root', json.dumps({'servers': ['test-host']}), 1, self.db.now()))
         with patch.object(self.service, 'execute_action') as run:
             self.assertEqual(self.client.post(f'/api/actions/{action_id}/approve', headers=self.headers).status_code, 400)
             run.assert_not_called()
+
+    def test_srvmgr_and_sync_can_be_managed_with_system_uids_and_ssh_login(self):
+        server_id = self.add_server()
+        for username, uid in (('srvmgr', 999), ('sync', 4)):
+            self.db.execute('INSERT INTO server_users(server_id,username,uid,gid,home,shell,is_sudo,is_disabled,scanned_at) VALUES(?,?,?,?,?,?,?,?,?)', (server_id, username, uid, uid, '/', '/bin/sh', 0, 0, self.db.now()))
+            self.db.execute('UPDATE servers SET ssh_user=? WHERE id=?', (username, server_id))
+            for action, sudo in (('enable_user', False), ('disable_user', False), ('set_sudo', True), ('set_sudo', False), ('delete_user', False)):
+                with self.subTest(username=username, action=action, sudo=sudo):
+                    response = self.client.post('/api/actions/user', json={'username': username, 'servers': ['test-host'], 'action': action, 'sudo': sudo}, headers=self.headers)
+                    self.assertEqual(response.status_code, 200, response.text)
+                    action_id = response.json()['action_id']
+                    with patch.object(self.service, '_run', return_value=self.service.RunResult(True, 'ok')) as run, patch.object(self.service, 'scan_servers', return_value=([], {})):
+                        approval = self.client.post(f'/api/actions/{action_id}/approve', headers=self.headers)
+                    self.assertEqual(approval.status_code, 200, approval.text)
+                    self.assertEqual(run.call_args_list[0].args[0], 'preflight.yml')
+                    self.assertEqual(self.db.row('SELECT status FROM actions WHERE id=?', (action_id,))['status'], 'executed')
 
     def test_remote_routes_and_sanitized_errors(self):
         server_id = self.add_server()
