@@ -14,7 +14,7 @@ module.exports = {
     target: ['dmg', 'zip'],
     icon: 'desktop/icons/icon.icns',
     category: 'public.app-category.developer-tools',
-    minimumSystemVersion: '12.0',
+    minimumSystemVersion: '13.0',
     identity: '-',
     hardenedRuntime: false,
     artifactName: '${productName}-${version}-macOS-${arch}.${ext}',

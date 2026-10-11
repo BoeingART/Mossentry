@@ -2,7 +2,7 @@
 
 ## macOS
 
-- Requires macOS 12 or later.
+- Requires macOS 13 or later.
 - Apple Silicon (M1/M2/M3/M4 and later): download `Mossentry-0.1.0-macOS-arm64.dmg`.
 - Intel: download `Mossentry-0.1.0-macOS-x64.dmg`.
 - Open the disk image and drag Mossentry to Applications. ZIP copies are also available.

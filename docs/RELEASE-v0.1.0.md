@@ -9,8 +9,8 @@ Mossentry's first desktop release for managing Linux servers over SSH.
 
 | Platform | File |
 | --- | --- |
-| macOS 12+, Apple Silicon | `Mossentry-0.1.0-macOS-arm64.dmg` |
-| macOS 12+, Intel | `Mossentry-0.1.0-macOS-x64.dmg` |
+| macOS 13+, Apple Silicon | `Mossentry-0.1.0-macOS-arm64.dmg` |
+| macOS 13+, Intel | `Mossentry-0.1.0-macOS-x64.dmg` |
 | Windows 10/11 x64 | `Mossentry-0.1.0-Windows-x64-Setup.exe` |
 
 macOS ZIP archives and SHA-256 checksums are also attached.
