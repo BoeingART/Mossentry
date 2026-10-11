@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from pathlib import Path
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, Iterator
@@ -73,6 +74,10 @@ CREATE TABLE IF NOT EXISTS server_users (
   created_at_source TEXT,
   PRIMARY KEY (server_id, username)
 );
+CREATE TABLE IF NOT EXISTS server_credentials (
+  server_id INTEGER PRIMARY KEY REFERENCES servers(id) ON DELETE CASCADE,
+  sudo_password TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS user_profiles (
   username TEXT PRIMARY KEY,
   full_name TEXT NOT NULL DEFAULT '',
@@ -122,6 +127,12 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
 
 def init_db() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.chmod(0o700)
+    # Restrict both the database and SQLite sidecars before storing credentials.
+    DB_PATH.touch(mode=0o600, exist_ok=True)
+    for path in (DB_PATH, Path(str(DB_PATH) + "-wal"), Path(str(DB_PATH) + "-shm")):
+        if path.exists():
+            path.chmod(0o600)
     (DATA_DIR / "jobs").mkdir(mode=0o700, exist_ok=True)
     (DATA_DIR / "keys").mkdir(mode=0o700, exist_ok=True)
     with connect() as conn:

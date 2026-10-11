@@ -9,6 +9,10 @@ def friendly_error(raw: str | None) -> str | None:
         return "Verify this server's SSH fingerprint and update the local known hosts file, then retry."
     if "no such identity" in text or "private key" in text or "unprotected private" in text:
         return "Check that the SSH private key exists and only its owner can read it."
+    if "missing sudo password" in text or "a password is required" in text:
+        return "A sudo password is required. Edit this server to save the SSH login account's sudo password, then retry."
+    if "incorrect sudo password" in text or "incorrect become password" in text:
+        return "The sudo password was rejected. Update it in this server's settings and retry."
     if "permission denied" in text or "authentication" in text:
         return "SSH sign-in failed. Check the login account and private key."
     if "sudo" in text or "become" in text or "privilege" in text:

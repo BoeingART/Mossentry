@@ -5,7 +5,7 @@ import ipaddress
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator
 
 USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 
@@ -59,6 +59,17 @@ class ServerRequest(BaseModel):
     ssh_user: str = Field(pattern=r"^[a-z_][a-z0-9_-]{0,31}$")
     key_path: str = Field(default_factory=lambda: str(Path("~/.ssh/id_rsa").expanduser()), min_length=1, max_length=1024)
     enabled: bool = True
+    sudo_password: SecretStr | None = None
+    clear_sudo_password: bool = False
+
+    @field_validator("sudo_password")
+    @classmethod
+    def valid_sudo_password(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None:
+            password = value.get_secret_value()
+            if len(password) > 4096 or any(char in password for char in "\r\n\x00"):
+                raise ValueError("Enter a sudo password of at most 4096 characters without line breaks")
+        return value
 
     @field_validator("hostname")
     @classmethod

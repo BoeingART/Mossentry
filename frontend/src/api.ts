@@ -22,7 +22,7 @@ export async function api<T>(path: string, method = 'GET', body?: unknown, signa
   const data = contentType.includes('json') ? await response.json() : await response.text();
   if (!response.ok) {
     const detail = data?.detail;
-    const labels: Record<string, string> = { name: t("server name"), hostname: t("server address"), port: t("SSH port"), ssh_user: t("SSH login account"), key_path: t("private key path"), username: t("username"), servers: t("server selection"), new_password: t("new password") };
+    const labels: Record<string, string> = { name: t("server name"), hostname: t("server address"), port: t("SSH port"), ssh_user: t("SSH login account"), key_path: t("private key path"), sudo_password: t("Sudo password (optional)"), username: t("username"), servers: t("server selection"), new_password: t("new password") };
     const message = response.status === 500 ? t("The local service could not complete this operation. Please retry.")
       : Array.isArray(detail) ? [...new Set(detail.map(item => {
         if (item.type === 'value_error' && typeof item.msg === 'string') return item.msg.replace(/^Value error, /, '');

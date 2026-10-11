@@ -2,7 +2,7 @@ import { numericDate } from './dateFormat';
 import { t } from './i18n';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Modal, NumberInput, Paper, Progress, Select, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip } from '@mantine/core';
+import { ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Modal, NumberInput, Paper, PasswordInput, Progress, Select, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip } from '@mantine/core';
 import { IconCheck, IconDots, IconEdit, IconPlus, IconSearch, IconServer, IconTrash, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { api } from './api';
@@ -17,12 +17,15 @@ function ServerForm({ server, close, saved }: { server: Server | null; close: ()
   const [draft, setDraft] = useState<Draft>({ name: server?.name || '', hostname: server?.hostname || '', port: server?.port || 22, ssh_user: server?.ssh_user || 'srvmgr', key_path: server?.key_path || '~/.ssh/id_rsa', enabled: server ? !!server.enabled : true });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [sudoPassword, setSudoPassword] = useState('');
+  const [clearSudoPassword, setClearSudoPassword] = useState(false);
+  const identityChanged = !!server && (draft.hostname !== server.hostname || Number(draft.port) !== server.port || draft.ssh_user !== server.ssh_user);
   const field = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft(current => ({ ...current, [key]: value }));
   async function submit(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
     try {
       await api(server ? `/api/servers/${server.id}` : '/api/servers', server ? 'PUT' : 'POST', {
-        ...draft, port: Number(draft.port),
+        ...draft, port: Number(draft.port), sudo_password: sudoPassword, clear_sudo_password: clearSudoPassword,
       });
       notify(server ? t("Server settings saved") : draft.enabled ? t("Server added. Sync accounts to check its connection.") : t("Server added with management paused."));
       await saved(); close();
@@ -34,6 +37,9 @@ function ServerForm({ server, close, saved }: { server: Server | null; close: ()
       <Group grow align="start"><TextInput label={t("Hostname or IP address")} placeholder={t("e.g. 192.168.1.10")} value={draft.hostname} onChange={e => field('hostname', e.currentTarget.value)} required /><NumberInput label={t("SSH port")} min={1} max={65535} allowDecimal={false} value={draft.port} onChange={value => field('port', value)} required /></Group>
       <TextInput label={t("SSH login account")} value={draft.ssh_user} onChange={e => field('ssh_user', e.currentTarget.value)} pattern="[a-z_][a-z0-9_-]{0,31}" required />
       <TextInput label={t("SSH private key path")} placeholder="~/.ssh/id_rsa" value={draft.key_path} onChange={e => field('key_path', e.currentTarget.value)} required />
+      <PasswordInput label={t("Sudo password (optional)")} autoComplete="new-password" value={sudoPassword} onChange={e => setSudoPassword(e.currentTarget.value)} disabled={clearSudoPassword} maxLength={4096}
+        description={t(identityChanged && server?.has_sudo_password ? "The saved password will be cleared because the server address or login account changed." : server?.has_sudo_password ? "A password is saved. Leave blank to keep it, or enter a replacement." : "Enter the SSH login account's sudo password if required. Otherwise, leave blank.")} />
+      {!!server?.has_sudo_password && <Checkbox label={t("Clear saved sudo password")} checked={clearSudoPassword} onChange={e => setClearSudoPassword(e.currentTarget.checked)} />}
       <Checkbox label={t("Enable management")} checked={draft.enabled} onChange={e => field('enabled', e.currentTarget.checked)} />
       {error && <Alert color="red" role="alert">{t(error)}</Alert>}
       <Group justify="end"><Button variant="default" disabled={busy} onClick={close}>{t("Cancel")}</Button><Button type="submit" loading={busy}>{t("Save server")}</Button></Group>

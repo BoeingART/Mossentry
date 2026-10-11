@@ -42,8 +42,8 @@ def _enabled_servers() -> list[dict[str, Any]]:
     return rows("SELECT * FROM servers WHERE enabled=1 ORDER BY name")
 
 
-def _inventory() -> Path:
-    path = DATA_DIR / "inventory.json"
+def _inventory(path: Path | None = None, passwords: dict[str, str] | None = None) -> Path:
+    path = path or DATA_DIR / "inventory.json"
     hosts = {}
     for server in _enabled_servers():
         hosts[server["name"]] = {
@@ -52,6 +52,8 @@ def _inventory() -> Path:
             "ansible_python_interpreter": "/usr/bin/python3",
             "ansible_ssh_common_args": "-o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=10",
         }
+        if passwords and server["name"] in passwords:
+            hosts[server["name"]]["ansible_become_password"] = passwords[server["name"]]
     path.write_text(json.dumps({"all": {"children": {"managed": {"hosts": hosts}}}}), encoding="utf-8")
     path.chmod(0o600)
     return path
@@ -75,23 +77,34 @@ def _run(playbook: str, limit: str, extra: dict[str, Any] | None = None, timeout
     selected = set(limit.split(","))
     if not selected or not selected <= valid_servers:
         raise ValueError("Target host is not in the inventory")
-    inventory = _inventory()
-    command = [
-        _ansible_playbook(), "-i", str(inventory), str(ANSIBLE_DIR / playbook),
-        "--limit", limit,
-    ]
+    executable = _ansible_playbook()
     extra_path: Path | None = None
     effective_extra = dict(extra or {})
-    become_password = None if playbook in {"test_connection.yml", "server_status.yml"} else _become_password()
-    if become_password is not None:
-        effective_extra["ansible_become_password"] = become_password
+    passwords: dict[str, str] = {}
+    if playbook not in {"test_connection.yml", "server_status.yml"}:
+        passwords = {item["name"]: item["sudo_password"] for item in rows(
+            f"""SELECT s.name,c.sudo_password FROM server_credentials c
+            JOIN servers s ON s.id=c.server_id WHERE s.name IN ({','.join('?' for _ in selected)})""",
+            tuple(selected),
+        )}
+        missing = selected - passwords.keys()
+        fallback = _become_password() if missing else None
+        if fallback is not None:
+            passwords.update({name: fallback for name in missing})
+
+    def redact(output: str | bytes | None) -> str:
+        value = output.decode(errors="replace") if isinstance(output, bytes) else (output or "")
+        for password in sorted(set(passwords.values()), key=len, reverse=True):
+            value = value.replace(password, "[redacted]")
+            value = value.replace(json.dumps(password)[1:-1], "[redacted]")
+        return value
+
     if effective_extra:
         handle = tempfile.NamedTemporaryFile("w", suffix=".json", dir=DATA_DIR / "jobs", delete=False)
         json.dump(effective_extra, handle, ensure_ascii=False)
         handle.close()
         extra_path = Path(handle.name)
         extra_path.chmod(0o600)
-        command.extend(["--extra-vars", f"@{extra_path}"])
     env = os.environ.copy()
     local_tmp = DATA_DIR / "jobs" / "ansible-local"
     local_tmp.mkdir(mode=0o700, exist_ok=True)
@@ -107,16 +120,22 @@ def _run(playbook: str, limit: str, extra: dict[str, Any] | None = None, timeout
         # data directory nor macOS's per-user TMPDIR is reliably short enough.
         # mkdtemp creates a private (0700), unpredictable directory per run.
         with tempfile.TemporaryDirectory(prefix="mossentry-ssh-", dir="/tmp") as control_dir:
+            # Host-scoped credentials avoid overriding other hosts during Sync all.
+            # The private inventory is removed on success, failure, or timeout.
+            inventory = _inventory(Path(control_dir) / "inventory.json", passwords)
+            command = [executable, "-i", str(inventory), str(ANSIBLE_DIR / playbook), "--limit", limit]
+            if extra_path:
+                command.extend(["--extra-vars", f"@{extra_path}"])
             env["ANSIBLE_SSH_CONTROL_PATH_DIR"] = control_dir
             env["ANSIBLE_SSH_CONTROL_PATH"] = "%(directory)s/%%C"
             completed = subprocess.run(
                 command, cwd=ANSIBLE_DIR.parent, env=env, capture_output=True,
                 text=True, timeout=timeout, check=False,
             )
-        output = (completed.stdout + "\n" + completed.stderr).strip()
+        output = redact(completed.stdout + "\n" + completed.stderr).strip()
         return RunResult(completed.returncode == 0, output[-12000:])
     except subprocess.TimeoutExpired as exc:
-        return RunResult(False, f"Execution timed out after {timeout} seconds.\n{exc.stdout or ''}")
+        return RunResult(False, f"Execution timed out after {timeout} seconds.\n{redact(exc.stdout)}")
     finally:
         if extra_path:
             extra_path.unlink(missing_ok=True)

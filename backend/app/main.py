@@ -11,6 +11,7 @@ from typing import Any
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 
 from . import ansible_service, monitoring_service
@@ -26,6 +27,15 @@ DESKTOP_TOKEN = setting("DESKTOP_TOKEN", "")
 DESKTOP_CSRF = secrets.token_urlsafe(32)
 FRONTEND_DIR = BASE_DIR / "app" / "frontend"
 operation_lock = Lock()
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError):
+    # Validation responses must not echo credentials from the submitted body.
+    return JSONResponse(status_code=422, content={"detail": [
+        {key: error[key] for key in ("type", "loc", "msg")}
+        for error in exc.errors()
+    ]})
 
 
 def serialized_operation(function):
@@ -130,7 +140,9 @@ def logout(
 def dashboard(session: dict[str, Any] = Depends(current_admin)) -> dict[str, Any]:
     servers = rows(
         """SELECT id,name,hostname,port,ssh_user,key_path,enabled,
-        last_scan_at,last_scan_status,last_scan_error FROM servers ORDER BY name"""
+        last_scan_at,last_scan_status,last_scan_error,
+        EXISTS(SELECT 1 FROM server_credentials WHERE server_id=servers.id) AS has_sudo_password
+        FROM servers ORDER BY name"""
     )
     for server in servers:
         server["last_scan_error"] = friendly_error(server["last_scan_error"])
@@ -196,15 +208,29 @@ def _require_no_pending(server: dict[str, Any]) -> None:
             raise HTTPException(409, "Handle this server's pending requests before changing or removing it")
 
 
+def _save_sudo_password(conn: sqlite3.Connection, server_id: int, body: ServerRequest,
+                        identity_changed: bool = False) -> None:
+    if body.clear_sudo_password or identity_changed:
+        conn.execute("DELETE FROM server_credentials WHERE server_id=?", (server_id,))
+    password = body.sudo_password.get_secret_value() if body.sudo_password is not None else ""
+    if password and not body.clear_sudo_password:
+        conn.execute(
+            "INSERT OR REPLACE INTO server_credentials(server_id,sudo_password) VALUES(?,?)",
+            (server_id, password),
+        )
+
+
 @app.post("/api/servers")
 @serialized_operation
 def create_server(body: ServerRequest, request: Request, session: dict[str, Any] = Depends(csrf_admin)):
     try:
-        server_id = execute(
-            """INSERT INTO servers(name,hostname,port,ssh_user,key_path,enabled)
-            VALUES(?,?,?,?,?,?)""",
-            (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled),
-        )
+        with connect() as conn:
+            server_id = conn.execute(
+                """INSERT INTO servers(name,hostname,port,ssh_user,key_path,enabled)
+                VALUES(?,?,?,?,?,?)""",
+                (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled),
+            ).lastrowid
+            _save_sudo_password(conn, server_id, body)
     except sqlite3.IntegrityError as exc:
         raise HTTPException(409, "A server with this name already exists") from exc
     audit(session["admin_id"], "server_created", body.name, {}, _client_ip(request))
@@ -223,6 +249,9 @@ def update_server(server_id: int, body: ServerRequest, request: Request, session
                 """UPDATE servers SET name=?,hostname=?,port=?,ssh_user=?,key_path=?,enabled=? WHERE id=?""",
                 (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled, server_id),
             )
+            _save_sudo_password(conn, server_id, body, identity_changed=any(
+                server[key] != getattr(body, key) for key in ("hostname", "port", "ssh_user")
+            ))
             if connection_changed:
                 conn.execute("DELETE FROM server_users WHERE server_id=?", (server_id,))
                 conn.execute("UPDATE servers SET last_scan_at=NULL,last_scan_status='never',last_scan_error=NULL WHERE id=?", (server_id,))

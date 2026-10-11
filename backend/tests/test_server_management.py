@@ -65,6 +65,59 @@ class ServerManagementTests(unittest.TestCase):
         self.db.init_db()
         self.assertEqual(self.db.row('SELECT key_path FROM servers WHERE id=?', (server_id,))['key_path'], server['key_path'])
 
+    def test_sudo_password_lifecycle_and_no_disclosure(self):
+        secret = '  private-SUDO-密码-{{literal}}  '
+        self.body['sudo_password'] = secret
+        server_id = self.add_server()
+
+        def stored():
+            return self.db.row('SELECT sudo_password FROM server_credentials WHERE server_id=?', (server_id,))
+
+        self.assertEqual(stored()['sudo_password'], secret)
+        self.assertEqual(self.db.DB_PATH.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.db.DATA_DIR.stat().st_mode & 0o777, 0o700)
+        self.db.init_db()
+        self.assertEqual(stored()['sudo_password'], secret)
+        dashboard = self.client.get('/api/dashboard')
+        self.assertNotIn(secret, dashboard.text)
+        visible = next(s for s in dashboard.json()['servers'] if s['id'] == server_id)
+        self.assertTrue(visible['has_sudo_password'])
+        self.assertNotIn('sudo_password', visible)
+        self.assertNotIn(secret, str(self.db.rows('SELECT * FROM audit_log')))
+        # Blank edits and pause/resume requests preserve the secret.
+        for body in ({**self.body, 'sudo_password': ''}, {k: v for k, v in self.body.items() if k != 'sudo_password'}):
+            response = self.client.put(f'/api/servers/{server_id}', json=body, headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(stored()['sudo_password'], secret)
+        self.body['sudo_password'] = 'replacement'
+        self.client.put(f'/api/servers/{server_id}', json=self.body, headers=self.headers)
+        self.assertEqual(stored()['sudo_password'], 'replacement')
+        self.client.put(f'/api/servers/{server_id}', json={**self.body, 'clear_sudo_password': True}, headers=self.headers)
+        self.assertIsNone(stored())
+        self.client.put(f'/api/servers/{server_id}', json=self.body, headers=self.headers)
+        self.client.delete(f'/api/servers/{server_id}', headers=self.headers)
+        self.assertIsNone(stored())
+
+    def test_sudo_password_is_not_reused_for_another_host_or_account(self):
+        server_id = self.add_server()
+        for change in ({'hostname': 'another.example.com'}, {'port': 2200}, {'ssh_user': 'another'}):
+            self.client.put(f'/api/servers/{server_id}', json={**self.body, 'sudo_password': 'original'}, headers=self.headers)
+            response = self.client.put(f'/api/servers/{server_id}', json={**self.body, **change, 'sudo_password': ''}, headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertIsNone(self.db.row('SELECT * FROM server_credentials WHERE server_id=?', (server_id,)))
+        response = self.client.put(f'/api/servers/{server_id}', json={**self.body, 'sudo_password': 'new-host-password'}, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.db.row('SELECT sudo_password FROM server_credentials WHERE server_id=?', (server_id,))['sudo_password'], 'new-host-password')
+
+    def test_password_validation_never_echoes_submitted_secrets(self):
+        for value in ('SECRET\nline', 'SECRET\x00', 'SECRET' * 1000, {'SECRET': 'invalid'}):
+            response = self.client.post('/api/servers', json={**self.body, 'sudo_password': value}, headers=self.headers)
+            self.assertEqual(response.status_code, 422)
+            self.assertNotIn('SECRET', response.text)
+        response = self.client.post('/api/servers', json={**self.body, 'port': 0, 'sudo_password': 'SECRET'}, headers=self.headers)
+        self.assertEqual(response.status_code, 422)
+        self.assertNotIn('SECRET', response.text)
+
     def test_creation_time_migration_preserves_existing_accounts(self):
         server_id = self.add_server()
         with self.db.connect() as conn:
