@@ -110,8 +110,8 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
       return <Card key={server.id} withBorder radius="md" p="md" className="host-card">
         <Group className="host-heading" gap="sm" wrap="nowrap">
           <ThemeIcon size={34} radius="xl" variant="light" style={{ flexShrink: 0 }}><IconServer size={18} /></ThemeIcon>
-          <Title order={3} size="sm" style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{server.name}</Title>
-          <Group gap={6} wrap="nowrap">
+          <Title className="host-name" order={3} size="sm"><span className="host-text-scroll host-name-scroll" tabIndex={0} title={server.name}>{server.name}</span></Title>
+          <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
             <Tooltip label={detail} multiline w={280} withArrow events={{ hover: true, focus: true, touch: true }}>
               <span className={`server-connection ${connected ? 'connected' : failed ? 'failed' : 'unknown'}`}
                 tabIndex={0} role="img" aria-label={`${server.name}: ${detail}`}>
@@ -130,7 +130,7 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
           </Group>
         </Group>
         <Group className="host-accounts" gap="md" wrap="nowrap" align="start">
-          <Text className="host-administrator" size="sm" c="dimmed">{t("Administrator:")} <Text span inherit c="var(--ink)" fw={600}>{server.ssh_user}</Text></Text>
+          <Text className="host-administrator" component="div" size="sm" c="dimmed"><span>{t("Administrator:")}</span><Text className="host-text-scroll host-username-scroll" span inherit c="var(--ink)" fw={600} tabIndex={0} title={server.ssh_user}>{server.ssh_user}</Text></Text>
           <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}><Text size="sm" c="dimmed">{t("Accounts:")}</Text><Text size="sm" fw={600}>{server.last_scan_at ? count : '—'}</Text></Group>
         </Group>
         <Group className="server-actions" gap={8}>
