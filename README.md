@@ -104,6 +104,17 @@ collect missing creation dates and any system accounts older scans omitted.
 - Pending requests must be handled before a server can be edited or removed. Removing a server removes only its local configuration and cached account list; remote accounts and files and local operation history are retained. Connection changes invalidate cached accounts. Remote operations are serialized with configuration changes.
 - The interface shows short error explanations. Raw management execution details remain in the local database for troubleshooting. Failed syncs identify saved account data as potentially stale. **Status** remains a point-in-time snapshot; **Monitor** opens a dedicated resource monitoring page.
 
+## Small-server operations
+
+The **Operations** page adds batch health inspection, existing systemd service
+management and bounded journal queries, with persistent per-host results and
+exportable task history. **Servers** now supports groups, notes, and inventory
+import/export with a conflict preview. Imported hosts start paused.
+
+These workflows use the existing SSH or Ansible transport and add no dependencies
+or remote services. Missing systemd/journal tools are reported as unavailable.
+See [dev-forward workflows and limits](docs/DEV-FORWARD.md) for details.
+
 ## Monitor pages
 
 Open **Monitor** in the left navigation to see the server list. Each **Open monitor** button opens that server's main monitoring page; **Monitor** on a Servers card goes directly to the same detail page. **All monitors** returns to the list. Both desktop and narrow windows use the main content area.

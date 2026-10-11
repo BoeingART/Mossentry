@@ -3,6 +3,14 @@ def friendly_error(raw: str | None) -> str | None:
     if not raw:
         return None
     text = raw.lower()
+    if "protected system or ssh service" in text:
+        return "System or SSH services are protected from changes."
+    if "systemd is not available" in text:
+        return "This server does not support systemd service management."
+    if "service is not loaded or is masked" in text:
+        return "The service is unavailable or masked. Check its exact name and configuration."
+    if "service refuses manual" in text:
+        return "This service refuses manual changes. Check its unit configuration."
     if "controlpath too long" in text or "unix_listener: path" in text and "too long" in text:
         return "The local SSH connection path is too long. Update and restart the application, then retry."
     if "host key verification failed" in text or "identification has changed" in text:

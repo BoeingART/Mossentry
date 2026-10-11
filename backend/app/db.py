@@ -123,6 +123,25 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_server_users_username ON server_users(username);
 CREATE INDEX IF NOT EXISTS idx_actions_status_requested ON actions(status, requested_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
+CREATE TABLE IF NOT EXISTS operation_jobs (
+  id INTEGER PRIMARY KEY,
+  operation TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  status TEXT NOT NULL,
+  requested_by INTEGER REFERENCES admins(id),
+  created_at TEXT NOT NULL,
+  finished_at TEXT
+);
+CREATE TABLE IF NOT EXISTS operation_results (
+  job_id INTEGER NOT NULL REFERENCES operation_jobs(id) ON DELETE CASCADE,
+  server_name TEXT NOT NULL,
+  status TEXT NOT NULL,
+  result_json TEXT,
+  error TEXT,
+  started_at TEXT,
+  finished_at TEXT,
+  PRIMARY KEY(job_id, server_name)
+);
 """
 
 
@@ -138,6 +157,10 @@ def init_db() -> None:
     (DATA_DIR / "keys").mkdir(mode=0o700, exist_ok=True)
     with connect() as conn:
         conn.executescript(SCHEMA)
+        server_columns = {column["name"] for column in conn.execute("PRAGMA table_info(servers)")}
+        for column in ("group_name", "notes"):
+            if column not in server_columns:
+                conn.execute(f"ALTER TABLE servers ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
         # Add nullable fields in place for databases from earlier releases.
         user_columns = {column["name"] for column in conn.execute("PRAGMA table_info(server_users)")}
         for column in ("created_at", "created_at_source"):

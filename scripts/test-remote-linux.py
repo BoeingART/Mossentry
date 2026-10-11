@@ -39,3 +39,17 @@ try:
 except KeyError:
     pass
 print('Native Linux account create/scan/disable/enable/sudo/delete and file preservation passed.')
+
+# Read-only operations must work with the container's existing Python. No
+# systemd/journal packages or resident agents are installed for these checks.
+from app.operations_probe import run as maintenance
+inspection = maintenance({'operation': 'inspect'})
+assert inspection['os'] and inspection['cores'] > 0
+assert isinstance(inspection['filesystems'], list)
+assert isinstance(inspection['alerts'], list)
+service_list = maintenance({'operation': 'services'})
+assert isinstance(service_list['available'], bool)
+journal = maintenance({'operation': 'logs', 'lines': 5, 'minutes': 5, 'priority': 6})
+assert isinstance(journal['available'], bool)
+assert len(journal['entries']) <= 5
+print('Agentless inspection and optional systemd/journal capability detection passed.')

@@ -82,7 +82,7 @@ def _run(playbook: str, limit: str, extra: dict[str, Any] | None = None, timeout
     extra_path: Path | None = None
     effective_extra = dict(extra or {})
     passwords: dict[str, str] = {}
-    if playbook not in {"test_connection.yml", "server_status.yml"}:
+    if playbook not in {"test_connection.yml", "server_status.yml"} and not (playbook == "operations.yml" and not effective_extra.get("operation_become")):
         passwords = {item["name"]: item["sudo_password"] for item in rows(
             f"""SELECT s.name,c.sudo_password FROM server_credentials c
             JOIN servers s ON s.id=c.server_id WHERE s.name IN ({','.join('?' for _ in selected)})""",

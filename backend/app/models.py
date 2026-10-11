@@ -61,6 +61,8 @@ class ServerRequest(BaseModel):
     enabled: bool = True
     sudo_password: SecretStr | None = None
     clear_sudo_password: bool = False
+    group_name: str = Field(default="", max_length=80)
+    notes: str = Field(default="", max_length=2000)
 
     @field_validator("sudo_password")
     @classmethod
@@ -99,3 +101,32 @@ class ServerRequest(BaseModel):
         if not path.is_absolute():
             raise ValueError("Use an absolute SSH key path or a path starting with ~/")
         return str(path)
+
+
+class InventoryEntry(ServerRequest):
+    model_config = {"extra": "forbid"}
+
+
+class InventoryImport(BaseModel):
+    model_config = {"extra": "forbid"}
+    version: Literal[1] = 1
+    servers: list[InventoryEntry] = Field(min_length=1, max_length=500)
+    preview: bool = True
+
+
+class OperationRequest(BaseModel):
+    servers: list[str] = Field(min_length=1, max_length=50)
+    operation: Literal["inspect", "services", "logs", "start", "stop", "restart", "enable", "disable"]
+    unit: str = Field(default="", max_length=200)
+    minutes: int = Field(default=60, ge=1, le=10080)
+    lines: int = Field(default=100, ge=1, le=1000)
+    priority: int = Field(default=6, ge=0, le=7)
+    elevated: bool = False
+    confirmation: str = Field(default="", max_length=220)
+
+    @field_validator("unit")
+    @classmethod
+    def valid_unit(cls, value: str) -> str:
+        if value and not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.@:-]{0,191}\.service", value):
+            raise ValueError("Enter an exact service name ending in .service")
+        return value

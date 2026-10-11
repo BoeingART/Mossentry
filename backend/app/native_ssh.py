@@ -77,7 +77,7 @@ def execute(server, source, payload=None, *, sudo=False, password=None, timeout=
 
 
 def run(playbook, servers, extra, passwords, timeout):
-    source = Path(__file__).with_name('remote_actions.py').read_text(encoding='utf-8')
+    source = Path(__file__).with_name('operations_probe.py' if playbook == 'operations.yml' else 'remote_actions.py').read_text(encoding='utf-8')
     creation_source = (Path(__file__).parent.parent / 'ansible' / 'user_creation_times.py').read_text(encoding='utf-8')
     errors = []
     for server in servers:
@@ -86,11 +86,13 @@ def run(playbook, servers, extra, passwords, timeout):
             payload.update(operation=playbook.removesuffix('.yml'), ssh_user=server['ssh_user'])
             if playbook == 'scan_users.yml':
                 payload['creation_source'] = creation_source
+            if playbook == 'operations.yml':
+                payload = extra['operation_payload']
             response = execute(server, source, payload,
-                               sudo=playbook not in {'test_connection.yml', 'server_status.yml'},
+                               sudo=bool(extra.get('operation_become')) if playbook == 'operations.yml' else playbook not in {'test_connection.yml', 'server_status.yml'},
                                password=passwords.get(server['name']), timeout=timeout)
             data = json.loads(response)
-            field = {'scan_users.yml': 'scan_output_dir', 'server_status.yml': 'status_output_dir'}.get(playbook)
+            field = {'scan_users.yml': 'scan_output_dir', 'server_status.yml': 'status_output_dir', 'operations.yml': 'operation_output_dir'}.get(playbook)
             if field:
                 destination = Path(extra[field]) / (server['name'] + '.json')
                 destination.write_text(json.dumps(data), encoding='utf-8')

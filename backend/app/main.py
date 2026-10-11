@@ -14,10 +14,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 
-from . import ansible_service, monitoring_service
+from . import ansible_service, monitoring_service, operations_service
 from .config import BASE_DIR, COOKIE_SECURE, DATA_DIR, SESSION_HOURS, setting
 from .db import audit, connect, create_session, execute, get_session, init_db, now, row, rows
-from .models import USERNAME_RE, CreateUserRequest, LoginRequest, PasswordChangeRequest, UserActionRequest, UserProfileUpdate, ServerRequest
+from .models import USERNAME_RE, CreateUserRequest, LoginRequest, PasswordChangeRequest, UserActionRequest, UserProfileUpdate, ServerRequest, InventoryImport, OperationRequest
 from .errors import friendly_error
 from .security import hash_password, verify_password
 from .user_history import statistics
@@ -64,6 +64,7 @@ async def desktop_access(request: Request, call_next):
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    operations_service.recover_interrupted()
 
 
 def _client_ip(request: Request) -> str:
@@ -140,7 +141,7 @@ def logout(
 def dashboard(session: dict[str, Any] = Depends(current_admin)) -> dict[str, Any]:
     servers = rows(
         """SELECT id,name,hostname,port,ssh_user,key_path,enabled,
-        last_scan_at,last_scan_status,last_scan_error,
+        last_scan_at,last_scan_status,last_scan_error,group_name,notes,
         EXISTS(SELECT 1 FROM server_credentials WHERE server_id=servers.id) AS has_sudo_password
         FROM servers ORDER BY name"""
     )
@@ -226,9 +227,9 @@ def create_server(body: ServerRequest, request: Request, session: dict[str, Any]
     try:
         with connect() as conn:
             server_id = conn.execute(
-                """INSERT INTO servers(name,hostname,port,ssh_user,key_path,enabled)
-                VALUES(?,?,?,?,?,?)""",
-                (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled),
+                """INSERT INTO servers(name,hostname,port,ssh_user,key_path,enabled,group_name,notes)
+                VALUES(?,?,?,?,?,?,?,?)""",
+                (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled, body.group_name, body.notes),
             ).lastrowid
             _save_sudo_password(conn, server_id, body)
     except sqlite3.IntegrityError as exc:
@@ -246,8 +247,8 @@ def update_server(server_id: int, body: ServerRequest, request: Request, session
     try:
         with connect() as conn:
             conn.execute(
-                """UPDATE servers SET name=?,hostname=?,port=?,ssh_user=?,key_path=?,enabled=? WHERE id=?""",
-                (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled, server_id),
+                """UPDATE servers SET name=?,hostname=?,port=?,ssh_user=?,key_path=?,enabled=?,group_name=?,notes=? WHERE id=?""",
+                (body.name, body.hostname, body.port, body.ssh_user, body.key_path, body.enabled, body.group_name, body.notes, server_id),
             )
             _save_sudo_password(conn, server_id, body, identity_changed=any(
                 server[key] != getattr(body, key) for key in ("hostname", "port", "ssh_user")
@@ -535,3 +536,85 @@ def change_password(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get('/api/inventory/export')
+def export_inventory(session: dict[str, Any] = Depends(current_admin)):
+    # Export connection references and annotations only, never credentials or
+    # account caches. Imports are paused until deliberately enabled.
+    servers = rows('SELECT name,hostname,port,ssh_user,key_path,enabled,group_name,notes FROM servers ORDER BY name')
+    return JSONResponse({'version': 1, 'servers': servers}, headers={
+        'Content-Disposition': 'attachment; filename="mossentry-inventory.json"', 'Cache-Control': 'no-store',
+    })
+
+
+@app.post('/api/inventory/import')
+@serialized_operation
+def import_inventory(body: InventoryImport, request: Request, session: dict[str, Any] = Depends(csrf_admin)):
+    names = [server.name for server in body.servers]
+    if len(set(names)) != len(names):
+        raise HTTPException(400, 'The inventory contains duplicate server names')
+    if any(server.sudo_password is not None or server.clear_sudo_password for server in body.servers):
+        raise HTTPException(400, 'Inventory files must not contain passwords')
+    existing = {item['name'] for item in rows('SELECT name FROM servers')}
+    conflicts = sorted(set(names) & existing)
+    if body.preview:
+        return {'count': len(names), 'conflicts': conflicts, 'names': names, 'paused': True}
+    if conflicts:
+        raise HTTPException(409, 'Some server names already exist. Rename them in the inventory before importing')
+    with connect() as conn:
+        conn.executemany('INSERT INTO servers(name,hostname,port,ssh_user,key_path,enabled,group_name,notes) VALUES(?,?,?,?,?,0,?,?)',
+                         [(s.name, s.hostname, s.port, s.ssh_user, s.key_path, s.group_name, s.notes) for s in body.servers])
+    audit(session['admin_id'], 'inventory_imported', None, {'count': len(names)}, _client_ip(request))
+    return {'ok': True, 'count': len(names)}
+
+
+@app.post('/api/operations', status_code=202)
+def create_operation(body: OperationRequest, request: Request, session: dict[str, Any] = Depends(csrf_admin)):
+    if not operation_lock.acquire(blocking=False):
+        raise HTTPException(409, 'Another server operation is running. Wait for it to finish and retry')
+    try:
+        names = _validate_servers(body.servers)
+        if body.operation in operations_service.MUTATIONS:
+            from .operations_probe import protected_unit
+            if not body.unit or body.confirmation != f'{body.operation} {body.unit}':
+                raise HTTPException(400, 'Type the operation and service name to confirm')
+            if protected_unit(body.unit):
+                raise HTTPException(400, 'Protected system or SSH service')
+        elif body.elevated and body.operation != 'logs':
+            raise HTTPException(400, 'Elevated access is only available for service changes and log queries')
+        audit(session['admin_id'], 'operation_started', ','.join(names), {'operation': body.operation, 'unit': body.unit}, _client_ip(request))
+        job_id = operations_service.start_job(names, body, session['admin_id'], operation_lock)
+    except Exception:
+        operation_lock.release()
+        raise
+    return {'id': job_id}
+
+
+@app.get('/api/operations')
+def list_operations(offset: int = 0, session: dict[str, Any] = Depends(current_admin)):
+    if offset < 0:
+        raise HTTPException(400, 'Invalid history offset')
+    return {'jobs': rows('SELECT id,operation,status,created_at,finished_at FROM operation_jobs ORDER BY id DESC LIMIT 25 OFFSET ?', (offset,)),
+            'total': row('SELECT COUNT(*) AS count FROM operation_jobs')['count']}
+
+
+@app.get('/api/operations/{job_id}')
+def get_operation(job_id: int, session: dict[str, Any] = Depends(current_admin)):
+    job = operations_service.job_detail(job_id)
+    if not job:
+        raise HTTPException(404, 'Operation no longer exists')
+    return JSONResponse(job, headers={'Cache-Control': 'no-store'})
+
+
+@app.delete('/api/operations/{job_id}')
+@serialized_operation
+def delete_operation(job_id: int, request: Request, session: dict[str, Any] = Depends(csrf_admin)):
+    job = row('SELECT status FROM operation_jobs WHERE id=?', (job_id,))
+    if not job:
+        raise HTTPException(404, 'Operation no longer exists')
+    if job['status'] == 'running':
+        raise HTTPException(409, 'Wait for the operation to finish')
+    execute('DELETE FROM operation_jobs WHERE id=?', (job_id,))
+    audit(session['admin_id'], 'operation_deleted', f'job:{job_id}', {}, _client_ip(request))
+    return {'ok': True}

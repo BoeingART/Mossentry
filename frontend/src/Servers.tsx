@@ -2,19 +2,20 @@ import { numericDate } from './dateFormat';
 import { t } from './i18n';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Modal, NumberInput, Paper, PasswordInput, Progress, Select, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip } from '@mantine/core';
+import { ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Modal, NumberInput, Paper, PasswordInput, Progress, Select, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip, Textarea, Badge } from '@mantine/core';
 import { IconCheck, IconDots, IconEdit, IconPlus, IconSearch, IconServer, IconTrash, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { api } from './api';
+import InventoryTransfer from './InventoryTransfer';
 import type { Dashboard, Server, ServerMetrics } from './types';
 
 const date = (value: string | null) => value ? numericDate(value, { includeTime: true }) : t("Not yet synced");
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : t("Please retry the operation");
 const notify = (message: string, error = false) => notifications.show({ title: error ? t("Could not complete") : t("Done"), message: t(message), color: error ? 'red' : 'teal' });
-type Draft = { name: string; hostname: string; port: number | string; ssh_user: string; key_path: string; enabled: boolean };
+type Draft = { name: string; hostname: string; port: number | string; ssh_user: string; key_path: string; enabled: boolean; group_name: string; notes: string };
 
 function ServerForm({ server, close, saved }: { server: Server | null; close: () => void; saved: () => Promise<void> }) {
-  const [draft, setDraft] = useState<Draft>({ name: server?.name || '', hostname: server?.hostname || '', port: server?.port || 22, ssh_user: server?.ssh_user || 'srvmgr', key_path: server?.key_path || '~/.ssh/id_rsa', enabled: server ? !!server.enabled : true });
+  const [draft, setDraft] = useState<Draft>({ name: server?.name || '', hostname: server?.hostname || '', port: server?.port || 22, ssh_user: server?.ssh_user || 'srvmgr', key_path: server?.key_path || '~/.ssh/id_rsa', enabled: server ? !!server.enabled : true, group_name: server?.group_name || '', notes: server?.notes || '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sudoPassword, setSudoPassword] = useState('');
@@ -40,6 +41,8 @@ function ServerForm({ server, close, saved }: { server: Server | null; close: ()
       <PasswordInput label={t("Sudo password (optional)")} autoComplete="new-password" value={sudoPassword} onChange={e => setSudoPassword(e.currentTarget.value)} disabled={clearSudoPassword} maxLength={4096}
         description={t(identityChanged && server?.has_sudo_password ? "The saved password will be cleared because the server address or login account changed." : server?.has_sudo_password ? "A password is saved. Leave blank to keep it, or enter a replacement." : "Enter the SSH login account's sudo password if required. Otherwise, leave blank.")} />
       {!!server?.has_sudo_password && <Checkbox label={t("Clear saved sudo password")} checked={clearSudoPassword} onChange={e => setClearSudoPassword(e.currentTarget.checked)} />}
+      <TextInput label={t('Server group')} maxLength={80} value={draft.group_name} onChange={e => field('group_name', e.currentTarget.value)} />
+      <Textarea label={t('Notes')} maxLength={2000} autosize minRows={2} value={draft.notes} onChange={e => field('notes', e.currentTarget.value)} />
       <Checkbox label={t("Enable management")} checked={draft.enabled} onChange={e => field('enabled', e.currentTarget.checked)} />
       {error && <Alert color="red" role="alert">{t(error)}</Alert>}
       <Group justify="end"><Button variant="default" disabled={busy} onClick={close}>{t("Cancel")}</Button><Button type="submit" loading={busy}>{t("Save server")}</Button></Group>
@@ -49,6 +52,7 @@ function ServerForm({ server, close, saved }: { server: Server | null; close: ()
 
 export default function Servers({ data, saved, monitor }: { data: Dashboard; saved: () => Promise<void>; monitor: (server: Server) => void }) {
   const [search, setSearch] = useState('');
+  const [group, setGroup] = useState<string | null>(null);
   const [filter, setFilter] = useState<string | null>('all');
   const [editor, setEditor] = useState<{ server: Server | null } | null>(null);
   const [remove, setRemove] = useState<Server | null>(null);
@@ -56,7 +60,7 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
   const [busy, setBusy] = useState('');
   const [connections, setConnections] = useState<Record<number, { source: string; ok: boolean; detail: string }>>({});
   const [metrics, setMetrics] = useState<{ server: Server; result: ServerMetrics } | null>(null);
-  const servers = data.servers.filter(server => [server.name, server.hostname, server.ssh_user].some(value => value.toLowerCase().includes(search.toLowerCase())) && (filter === 'all' || (filter === 'enabled' ? !!server.enabled : !server.enabled)));
+  const servers = data.servers.filter(server => [server.name, server.hostname, server.ssh_user, server.group_name || '', server.notes || ''].some(value => value.toLowerCase().includes(search.toLowerCase())) && (!group || server.group_name === group) && (filter === 'all' || (filter === 'enabled' ? !!server.enabled : !server.enabled)));
   // A saved scan is the initial result; newer checks apply only to the same connection settings.
   const connectionSource = (server: Server) => JSON.stringify([
     server.name, server.hostname, server.port, server.ssh_user, server.key_path,
@@ -96,8 +100,8 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
     catch (cause) { notify(errorMessage(cause), true); } finally { setBusy(''); }
   }
   return <>
-    <Group className="page-heading" justify="space-between" align="center" mb="lg"><div><Title order={2}>{t("Servers")}</Title></div><Button leftSection={<IconPlus size={16} />} onClick={() => setEditor({ server: null })} disabled={!!busy}>{t("Add server")}</Button></Group>
-    <Group className="filter-toolbar" mb="lg"><TextInput leftSection={<IconSearch size={16} />} placeholder={t("Find a server")} value={search} onChange={e => setSearch(e.currentTarget.value)} w={300} /><Select aria-label={t("Filter servers")} value={filter} onChange={setFilter} allowDeselect={false} data={[{ value: 'all', label: t("All servers") }, { value: 'enabled', label: t("Enabled") }, { value: 'paused', label: t("Paused") }]} w={160} /><Text size="sm" c="dimmed">{data.servers.filter(s => s.enabled).length} {t("enabled ·")} {data.servers.length} {t("total")}</Text></Group>
+    <Group className="page-heading" justify="space-between" align="center" mb="lg"><div><Title order={2}>{t("Servers")}</Title></div><Group gap="xs"><InventoryTransfer saved={saved} /><Button leftSection={<IconPlus size={16} />} onClick={() => setEditor({ server: null })} disabled={!!busy}>{t("Add server")}</Button></Group></Group>
+    <Group className="filter-toolbar" mb="lg"><TextInput leftSection={<IconSearch size={16} />} placeholder={t("Find a server")} value={search} onChange={e => setSearch(e.currentTarget.value)} w={300} /><Select aria-label={t("Filter servers")} value={filter} onChange={setFilter} allowDeselect={false} data={[{ value: 'all', label: t("All servers") }, { value: 'enabled', label: t("Enabled") }, { value: 'paused', label: t("Paused") }]} w={160} /><Select clearable searchable placeholder={t("All groups")} aria-label={t("Server group")} value={group} onChange={setGroup} data={[...new Set(data.servers.map(s => s.group_name).filter(Boolean))].sort()} /><Text size="sm" c="dimmed">{data.servers.filter(s => s.enabled).length} {t("enabled ·")} {data.servers.length} {t("total")}</Text></Group>
     {servers.length ? <div className="host-grid">{servers.map(server => {
       const latest = connections[server.id];
       const current = latest?.source === connectionSource(server) ? latest : undefined;
@@ -133,6 +137,8 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
           <Text className="host-administrator" component="div" size="sm" c="dimmed"><span>{t("Administrator:")}</span><Text className="host-text-scroll host-username-scroll" span inherit c="var(--ink)" fw={600} tabIndex={0} title={server.ssh_user}>{server.ssh_user}</Text></Text>
           <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}><Text size="sm" c="dimmed">{t("Accounts:")}</Text><Text size="sm" fw={600}>{server.last_scan_at ? count : '—'}</Text></Group>
         </Group>
+        {server.group_name && <Badge variant="light" mb="xs">{server.group_name}</Badge>}
+        {server.notes && <Text size="xs" c="dimmed" mb="sm" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{server.notes}</Text>}
         <Group className="server-actions" gap={8}>
           <Button size="xs" variant="default" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:scan`} onClick={() => void operate(server, 'scan')}>{t("Sync")}</Button>
           <Button size="xs" variant="default" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:status`} onClick={() => void operate(server, 'status')}>{t("Status")}</Button>

@@ -19,11 +19,12 @@ import {
 import { api, downloadCredentials, fetchDashboard, setCsrf } from './api';
 import type { Action, Dashboard, Server, User } from './types';
 import Servers from './Servers';
+import Operations from './Operations';
 import ResourceMonitor from './ResourceMonitor';
 import DashboardPage from './DashboardPage';
 import AppearanceControls from './AppearanceControls';
 
-type View = 'dashboard' | 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
+type View = 'operations' | 'dashboard' | 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
 type UserAction = 'disable_user' | 'enable_user' | 'set_sudo' | 'delete_user';
 type RequestDraft = { mode: 'create_user' | UserAction; username: string; server?: string; sudo: boolean };
 type ConfirmDraft = { reject?: boolean; title: string; message: string; run: () => Promise<void> };
@@ -40,6 +41,7 @@ const eventLabels: Record<string, string> = {
   action_requested: 'Request submitted', action_approved: 'Action approved',
   action_rejected: 'Action rejected', action_executed: 'Action completed',
   action_failed: 'Action failed', private_key_downloaded: 'Credentials downloaded',
+  operation_started: 'Server task started', operation_host_finished: 'Server task finished', operation_deleted: 'Saved task deleted', inventory_imported: 'Inventory imported',
   user_profile_updated: 'User profile updated', password_changed: 'Password changed',
 };
 const statusLabels: Record<Action['status'], string> = {
@@ -286,6 +288,7 @@ export default function App() {
     { id: 'dashboard', label: t("Dashboard"), icon: <IconLayoutDashboard size={19} /> },
     { id: 'overview', label: t("Servers"), icon: <IconServer size={19} /> },
     { id: 'monitor', label: t("Monitor"), icon: <IconActivity size={19} /> },
+    { id: 'operations', label: t('Operations'), icon: <IconServer size={19} /> },
     { id: 'users', label: t("Users & access"), icon: <IconUsers size={19} /> },
     { id: 'approvals', label: t("Approvals"), icon: <IconShieldCheck size={19} /> },
     { id: 'audit', label: t("Activity log"), icon: <IconHistory size={19} /> },
@@ -316,7 +319,7 @@ export default function App() {
       <ScrollArea className="sidebar-scroll" type="never" viewportProps={{ tabIndex: 0, 'aria-label': t("Navigation") }}>
         <span className="nav-section-label" aria-hidden={compactSidebar}>{t("Workspace")}</span>
         <Stack component="nav" aria-label={t("Main navigation")} gap={7}>{nav.map((item, index) => <div key={item.id}>
-          {index === 3 && <span className="nav-section-label nav-section-divider" aria-hidden={compactSidebar}>{t("Administration")}</span>}
+          {index === 4 && <span className="nav-section-label nav-section-divider" aria-hidden={compactSidebar}>{t("Administration")}</span>}
           <Tooltip label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} position="right" disabled={!compactSidebar} events={{ hover: true, focus: true, touch: false }}>
             <button type="button" aria-label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} aria-current={view === item.id ? 'page' : undefined} className={`nav-button ${view === item.id ? 'active' : ''}`} onClick={() => navigate(item.id)}><span className="nav-icon">{item.icon}</span><span className="nav-label" aria-hidden={compactSidebar}>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge className="nav-badge" aria-hidden size="sm" color={view === 'approvals' ? 'gray' : 'teal'} variant="light" circle ml="auto">{pending}</Badge>}</button>
           </Tooltip>
@@ -334,6 +337,7 @@ export default function App() {
       {view === 'dashboard' && <DashboardPage data={data} refresh={refresh} openServers={() => navigate('overview')} openApprovals={() => navigate('approvals')} />}
       {view === 'overview' && <Servers data={data} saved={refresh} monitor={server => { setMonitorServerId(server.id); setView('monitor'); }} />}
       {view === 'monitor' && <ResourceMonitor data={data} serverId={monitorServerId} selectServer={setMonitorServerId} />}
+      {view === 'operations' && <Operations servers={data.servers} />}
       {view === 'users' && <Users data={data} openRequest={setRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}
       {view === 'approvals' && <Approvals data={data} run={actionConfirm} busy={busy} approveAll={approveAll} download={action => void download(action)} />}
       {view === 'audit' && <AuditLog data={data} />}

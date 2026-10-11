@@ -2,7 +2,7 @@ export type Server = {
   id: number; name: string; hostname: string; port: number;
   ssh_user: string; key_path: string; enabled: number; last_scan_at: string | null;
   last_scan_status: string | null; last_scan_error: string | null;
-  has_sudo_password: boolean | number;
+  has_sudo_password: boolean | number; group_name: string; notes: string;
 };
 export type User = {
   id: number; username: string; server: string; full_name: string; uid: number;
