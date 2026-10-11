@@ -8,6 +8,7 @@ import sys
 import tempfile
 import socket
 import threading
+import subprocess
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +16,15 @@ from app import native_ssh
 
 
 class NativeSSHTests(unittest.TestCase):
+    def test_sudo_password_consumed_or_skipped_both_preserve_the_request(self):
+        source = 'from __future__ import annotations\nimport json, sys\nprint(json.loads(sys.stdin.readline())["value"])'
+        program = native_ssh.framed_program(source, 'fixture-marker')
+        for prefix in ['', 'saved-sudo-password\n']:
+            result = subprocess.run([sys.executable, '-c', program],
+                                    input=prefix + 'fixture-marker\n{"value":"correct"}\n',
+                                    text=True, capture_output=True, check=True)
+            self.assertEqual(result.stdout.strip(), 'correct')
+
     def test_real_loopback_ssh_connection_checks_known_host_and_authenticates(self):
         # A disposable protocol fixture, never a configured/real server.
         host_key = native_ssh.paramiko.RSAKey.generate(2048)

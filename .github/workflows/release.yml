@@ -2,7 +2,6 @@ name: Desktop release
 
 on:
   push:
-    branches: ['codex/release-v0.1.0']
     tags: ['v*']
   workflow_dispatch:
 
@@ -130,4 +129,11 @@ jobs:
           cp docs/INSTALL.md release/INSTALL.md
           cd release
           sha256sum *.dmg *.zip *.exe > SHA256SUMS.txt
-          gh release create "$GITHUB_REF_NAME" *.dmg *.zip *.exe SHA256SUMS.txt INSTALL.md --repo "$GITHUB_REPOSITORY" --verify-tag --title "Mossentry $GITHUB_REF_NAME" --notes-file ../docs/RELEASE-v0.1.0.md
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft > draft-state; then
+            test "$(cat draft-state)" = true
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "Mossentry $GITHUB_REF_NAME" --notes-file ../docs/RELEASE-v0.1.0.md
+          fi
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --notes-file ../docs/RELEASE-v0.1.0.md
+          gh release upload "$GITHUB_REF_NAME" *.dmg *.zip *.exe SHA256SUMS.txt INSTALL.md --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest

@@ -5,9 +5,23 @@ import json
 import os
 from pathlib import Path
 import shlex
+import secrets
 import time
 
 import paramiko
+
+
+def framed_program(source, marker):
+    # sudo may consume the password, or leave it untouched for NOPASSWD/cached
+    # authorization. Discard input through a per-request marker in either case.
+    # Execute the source separately so its __future__ imports remain valid.
+    return ("import sys\n"
+            "for _line in sys.stdin:\n"
+            f"    if _line.rstrip('\\r\\n') == {marker!r}:\n"
+            "        break\n"
+            "else:\n"
+            "    raise RuntimeError('Missing SSH request marker')\n"
+            f"exec(compile({source!r}, '<mossentry>', 'exec'))\n")
 
 
 def execute(server, source, payload=None, *, sudo=False, password=None, timeout=30):
@@ -26,14 +40,15 @@ def execute(server, source, payload=None, *, sudo=False, password=None, timeout=
         client.get_transport().set_keepalive(5)
         # The shell receives only fixed program text. Passwords and request fields
         # travel over stdin, never in command lines, environment variables or files.
-        command = '/usr/bin/python3 -c ' + shlex.quote(source)
+        marker = 'mossentry-request-' + secrets.token_hex(24)
+        command = '/usr/bin/python3 -c ' + shlex.quote(framed_program(source, marker))
         if sudo:
             command = ('sudo -S -p "" -- ' if password is not None else 'sudo -n -- ') + command
         stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
         if sudo and password is not None:
             stdin.write(password + '\n')
             stdin.flush()
-        stdin.write(json.dumps(payload or {}) + '\n')
+        stdin.write(marker + '\n' + json.dumps(payload or {}) + '\n')
         stdin.flush()
         stdin.channel.shutdown_write()
         channel = stdout.channel
