@@ -83,7 +83,7 @@ accounts; the same username on multiple hosts counts once. Log dates take
 precedence over home-directory birth-time estimates. Accounts without a usable
 full date count in the total but are reported separately from the timeline.
 The local username history survives account deletion and server removal.
-Accounts by server and Access overview show the current cached account lists.
+Access overview summarizes permissions from the current cached account lists.
 Old account caches are backfilled into history on startup; sync servers to
 collect missing creation dates and any system accounts older scans omitted.
 

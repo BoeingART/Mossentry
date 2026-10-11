@@ -77,20 +77,6 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
   </section>;
 }
 
-function ServerAccounts({ data }: { data: Dashboard }) {
-  const hosts = data.servers.map(server => ({ ...server, count: data.users.filter(user => user.server === server.name).length }));
-  const maximum = Math.max(1, ...hosts.map(host => host.count));
-  return <section className="dashboard-panel" aria-labelledby="host-accounts-title">
-    <div className="dashboard-panel-heading"><div><Title order={3} id="host-accounts-title">{t("Accounts by server")}</Title></div><span className="dashboard-small-icon"><IconServer size={19} /></span></div>
-    <ScrollArea.Autosize mah={225} viewportProps={{ tabIndex: 0, 'aria-label': t("Accounts by server") }}><div className="dashboard-host-bars">{hosts.map((host, index) => <div className="dashboard-host-bar" key={host.id}>
-      <div><span>{host.name}</span><b>{count(host.count)}</b></div>
-      <div className="dashboard-bar-track" role="img" aria-label={t("{0}: {1} accounts{2}", { 0: host.name, 1: host.count, 2: ['error', 'failed'].includes(host.last_scan_status || '') ? ', cached data' : '' })}>
-        <span style={{ width: `${host.count / maximum * 100}%`, background: ['#4db6ac', '#4fc3f7', '#4dd0e1'][index % 3] }} />
-      </div>
-    </div>)}{!hosts.length && <p className="dashboard-no-data">{t("No data")}</p>}</div></ScrollArea.Autosize>
-  </section>;
-}
-
 function AccessOverview({ data }: { data: Dashboard }) {
   const { total, sudo, standard } = accessCounts(data.users);
   return <section className="dashboard-panel access-panel" aria-labelledby="access-overview-title">
@@ -104,16 +90,6 @@ function AccessOverview({ data }: { data: Dashboard }) {
       <div className="access-gauge-total"><span>{t("Total unique users")}</span><strong>{count(total)}</strong></div>
     </div>
     <div className="access-gauge-legend"><span><i className="teal" />{t("Sudo access")} <b>{count(sudo)}</b></span><span><i className="cyan" />{t("Standard")} <b>{count(standard)}</b></span></div>
-  </section>;
-}
-
-function RequestActivity({ data, openApprovals }: { data: Dashboard; openApprovals: () => void }) {
-  const labels = { create_user: t("Create user"), delete_user: t("Delete user"), disable_user: t("Disable sign-in"), enable_user: t("Enable sign-in"), set_sudo: t("Change sudo access") };
-  const states = { pending: t("Pending"), approved: t("Running"), executed: t("Completed"), failed: t("Failed"), rejected: t("Rejected") };
-  return <section className="dashboard-panel" aria-labelledby="request-activity-title">
-    <div className="dashboard-panel-heading"><div><Title order={3} id="request-activity-title">{t("Recent requests")}</Title></div><Tooltip label={t("View all requests")}><ActionIcon variant="default" aria-label={t("View all requests")} onClick={openApprovals}><IconArrowUpRight size={17} /></ActionIcon></Tooltip></div>
-    <div className="request-activity-list">{data.actions.slice(0, 4).map(action => <div className="request-activity-row" key={action.id}><span className="request-activity-icon"><IconShieldCheck size={18} stroke={1.5} /></span><div className="request-activity-copy"><strong>{labels[action.action_type]}</strong><span>{action.target_user} · {action.target_server}</span></div><Badge variant="light" color={action.status === 'failed' ? 'red' : action.status === 'pending' ? 'orange' : action.status === 'rejected' ? 'gray' : 'teal'}>{states[action.status]}</Badge></div>)}</div>
-    {!data.actions.length && <div className="dashboard-empty-state"><IconShieldCheck size={30} stroke={1.3} /><strong>{t("No requests yet")}</strong></div>}
   </section>;
 }
 
@@ -149,7 +125,6 @@ export default function DashboardPage({ data, refresh, openServers, openApproval
       })}
     </div>
     <div className="dashboard-primary-grid"><UserNumber statistics={data.statistics} /><AccessOverview data={data} /></div>
-    <div className="dashboard-chart-grid"><ServerAccounts data={data} /><RequestActivity data={data} openApprovals={openApprovals} /></div>
     <section className="dashboard-server-section" aria-labelledby="server-overview-title"><Group justify="space-between"><Group gap="md"><Title order={3} id="server-overview-title">{t("Server overview")}</Title><span className="dashboard-caption">{latest ? t("Last sync {0}", { 0: numericDate(latest, { includeTime: true }) }) : t("Ready to sync")}</span></Group><Button variant="subtle" color="gray" size="xs" rightSection={<IconChevronRight size={15} />} onClick={openServers}>{t("View all")}</Button></Group>
       {stale && <p className="dashboard-cache-note">{t("Some servers could not sync. Their account totals use the last saved data.")}</p>}
       <div className="server-table-toolbar"><TextInput aria-label={t("Search server overview")} placeholder={t("Search servers…")} leftSection={<IconSearch size={16} />} value={search} onChange={event => setSearch(event.currentTarget.value)} /><span className="dashboard-caption">{hosts.length} {t("servers in your workspace")}</span></div>
