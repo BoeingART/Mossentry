@@ -9,6 +9,7 @@ export const zh: Record<string, string> = {
   "Workspace": "工作区",
   "Administration": "管理",
   "Administrator": "管理员",
+  "Administrator:": "管理员：",
   "Toggle navigation": "展开或收起导航",
   "Collapse sidebar": "收起侧边栏",
   "Expand sidebar": "展开侧边栏",

@@ -129,7 +129,10 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
             </Menu>
           </Group>
         </Group>
-        <Group className="host-accounts" gap={6}><Text size="sm" c="dimmed">{t("Accounts:")}</Text><Text size="sm" fw={600}>{server.last_scan_at ? count : '—'}</Text></Group>
+        <Group className="host-accounts" gap="md" wrap="nowrap" align="start">
+          <Text className="host-administrator" size="sm" c="dimmed">{t("Administrator:")} <Text span inherit c="var(--ink)" fw={600}>{server.ssh_user}</Text></Text>
+          <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}><Text size="sm" c="dimmed">{t("Accounts:")}</Text><Text size="sm" fw={600}>{server.last_scan_at ? count : '—'}</Text></Group>
+        </Group>
         <Group className="server-actions" gap={8}>
           <Button size="xs" variant="default" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:scan`} onClick={() => void operate(server, 'scan')}>{t("Sync")}</Button>
           <Button size="xs" variant="default" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:status`} onClick={() => void operate(server, 'status')}>{t("Status")}</Button>

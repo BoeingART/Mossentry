@@ -150,7 +150,8 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .host-grid, .monitor-host-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 275px), 1fr)); gap: 18px; align-items: stretch; }
 .host-card { min-width: 0; display: flex; flex-direction: column; gap: 20px; border: 1px solid var(--line); border-radius: var(--mantine-radius-lg); }
 .host-heading .mantine-Title-root { font-size: var(--title-compact); font-weight: 600; }
-.host-accounts { padding-block: 13px; border-block: 1px solid var(--subtle-line); }
+.host-accounts { padding-block: 13px; }
+.host-administrator { flex: 1; min-width: 0; }
 .server-connection { display: inline-flex; align-items: center; justify-content: center; width: 23px; height: 23px; flex-shrink: 0; border: 1px solid currentColor; border-radius: 50%; }
 .server-connection.connected { color: #00897b; background: #e0f2f1; }
 .server-connection.failed { color: #c34750; background: #fff4f4; }
