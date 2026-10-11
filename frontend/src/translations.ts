@@ -10,6 +10,8 @@ export const zh: Record<string, string> = {
   "Administration": "管理",
   "Administrator": "管理员",
   "Toggle navigation": "展开或收起导航",
+  "Collapse sidebar": "收起侧边栏",
+  "Expand sidebar": "展开侧边栏",
   "Jump to a page": "跳转页面",
   "Find a page…": "查找页面…",
   "No matching pages": "没有匹配的页面",

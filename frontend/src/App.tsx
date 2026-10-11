@@ -10,10 +10,11 @@ import {
   ThemeIcon, Title, Tooltip,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { useMediaQuery, useReducedMotion } from '@mantine/hooks';
 import {
   IconActivity, IconBell, IconArrowUpRight, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
   IconEdit, IconHistory, IconKey, IconPlus, IconSearch, IconServer,
-  IconShieldCheck, IconUser, IconUsers,
+  IconShieldCheck, IconUser, IconUsers, IconLayoutSidebarLeftCollapse,
 } from '@tabler/icons-react';
 import { api, downloadCredentials, fetchDashboard, setCsrf } from './api';
 import type { Action, Dashboard, Server, User } from './types';
@@ -220,6 +221,10 @@ export default function App() {
   const [fatal, setFatal] = useState('');
   const [view, setView] = useState<View>('dashboard');
   const [mobileOpened, setMobileOpened] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const desktopLayout = useMediaQuery('(min-width: 48em)');
+  const reducedMotion = useReducedMotion();
+  const compactSidebar = desktopLayout && sidebarCollapsed;
   const [monitorServerId, setMonitorServerId] = useState<number | null>(null);
   const [request, setRequest] = useState<RequestDraft | null>(null);
   const [profile, setProfile] = useState<{ username: string; fullName: string } | null>(null);
@@ -291,28 +296,37 @@ export default function App() {
     setMobileOpened(false);
   }
   const nativeDesktop = navigator.userAgent.includes('Electron');
-  return <AppShell data-language={language} navbar={{ width: 232, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: nativeDesktop ? 100 : 76 }} padding={0}>
+  return <AppShell className="app-shell" data-language={language} data-sidebar-collapsed={compactSidebar || undefined} transitionDuration={reducedMotion ? 0 : 280} transitionTimingFunction="cubic-bezier(0.22, 1, 0.36, 1)" navbar={{ width: compactSidebar ? 76 : 232, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: nativeDesktop ? 100 : 76 }} padding={0}>
     <AppShell.Header className="topbar">
-      <div className="topbar-brand"><img className="brand-mark" src={brandIcon} width={42} height={42} alt="" /><span className="brand-name"><span className="brand-accent">Moss</span>entry</span></div>
+      <div className="topbar-brand" aria-label="Mossentry"><img className="brand-mark" src={brandIcon} width={42} height={42} alt="" /><span className="brand-name" aria-hidden={compactSidebar}><span className="brand-accent">Moss</span>entry</span></div>
       <div className="topbar-content">
         <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label={t("Toggle navigation")} />
+        <Tooltip label={compactSidebar ? t("Expand sidebar") : t("Collapse sidebar")}>
+          <ActionIcon className="sidebar-toggle" variant="subtle" color="gray" size="lg" visibleFrom="sm" aria-label={compactSidebar ? t("Expand sidebar") : t("Collapse sidebar")} aria-expanded={!compactSidebar} aria-controls="main-sidebar" onClick={() => setSidebarCollapsed(value => !value)}>
+            <IconLayoutSidebarLeftCollapse size={21} stroke={1.5} />
+          </ActionIcon>
+        </Tooltip>
         <div className="topbar-actions">
           <Tooltip label={pending ? t("{0} requests awaiting approval", { 0: pending }) : t("View approvals")}><ActionIcon className="approval-bell" variant="subtle" color="gray" size="lg" aria-label={t("View pending approvals")} onClick={() => navigate('approvals')}><IconBell size={20} stroke={1.5} />{pending > 0 && <span className="notification-dot" />}</ActionIcon></Tooltip>
           <AppearanceControls />
         </div>
       </div>
     </AppShell.Header>
-    <AppShell.Navbar className="sidebar" p="md">
-      <ScrollArea className="sidebar-scroll" viewportProps={{ tabIndex: 0, 'aria-label': t("Navigation") }}>
-        <span className="nav-section-label">{t("Workspace")}</span>
+    <AppShell.Navbar id="main-sidebar" className="sidebar">
+      <ScrollArea className="sidebar-scroll" type="never" viewportProps={{ tabIndex: 0, 'aria-label': t("Navigation") }}>
+        <span className="nav-section-label" aria-hidden={compactSidebar}>{t("Workspace")}</span>
         <Stack component="nav" aria-label={t("Main navigation")} gap={7}>{nav.map((item, index) => <div key={item.id}>
-          {index === 3 && <span className="nav-section-label nav-section-divider">{t("Administration")}</span>}
-          <button type="button" aria-current={view === item.id ? 'page' : undefined} className={`nav-button ${view === item.id ? 'active' : ''}`} onClick={() => navigate(item.id)}><span>{item.icon}</span><span>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge size="sm" color={view === 'approvals' ? 'gray' : 'teal'} variant="light" circle ml="auto">{pending}</Badge>}</button>
+          {index === 3 && <span className="nav-section-label nav-section-divider" aria-hidden={compactSidebar}>{t("Administration")}</span>}
+          <Tooltip label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} position="right" disabled={!compactSidebar} events={{ hover: true, focus: true, touch: false }}>
+            <button type="button" aria-label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} aria-current={view === item.id ? 'page' : undefined} className={`nav-button ${view === item.id ? 'active' : ''}`} onClick={() => navigate(item.id)}><span className="nav-icon">{item.icon}</span><span className="nav-label" aria-hidden={compactSidebar}>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge className="nav-badge" aria-hidden size="sm" color={view === 'approvals' ? 'gray' : 'teal'} variant="light" circle ml="auto">{pending}</Badge>}</button>
+          </Tooltip>
         </div>)}</Stack>
       </ScrollArea>
       <div className="sidebar-footer">
-        <div className="workspace-card"><span className="workspace-card-icon"><IconActivity size={22} stroke={1.5} /></span><strong>{t("Your infrastructure,")}<br />{t("at a glance.")}</strong><Button fullWidth variant="light" rightSection={<IconArrowUpRight size={15} />} onClick={() => navigate('monitor')}>{t("Open monitor")}</Button></div>
-        <div className={`service-status ${fatal ? 'has-error' : ''}`}><i /><span>{fatal ? t("Service needs attention") : t("Mossentry connected")}</span><span className="service-status-count">{data.servers.length} {t("hosts")}</span></div>
+        <div className="workspace-card-reveal" inert={compactSidebar} aria-hidden={compactSidebar}><div><div className="workspace-card"><span className="workspace-card-icon"><IconActivity size={22} stroke={1.5} /></span><strong>{t("Your infrastructure,")}<br />{t("at a glance.")}</strong><Button fullWidth variant="light" rightSection={<IconArrowUpRight size={15} />} onClick={() => navigate('monitor')}>{t("Open monitor")}</Button></div></div></div>
+        <Tooltip label={`${fatal ? t("Service needs attention") : t("Mossentry connected")} · ${data.servers.length} ${t("hosts")}`} position="right" disabled={!compactSidebar} events={{ hover: true, focus: true, touch: false }}>
+          <div className={`service-status ${fatal ? 'has-error' : ''}`} tabIndex={compactSidebar ? 0 : undefined} aria-label={compactSidebar ? `${fatal ? t("Service needs attention") : t("Mossentry connected")} · ${data.servers.length} ${t("hosts")}` : undefined}><i /><span>{fatal ? t("Service needs attention") : t("Mossentry connected")}</span><span className="service-status-count">{data.servers.length} {t("hosts")}</span></div>
+        </Tooltip>
       </div>
     </AppShell.Navbar>
     <AppShell.Main className="main-area"><ScrollArea key={view} className="page-scroll" h="calc(100dvh - var(--app-shell-header-offset, 0px))" viewportProps={{ tabIndex: 0, 'aria-label': t("Page content") }}><main className="content">

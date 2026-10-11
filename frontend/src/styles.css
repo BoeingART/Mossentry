@@ -77,6 +77,38 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .service-status.has-error i { background: #e69a35; }
 .service-status-count { margin-left: auto; }
 .main-area { min-width: 0; background: var(--canvas); }
+/* Keep the rail, brand, and content on the same animation curve. */
+.app-shell { --sidebar-duration: 280ms; --sidebar-easing: cubic-bezier(0.22, 1, 0.36, 1); }
+.sidebar { transition-property: width, padding, transform; overflow: hidden; }
+.topbar-brand { overflow: hidden; transition: width var(--sidebar-duration) var(--sidebar-easing), padding var(--sidebar-duration) var(--sidebar-easing), gap var(--sidebar-duration) var(--sidebar-easing); }
+.brand-mark, .nav-icon { flex-shrink: 0; }
+.brand-name, .nav-label { overflow: hidden; white-space: nowrap; max-width: 180px; opacity: 1; transition: max-width var(--sidebar-duration) var(--sidebar-easing), opacity var(--sidebar-duration) var(--sidebar-easing), transform var(--sidebar-duration) var(--sidebar-easing); }
+.brand-name { min-width: 0; }
+.sidebar-toggle svg { transition: transform var(--sidebar-duration) var(--sidebar-easing); }
+.nav-button { position: relative; overflow: hidden; transition: background .15s, color .15s, box-shadow .15s, padding var(--sidebar-duration) var(--sidebar-easing), gap var(--sidebar-duration) var(--sidebar-easing); }
+.nav-label { min-width: 0; }
+.nav-section-label { white-space: nowrap; overflow: hidden; max-height: 64px; transition: max-height var(--sidebar-duration) var(--sidebar-easing), padding var(--sidebar-duration) var(--sidebar-easing), color var(--sidebar-duration) var(--sidebar-easing); }
+.workspace-card-reveal { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows var(--sidebar-duration) var(--sidebar-easing), opacity var(--sidebar-duration) var(--sidebar-easing); }
+.workspace-card-reveal > div { min-height: 0; overflow: hidden; }
+.workspace-card { min-width: 197px; }
+.service-status { flex-wrap: nowrap; overflow: hidden; min-height: 36px; transition: gap var(--sidebar-duration) var(--sidebar-easing), padding var(--sidebar-duration) var(--sidebar-easing); }
+.service-status i { flex-shrink: 0; }
+.service-status > span { white-space: nowrap; transition: opacity var(--sidebar-duration) var(--sidebar-easing); }
+[data-sidebar-collapsed] .topbar-brand { width: 76px; padding-inline: 16px; gap: 0; }
+[data-sidebar-collapsed] .brand-name, [data-sidebar-collapsed] .nav-label { opacity: 0; transform: translateX(-8px); max-width: 0; }
+[data-sidebar-collapsed] .sidebar-toggle svg { transform: rotate(180deg); }
+[data-sidebar-collapsed] .sidebar { padding-inline: 12px; }
+[data-sidebar-collapsed] .nav-button { gap: 0; padding-inline: 15px; }
+[data-sidebar-collapsed] .nav-section-label { max-height: 0; padding-block: 0; color: transparent; }
+[data-sidebar-collapsed] .nav-section-divider { max-height: 1px; margin-bottom: 20px; }
+[data-sidebar-collapsed] .nav-badge { position: absolute; top: 7px; right: 7px; width: 6px; min-width: 6px; height: 6px; min-height: 6px; padding: 0; font-size: 0; border-radius: 50%; background: #009688; }
+[data-sidebar-collapsed] .nav-button.active .nav-badge { background: white; }
+[data-sidebar-collapsed] .workspace-card-reveal { grid-template-rows: 0fr; opacity: 0; }
+[data-sidebar-collapsed] .service-status { gap: 0; padding-inline: 23px; }
+[data-sidebar-collapsed] .service-status > span { opacity: 0; width: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .app-shell { --sidebar-duration: 0ms; }
+}
 .content { width: min(1510px, 100%); margin: 0 auto; padding: 28px 30px 36px; }
 .page-heading { margin-bottom: 25px; }
 .page-heading h2, h2.page-heading { letter-spacing: -.5px; }
