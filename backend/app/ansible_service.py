@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import base64
+import hashlib
 import os
 import random
 import re
@@ -77,7 +79,6 @@ def _run(playbook: str, limit: str, extra: dict[str, Any] | None = None, timeout
     selected = set(limit.split(","))
     if not selected or not selected <= valid_servers:
         raise ValueError("Target host is not in the inventory")
-    executable = _ansible_playbook()
     extra_path: Path | None = None
     effective_extra = dict(extra or {})
     passwords: dict[str, str] = {}
@@ -91,6 +92,13 @@ def _run(playbook: str, limit: str, extra: dict[str, Any] | None = None, timeout
         fallback = _become_password() if missing else None
         if fallback is not None:
             passwords.update({name: fallback for name in missing})
+
+    if sys.platform == "win32" or setting("SSH_ENGINE") == "native":
+        from .native_ssh import run
+        servers = [server for server in _enabled_servers() if server["name"] in selected]
+        ok, output = run(playbook, servers, effective_extra, passwords, timeout)
+        return RunResult(ok, output[-12000:])
+    executable = _ansible_playbook()
 
     def redact(output: str | bytes | None) -> str:
         value = output.decode(errors="replace") if isinstance(output, bytes) else (output or "")
@@ -270,19 +278,18 @@ def _generate_key(action_id: int, username: str) -> tuple[Path, str, str]:
     private_path = key_dir / f"action-{action_id}-{username}"
     if private_path.exists() or private_path.with_suffix(".pub").exists():
         raise RuntimeError("Key file already exists; refusing to overwrite it")
-    completed = subprocess.run(
-        ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", f"{username}@mossentry/action-{action_id}", "-f", str(private_path)],
-        capture_output=True, text=True, timeout=20, check=False,
-    )
-    if completed.returncode != 0:
-        raise RuntimeError(completed.stderr.strip() or "Could not generate the SSH key")
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    key = Ed25519PrivateKey.generate()
+    private = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.OpenSSH,
+                                serialization.NoEncryption())
+    with private_path.open("xb") as stream:
+        stream.write(private)
     private_path.chmod(0o600)
-    public_path = private_path.with_suffix(".pub")
-    public_key = public_path.read_text(encoding="utf-8").strip()
-    fingerprint = subprocess.run(
-        ["ssh-keygen", "-lf", str(public_path)], capture_output=True, text=True, check=True, timeout=10,
-    ).stdout.split()[1]
-    public_path.unlink(missing_ok=True)
+    public = key.public_key().public_bytes(serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH).decode()
+    public_key = f"{public} {username}@mossentry/action-{action_id}"
+    digest = hashlib.sha256(base64.b64decode(public.split()[1])).digest()
+    fingerprint = "SHA256:" + base64.b64encode(digest).decode().rstrip("=")
     return private_path, public_key, fingerprint
 
 
@@ -299,14 +306,9 @@ def _generate_initial_password(length: int = 16) -> str:
 
 
 def _password_hash(password: str) -> str:
-    completed = subprocess.run(
-        ["openssl", "passwd", "-6", "-salt", secrets.token_hex(8), "-stdin"],
-        input=password + "\n", capture_output=True, text=True, timeout=10, check=False,
-    )
-    password_hash = completed.stdout.strip()
-    if completed.returncode != 0 or not password_hash.startswith("$6$"):
-        raise RuntimeError(completed.stderr.strip() or "Could not hash the user password")
-    return password_hash
+    # Bundle the portable implementation: macOS's system LibreSSL lacks passwd -6.
+    from passlib.hash import sha512_crypt
+    return sha512_crypt.using(rounds=100000).hash(password)
 
 
 def _zip_entry(name: str) -> zipfile.ZipInfo:

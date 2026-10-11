@@ -1,5 +1,8 @@
 """Short, authenticated, read-only SSH samples independent of management jobs."""
 import json
+import sys
+
+from .config import setting
 import subprocess
 import time
 from collections import OrderedDict
@@ -32,11 +35,16 @@ def inspect_resources(server):
                    '-o', 'ControlMaster=no', '-o', 'ControlPath=none',
                    '-p', str(server['port']), '-i', server['key_path'],
                    '--', f"{server['ssh_user']}@{server['hostname']}", '/usr/bin/python3 -']
-        result = subprocess.run(command, input=Path(__file__).with_name('resource_probe.py').read_text(),
-                                capture_output=True, text=True, timeout=30, check=False)
-        if result.returncode:
-            raise RuntimeError(result.stderr or 'Resource sample failed')
-        sample = json.loads(result.stdout)
+        source = Path(__file__).with_name('resource_probe.py').read_text()
+        if sys.platform == 'win32' or setting('SSH_ENGINE') == 'native':
+            from .native_ssh import execute
+            sample = json.loads(execute(server, source, timeout=30))
+        else:
+            result = subprocess.run(command, input=source,
+                                    capture_output=True, text=True, timeout=30, check=False)
+            if result.returncode:
+                raise RuntimeError(result.stderr or 'Resource sample failed')
+            sample = json.loads(result.stdout)
         if not isinstance(sample, dict) or not {'checked_at', 'cpu', 'memory', 'disks', 'gpu', 'warnings'} <= sample.keys():
             raise ValueError('Invalid resource sample')
         with _guard:

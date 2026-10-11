@@ -14,13 +14,17 @@
     "start": "npm run build && electron .",
     "dev:ui": "vite --host 127.0.0.1",
     "check": "npm run build && npm run test:monitor && npm run test:desktop && node --check desktop/main.cjs && .venv/bin/python -m compileall -q backend/app && cd backend && ../.venv/bin/python -m unittest discover -s tests -v",
-    "test:monitor": "node --experimental-strip-types --test frontend/tests/*.test.mjs"
+    "test:monitor": "node --experimental-strip-types --test frontend/tests/*.test.mjs",
+    "build:runtime": "python scripts/build-runtime.py",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:win": "npm run build && electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "electron": "44.4.4",
+    "electron-builder": "26.17.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.1"
   },

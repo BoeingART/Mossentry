@@ -1,0 +1,127 @@
+name: Desktop release
+
+on:
+  push:
+    branches: ['codex/release-v0.1.0']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.8.22'
+      - run: npm ci
+      - run: npm run build && npm run test:monitor && npm run test:desktop
+      - run: |
+          uv venv --python 3.12.11 .venv
+          uv pip install --python .venv/bin/python -r backend/requirements-dev.txt
+          cd backend
+          ../.venv/bin/python -m unittest discover -s tests -v
+
+  mac:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.8.22'
+      - run: npm ci
+      - run: npm run build && npm run test:monitor && npm run test:desktop
+      - run: python3 scripts/build-runtime.py
+      - run: python3 scripts/smoke-backend.py
+      - run: npx electron-builder --mac --${{ matrix.arch }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Test the backend inside the packaged application
+        shell: bash
+        run: |
+          app=$(find release -maxdepth 2 -name Mossentry.app -type d -print -quit)
+          python3 scripts/smoke-backend.py "$app/Contents/Resources/runtime/bin/python3" "$app/Contents/Resources/backend"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.arch }}
+          path: |
+            release/*.dmg
+            release/*.zip
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.8.22'
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:monitor
+      - run: npm run test:desktop
+      - run: python scripts/build-runtime.py
+      - run: python scripts/smoke-backend.py build/runtime/python.exe
+      - run: build/runtime/python.exe -m unittest discover -s backend/tests -p test_native_ssh.py -v
+        env:
+          PYTHONPATH: backend
+      - run: npx electron-builder --win --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: python scripts/smoke-backend.py release/win-unpacked/resources/runtime/python.exe release/win-unpacked/resources/backend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: release/*.exe
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [tests, mac, windows]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version matches tag
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mac-*
+          merge-multiple: true
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x64
+          path: release
+      - name: Publish installers and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp docs/INSTALL.md release/INSTALL.md
+          cd release
+          sha256sum *.dmg *.zip *.exe > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" *.dmg *.zip *.exe SHA256SUMS.txt INSTALL.md --repo "$GITHUB_REPOSITORY" --verify-tag --title "Mossentry $GITHUB_REF_NAME" --notes-file ../docs/RELEASE-v0.1.0.md

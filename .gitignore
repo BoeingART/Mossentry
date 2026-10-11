@@ -7,3 +7,5 @@ backend/**/__pycache__/
 .DS_Store
 server_manager.tar.gz
 backend/app/frontend/
+build/
+release/

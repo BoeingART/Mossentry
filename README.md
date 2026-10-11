@@ -4,9 +4,13 @@
 
 Electron desktop application for managing Linux servers over SSH. The interface uses React, Mantine, and TypeScript. A local FastAPI service handles host scans, access requests, approvals, audit events, and one-time credential downloads.
 
+## Downloads
+
+See [Releases](https://github.com/BoeingART/Mossentry/releases) for macOS (Apple Silicon and Intel) and Windows x64 installers. Read [installation instructions](docs/INSTALL.md) first; Windows runs natively without WSL.
+
 ## Run
 
-Requires macOS or Linux, Node.js, Python 3.12, SSH, OpenSSL, and Ansible.
+Requires macOS or Linux, Node.js, Python 3.12, SSH, and Ansible.
 
 ```bash
 npm install
@@ -119,3 +123,7 @@ Restricted `/proc` visibility, container PID namespaces, MIG/MPS and driver limi
 SSH host-key verification remains enabled. Verify a new server's fingerprint and add it to the local SSH known-hosts file before testing its connection. Remote servers require Linux and Python 3; account changes also require sudo privileges.
 
 Automated tests use temporary databases and mocked remote execution; they never change accounts on configured servers.
+
+## Release builds
+
+`Desktop release` builds and checks macOS arm64/x64 and Windows x64 packages. Pushing a version tag matching `package.json` publishes a GitHub Release only after every platform build passes. Manual workflow runs build artifacts without publishing. Native Python runtimes are prepared with `python scripts/build-runtime.py` using uv 0.8.22 on each target operating system. Packaged clients use the bundled SSH transport; development can retain Ansible, or select native SSH with `MOSSENTRY_SSH_ENGINE=native`. Run `npm run dist:mac` or `npm run dist:win` after preparing the runtime. Credentials, local databases and the development virtual environment are excluded from packages.

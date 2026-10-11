@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 
 const { setting, userDataDirectory, databasePath } = require('./branding.cjs');
 const { preferenceStore } = require('./preferences.cjs');
+const { backendCommand } = require('./backend-runtime.cjs');
 const APP_NAME = 'Mossentry';
 const appIcon = path.join(__dirname, 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 app.setName(APP_NAME);
@@ -16,6 +17,7 @@ let backend;
 let mainWindow;
 let quitting = false;
 let backendFailure;
+let backendStderr = '';
 const desktopToken = crypto.randomBytes(32).toString('hex');
 const dataHome = userDataDirectory(app.getPath('appData'));
 fs.mkdirSync(dataHome, { recursive: true, mode: 0o700 });
@@ -31,19 +33,6 @@ if (!hasInstanceLock) {
       mainWindow.focus();
     }
   });
-}
-
-function backendDirectory() {
-  return app.isPackaged
-    ? path.join(process.resourcesPath, 'backend')
-    : path.join(__dirname, '..', 'backend');
-}
-
-function pythonExecutable() {
-  if (setting('PYTHON')) return setting('PYTHON');
-  const local = path.join(__dirname, '..', '.venv', 'bin', 'python');
-  if (fs.existsSync(local)) return local;
-  return 'python3';
 }
 
 function freePort() {
@@ -71,25 +60,18 @@ function isHealthy(port) {
 }
 
 async function waitForBackend(port) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
     if (await isHealthy(port)) return;
     if (backendFailure || !backend || backend.exitCode !== null) break;
     await new Promise(resolve => setTimeout(resolve, 150));
   }
-  throw new Error('The local service could not start. Install the Python dependencies and check the terminal output.');
+  throw new Error('The local service could not start. See INSTALL.md.\n' + (backendFailure?.message || backendStderr));
 }
 
 function stopBackend() {
   if (!backend || backend.exitCode !== null) return;
   try {
-    const appearance = preferenceStore(dataHome);
-    ipcMain.on('mossentry:appearance:get', event => {
-      event.returnValue = event.sender === mainWindow?.webContents ? appearance.get() : {};
-    });
-    ipcMain.handle('mossentry:appearance:set', (event, key, value) => {
-      if (event.sender !== mainWindow?.webContents) throw new Error('Untrusted appearance request');
-      appearance.set(key, value);
-    });
+    backend.stdin.end();
     if (process.platform === 'win32') backend.kill();
     else process.kill(-backend.pid, 'SIGTERM');
   } catch {
@@ -147,20 +129,29 @@ if (hasInstanceLock) app.whenReady().then(async () => {
       details.requestHeaders['X-Desktop-Token'] = desktopToken;
       callback({ requestHeaders: details.requestHeaders });
     });
-    backend = spawn(pythonExecutable(), [
-      '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', String(port),
-    ], {
-      cwd: backendDirectory(),
-      env: {
-        ...process.env,
-        MOSSENTRY_DATA_DIR: dataDirectory,
-        MOSSENTRY_DB_PATH: databasePath(dataDirectory),
-        MOSSENTRY_DESKTOP_TOKEN: desktopToken,
-      },
-      detached: process.platform !== 'win32',
-      stdio: ['ignore', 'ignore', 'pipe'],
+    const command = backendCommand({
+      platform: process.platform,
+      packaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      projectRoot: path.join(__dirname, '..'),
+      python: setting('PYTHON'),
     });
-    backend.stderr.on('data', chunk => process.stderr.write(chunk));
+    backend = spawn(command.executable, command.args, {
+      cwd: command.directory,
+      env: { ...process.env, PYTHONUTF8: '1' },
+      detached: process.platform !== 'win32',
+      windowsHide: true,
+      stdio: ['pipe', 'ignore', 'pipe'],
+    });
+    backend.stdin.on('error', () => {});
+    backend.stdin.write(JSON.stringify({
+      dataDirectory, databasePath: databasePath(dataDirectory),
+      token: desktopToken, port, nativeSSH: app.isPackaged || process.platform === 'win32',
+    }) + '\n');
+    backend.stderr.on('data', chunk => {
+      process.stderr.write(chunk);
+      backendStderr = (backendStderr + chunk.toString()).slice(-2000);
+    });
     backend.on('error', error => {
       backendFailure = error;
       process.stderr.write(`${error.message}\n`);
