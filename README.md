@@ -80,11 +80,17 @@ The desktop service listens only on a random `127.0.0.1` port and requires a fre
 
 The app opens on **Dashboard**. **User number** plots cumulative unique usernames
 from their recorded creation dates, with all-time and shorter time ranges.
-All synced accounts count, including root, system accounts and SSH management
-accounts; the same username on multiple hosts counts once. Log dates take
+Dashboard user totals, account totals, recent growth, server account counts and
+access overview exclude accounts whose UID is below 1000 and whose interactive
+login is disabled (a shell ending in `/nologin` or `/false`). Low-UID accounts
+with login enabled and all accounts with UID 1000 or above still count.
+The same username on multiple hosts counts once if any account qualifies. Log dates take
 precedence over home-directory birth-time estimates. Accounts without a usable
 full date count in the total but are reported separately from the timeline.
-The local username history survives account deletion and server removal.
+The local username history and its last known eligibility survive account deletion
+and server removal. Startup backfills eligibility from cached accounts; legacy
+history without a remaining account retains its previous inclusion because its
+UID and login state are unknown. The full account list remains available in Users & access.
 Access overview summarizes permissions from the current cached account lists.
 Old account caches are backfilled into history on startup; sync servers to
 collect missing creation dates and any system accounts older scans omitted.

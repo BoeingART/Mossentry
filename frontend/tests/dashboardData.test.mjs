@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DAY, accessCounts, dateTime, growthWindow, smoothPath, totalAt } from '../src/dashboardData.ts';
+import { DAY, accessCounts, dashboardAccounts, dateTime, growthWindow, smoothPath, totalAt } from '../src/dashboardData.ts';
 
 const history = [{ date: '2020-01-01', total: 2, added: 2 }, { date: '2026-09-10', total: 3, added: 1 }, { date: '2026-10-06', total: 5, added: 2 }];
 
@@ -38,4 +38,19 @@ test('access breakdown includes root and management accounts, deduplicated acros
 test('curve handles remain within cumulative endpoints', () => {
   assert.equal(smoothPath([{ x: 0, y: 100 }, { x: 100, y: 50 }, { x: 200, y: 50 }]),
     'M 0 100 C 45 100, 55 50, 100 50 C 145 50, 155 50, 200 50');
+});
+
+test('dashboard excludes only low-UID disabled accounts before deduplicating access', () => {
+  const users = [
+    { username: 'daemon', uid: 1, is_disabled: 1, is_sudo: 0, server: 'one' },
+    { username: 'root', uid: 0, is_disabled: 0, is_sudo: 1, server: 'one' },
+    { username: 'srvmgr', uid: 999, is_disabled: 0, is_sudo: 1, server: 'one' },
+    { username: 'disabled-user', uid: 1000, is_disabled: 1, is_sudo: 0, server: 'one' },
+    { username: 'mixed', uid: 999, is_disabled: 1, is_sudo: 1, server: 'one' },
+    { username: 'mixed', uid: 1000, is_disabled: 0, is_sudo: 0, server: 'two' },
+  ];
+  assert.deepEqual(dashboardAccounts(users).map(user => user.username), ['root', 'srvmgr', 'disabled-user', 'mixed']);
+  assert.equal(dashboardAccounts(users).filter(user => user.server === 'one').length, 3);
+  assert.deepEqual(accessCounts(users), { total: 4, sudo: 2, standard: 2 });
+  assert.equal(users.length, 6);
 });

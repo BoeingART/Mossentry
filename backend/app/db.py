@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 );
 CREATE TABLE IF NOT EXISTS user_history (
   username TEXT PRIMARY KEY,
+  dashboard_eligible INTEGER NOT NULL DEFAULT 1,
   created_at TEXT,
   created_at_source TEXT,
   first_seen_at TEXT NOT NULL,
@@ -142,6 +143,9 @@ def init_db() -> None:
         for column in ("created_at", "created_at_source"):
             if column not in user_columns:
                 conn.execute(f"ALTER TABLE server_users ADD COLUMN {column} TEXT")
+        history_columns = {column["name"] for column in conn.execute("PRAGMA table_info(user_history)")}
+        if "dashboard_eligible" not in history_columns:
+            conn.execute("ALTER TABLE user_history ADD COLUMN dashboard_eligible INTEGER NOT NULL DEFAULT 1")
         remember_users(conn)
         seeded = conn.execute("SELECT 1 FROM settings WHERE key='servers_seeded'").fetchone()
         # Existing installations keep their inventory; deleted hosts stay deleted on restart.

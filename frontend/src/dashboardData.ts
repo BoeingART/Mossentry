@@ -3,6 +3,9 @@ import type { Dashboard } from './types';
 export const DAY = 86_400_000;
 export type HistoryPoint = Dashboard['statistics']['history'][number];
 export const dateTime = (date: string) => Date.parse(`${date}T00:00:00Z`);
+export function dashboardAccounts(users: Dashboard['users']) {
+  return users.filter(user => !(user.uid < 1000 && user.is_disabled));
+}
 export function totalAt(history: HistoryPoint[], time: number): number {
   let low = 0, high = history.length;
   while (low < high) {
@@ -36,7 +39,7 @@ export function smoothPath(points: { x: number; y: number }[]) {
 
 export function accessCounts(users: Dashboard['users']) {
   const accounts = new Map<string, boolean>();
-  for (const user of users) accounts.set(user.username, !!user.is_sudo || !!accounts.get(user.username));
+  for (const user of dashboardAccounts(users)) accounts.set(user.username, !!user.is_sudo || !!accounts.get(user.username));
   const sudo = [...accounts.values()].filter(Boolean).length;
   return { total: accounts.size, sudo, standard: accounts.size - sudo };
 }

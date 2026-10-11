@@ -2,6 +2,9 @@
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 
+# Match the cached interactive-login status used by the account list.
+DASHBOARD_ACCOUNT_FILTER = '(uid >= 1000 OR is_disabled = 0)'
+
 
 def creation_time(value):
     if not value:
@@ -40,6 +43,14 @@ def remember_users(conn):
              min(previous['first_seen_at'], account['scanned_at']),
              max(previous['last_seen_at'], account['scanned_at']), account['username']),
         )
+    # Filter before deduplicating across hosts. Keep the last known eligibility
+    # when an account or server is removed, just as we retain its creation date.
+    conn.execute(f'''
+        UPDATE user_history SET dashboard_eligible = (
+            SELECT MAX({DASHBOARD_ACCOUNT_FILTER}) FROM server_users
+            WHERE server_users.username = user_history.username
+        ) WHERE username IN (SELECT username FROM server_users)
+    ''')
 
 
 def statistics(conn, current_time):
@@ -54,7 +65,7 @@ def statistics(conn, current_time):
     daily = Counter()
     total = 0
     recent = 0
-    for user in conn.execute('SELECT created_at FROM user_history'):
+    for user in conn.execute('SELECT created_at FROM user_history WHERE dashboard_eligible = 1'):
         total += 1
         date = creation_time(user['created_at'])
         if date is not None and date <= end:
@@ -71,7 +82,7 @@ def statistics(conn, current_time):
         'dated_users': running,
         'undated_users': total - running,
         'new_users_30d': recent,
-        'new_accounts_30d': recent_count('SELECT created_at FROM server_users'),
+        'new_accounts_30d': recent_count(f'SELECT created_at FROM server_users WHERE {DASHBOARD_ACCOUNT_FILTER}'),
         'new_servers_30d': recent_count("SELECT created_at FROM audit_log WHERE event='server_created'"),
         'pending_approvals': conn.execute("SELECT COUNT(*) FROM actions WHERE status='pending'").fetchone()[0],
         'new_pending_approvals_30d': recent_count("SELECT requested_at FROM actions WHERE status='pending'"),

@@ -12,13 +12,45 @@ class DashboardStatisticsTests(unittest.TestCase):
         self.conn.executescript(SCHEMA)
         self.addCleanup(self.conn.close)
 
-    def account(self, server, username, date, source='auth_log', observed='2026-10-06T12:00:00+00:00'):
+    def account(self, server, username, date, source='auth_log', observed='2026-10-06T12:00:00+00:00', uid=None, disabled=False):
         self.conn.execute(
             '''INSERT OR REPLACE INTO server_users(server_id,username,uid,gid,home,shell,is_sudo,is_disabled,
             scanned_at,created_at,created_at_source) VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
-            (server, username, 0 if username == 'root' else 1000, 1000, '/home/' + username,
-             '/bin/bash', 0, 0, observed, date, source),
+            (server, username, uid if uid is not None else (0 if username == 'root' else 1000), 1000, '/home/' + username,
+             '/usr/sbin/nologin' if disabled else '/bin/bash', 0, int(disabled), observed, date, source),
         )
+
+    def test_excludes_only_low_uid_disabled_accounts_from_totals_and_growth(self):
+        date = '2026-10-05T12:00:00Z'
+        self.account(1, 'daemon', date, uid=1, disabled=True)
+        self.account(1, 'unknown-system', None, uid=999, disabled=True)
+        self.account(1, 'root', date, uid=0)
+        self.account(1, 'srvmgr', date, uid=999)
+        self.account(1, 'disabled-user', date, uid=1000, disabled=True)
+        self.account(1, 'mixed', date, uid=999, disabled=True)
+        self.account(2, 'mixed', date, uid=1000)
+        remember_users(self.conn)
+        result = statistics(self.conn, '2026-10-06T12:00:00Z')
+        self.assertEqual(result['total_unique_users'], 4)
+        self.assertEqual(result['dated_users'], 4)
+        self.assertEqual(result['undated_users'], 0)
+        self.assertEqual(result['new_users_30d'], 4)
+        self.assertEqual(result['new_accounts_30d'], 4)
+        self.assertEqual(result['history'], [{'date': '2026-10-05', 'total': 4, 'added': 4}])
+        self.assertEqual(self.conn.execute('SELECT COUNT(*) FROM server_users').fetchone()[0], 7)
+
+    def test_eligibility_tracks_login_changes_and_survives_account_removal(self):
+        self.account(1, 'service', '2020-01-01T00:00:00Z', uid=999, disabled=True)
+        remember_users(self.conn)
+        self.assertEqual(statistics(self.conn, '2026-10-06T12:00:00Z')['total_unique_users'], 0)
+        self.conn.execute('UPDATE server_users SET is_disabled=0')
+        remember_users(self.conn)
+        self.assertEqual(statistics(self.conn, '2026-10-06T12:00:00Z')['total_unique_users'], 1)
+        self.conn.execute('UPDATE server_users SET is_disabled=1')
+        remember_users(self.conn)
+        self.conn.execute('DELETE FROM server_users')
+        remember_users(self.conn)
+        self.assertEqual(statistics(self.conn, '2026-10-06T12:00:00Z')['total_unique_users'], 0)
 
     def test_counts_all_accounts_once_and_uses_earliest_creation_across_hosts(self):
         self.account(1, 'root', '2020-01-01T00:00:00Z')

@@ -65,6 +65,23 @@ class ServerManagementTests(unittest.TestCase):
         self.db.init_db()
         self.assertEqual(self.db.row('SELECT key_path FROM servers WHERE id=?', (server_id,))['key_path'], server['key_path'])
 
+    def test_dashboard_backfills_legacy_history_without_hiding_managed_accounts(self):
+        server_id = self.add_server()
+        for username, uid, disabled in (('daemon', 1, 1), ('root', 0, 0), ('alice', 1000, 1)):
+            self.db.execute('INSERT INTO server_users(server_id,username,uid,gid,home,shell,is_sudo,is_disabled,scanned_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                            (server_id, username, uid, uid, '/', '/bin/false' if disabled else '/bin/bash', 0, disabled, self.db.now(), '2020-01-01T00:00:00Z'))
+        self.db.init_db()
+        # Reproduce the history schema and unfiltered totals of earlier releases.
+        self.db.execute('ALTER TABLE user_history DROP COLUMN dashboard_eligible')
+        for _ in range(2):
+            self.db.init_db()
+            response = self.client.get('/api/dashboard')
+            self.assertEqual(response.status_code, 200, response.text)
+            data = response.json()
+            self.assertEqual({user['username'] for user in data['users']}, {'daemon', 'root', 'alice'})
+            self.assertEqual(data['statistics']['total_unique_users'], 2)
+            self.assertEqual(data['statistics']['history'], [{'date': '2020-01-01', 'total': 2, 'added': 2}])
+
     def test_sudo_password_lifecycle_and_no_disclosure(self):
         secret = '  private-SUDO-密码-{{literal}}  '
         self.body['sudo_password'] = secret

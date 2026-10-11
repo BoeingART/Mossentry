@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { ActionIcon, Badge, Button, Group, ScrollArea, Select, Table, TextInput, Title, Tooltip } from '@mantine/core';
 import { IconArrowUpRight, IconSearch, IconClock, IconCalendar, IconChevronRight, IconRefresh, IconServer, IconShieldCheck, IconUsers, IconUserCheck } from '@tabler/icons-react';
 import type { Dashboard } from './types';
-import { accessCounts, dateTime, DAY, growthWindow, smoothPath, totalAt } from './dashboardData';
+import { accessCounts, dashboardAccounts, dateTime, DAY, growthWindow, smoothPath, totalAt } from './dashboardData';
 
 const count = (value: number) => value.toLocaleString(locale());
 
@@ -96,12 +96,13 @@ function AccessOverview({ data }: { data: Dashboard }) {
 export default function DashboardPage({ data, refresh, openServers, openApprovals }: { data: Dashboard; refresh: () => Promise<void>; openServers: () => void; openApprovals: () => void }) {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const accounts = dashboardAccounts(data.users);
   const hosts = data.servers.filter(server => `${server.name} ${server.hostname}`.toLowerCase().includes(search.toLowerCase()));
   const stale = data.servers.some(server => ['error', 'failed'].includes(server.last_scan_status || ''));
   const latest = data.servers.map(server => server.last_scan_at).filter((date): date is string => !!date).sort().at(-1);
   const metrics = [
     { id: 'users', label: t("Unique users"), value: data.statistics.total_unique_users, added: data.statistics.new_users_30d, icon: IconUsers },
-    { id: 'accounts', label: t("Accounts"), value: data.users.length, added: data.statistics.new_accounts_30d, icon: IconUserCheck },
+    { id: 'accounts', label: t("Accounts"), value: accounts.length, added: data.statistics.new_accounts_30d, icon: IconUserCheck },
     { id: 'servers', label: t("Servers"), value: data.servers.length, added: data.statistics.new_servers_30d, icon: IconServer },
     { id: 'approvals', label: t("Pending approvals"), value: data.statistics.pending_approvals, added: data.statistics.new_pending_approvals_30d, icon: IconClock },
   ];
@@ -130,7 +131,7 @@ export default function DashboardPage({ data, refresh, openServers, openApproval
       <div className="server-table-toolbar"><TextInput aria-label={t("Search server overview")} placeholder={t("Search servers…")} leftSection={<IconSearch size={16} />} value={search} onChange={event => setSearch(event.currentTarget.value)} /><span className="dashboard-caption">{hosts.length} {t("servers in your workspace")}</span></div>
       <ScrollArea><Table className="dashboard-server-table" miw={620} verticalSpacing="md" horizontalSpacing="md" highlightOnHover><Table.Thead><Table.Tr><Table.Th>{t("Server name")}</Table.Th><Table.Th>{t("SSH port")}</Table.Th><Table.Th>{t("Management")}</Table.Th><Table.Th>{t("Sync status")}</Table.Th><Table.Th ta="right">{t("Accounts")}</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{hosts.slice(0, 5).map((server, index) => {
         const status = server.last_scan_status === 'ok' ? t("Synced") : ['error', 'failed'].includes(server.last_scan_status || '') ? t("Needs sync") : t("Not synced");
-        return <Table.Tr key={server.id}><Table.Td><div className="dashboard-server-identity"><span className={`dashboard-server-avatar tone-${index % 3}`}><IconServer size={19} /></span><div className="dashboard-server-name"><strong>{server.name}</strong><span>{server.hostname}</span></div></div></Table.Td><Table.Td>{server.port}</Table.Td><Table.Td><Badge color={server.enabled ? 'teal' : 'gray'} variant="light">{server.enabled ? t("Enabled") : t("Paused")}</Badge></Table.Td><Table.Td><span className={`dashboard-server-status ${status === t("Synced") ? 'synced' : status === t("Needs sync") ? 'needs-sync' : ''}`}><i />{status}</span></Table.Td><Table.Td ta="right">{server.last_scan_at ? count(data.users.filter(user => user.server === server.name).length) : '—'}</Table.Td></Table.Tr>;
+        return <Table.Tr key={server.id}><Table.Td><div className="dashboard-server-identity"><span className={`dashboard-server-avatar tone-${index % 3}`}><IconServer size={19} /></span><div className="dashboard-server-name"><strong>{server.name}</strong><span>{server.hostname}</span></div></div></Table.Td><Table.Td>{server.port}</Table.Td><Table.Td><Badge color={server.enabled ? 'teal' : 'gray'} variant="light">{server.enabled ? t("Enabled") : t("Paused")}</Badge></Table.Td><Table.Td><span className={`dashboard-server-status ${status === t("Synced") ? 'synced' : status === t("Needs sync") ? 'needs-sync' : ''}`}><i />{status}</span></Table.Td><Table.Td ta="right">{server.last_scan_at ? count(accounts.filter(user => user.server === server.name).length) : '—'}</Table.Td></Table.Tr>;
       })}</Table.Tbody></Table></ScrollArea>
       {!hosts.length && <div className="dashboard-no-data">{data.servers.length ? t("No servers match your search.") : <>{t("No servers yet.")} <button onClick={openServers}>{t("Add your first server")}</button></>}</div>}
       <div className="dashboard-table-footer"><span>{t("Showing")} {Math.min(hosts.length, 5)} {t("of")} {hosts.length} {t("servers")}</span><Button variant="default" size="xs" rightSection={<IconChevronRight size={14} />} onClick={openServers}>{t("Manage servers")}</Button></div>
