@@ -60,6 +60,8 @@ jobs:
         run: |
           app=$(find release -maxdepth 2 -name Mossentry.app -type d -print -quit)
           python3 scripts/smoke-backend.py "$app/Contents/Resources/runtime/bin/python3" "$app/Contents/Resources/backend"
+          node scripts/smoke-desktop.cjs "$app/Contents/MacOS/Mossentry"
+          codesign --verify --deep --strict "$app"
       - uses: actions/upload-artifact@v4
         with:
           name: mac-${{ matrix.arch }}
@@ -92,6 +94,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - run: python scripts/smoke-backend.py release/win-unpacked/resources/runtime/python.exe release/win-unpacked/resources/backend
+      - run: node scripts/smoke-desktop.cjs release/win-unpacked/Mossentry.exe
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64

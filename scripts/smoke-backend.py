@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix='mossentry-smoke-') as temp:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
     with open(Path(temp) / 'stderr.log', 'w+') as log:
-        process = subprocess.Popen([str(python), str(backend / 'launch.py')], cwd=backend,
+        process = subprocess.Popen([str(python), '-B', str(backend / 'launch.py')], cwd=backend,
                                    stdin=subprocess.PIPE, stdout=log, stderr=log, text=True)
         try:
             process.stdin.write(json.dumps({
@@ -54,6 +54,11 @@ with tempfile.TemporaryDirectory(prefix='mossentry-smoke-') as temp:
             process.stdin.close()
             assert process.wait(timeout=15) == 0, 'Service did not exit cleanly after parent disconnected'
             print('Packaged backend: health, authentication, UI, dashboard and shutdown passed.')
+        except Exception:
+            log.flush()
+            log.seek(0)
+            print(log.read(), file=sys.stderr)
+            raise
         finally:
             if process.poll() is None:
                 process.terminate()

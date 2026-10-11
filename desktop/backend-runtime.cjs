@@ -8,7 +8,7 @@ function backendCommand({ platform, packaged, resourcesPath, projectRoot, python
     executable: python || (packaged
       ? path.join(resourcesPath, 'runtime', interpreter)
       : path.join(projectRoot, development)),
-    args: [path.join(directory, 'launch.py')],
+    args: ['-B', path.join(directory, 'launch.py')],
     directory,
   };
 }

@@ -23,15 +23,19 @@ def main():
 
     import uvicorn
     server = uvicorn.Server(uvicorn.Config("app.main:app", host="127.0.0.1", port=int(options["port"]),
-                                          loop="asyncio", http="h11", access_log=False))
+                                          loop="asyncio", http="h11", access_log=False, timeout_graceful_shutdown=5))
 
     def watch_parent():
-        sys.stdin.read()
-        server.should_exit = True
+        try:
+            while sys.stdin.buffer.read(1):
+                pass
+        except (OSError, ValueError):
+            pass
+        finally:
+            server.should_exit = True
 
     threading.Thread(target=watch_parent, daemon=True).start()
     server.run()
-
 
 
 if __name__ == "__main__":
