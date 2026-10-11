@@ -28,6 +28,9 @@ jobs:
           uv pip install --python .venv/bin/python -r backend/requirements-dev.txt
           cd backend
           ../.venv/bin/python -m unittest discover -s tests -v
+      - name: Exercise native account operations in a disposable Linux container
+        run: |
+          docker run --rm -v "$PWD:/source:ro" ubuntu:22.04 bash -c 'apt-get update -qq && apt-get install -y -qq python3 sudo passwd && python3 /source/scripts/test-remote-linux.py'
 
   mac:
     strategy:
