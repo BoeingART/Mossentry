@@ -8,6 +8,7 @@ from threading import Thread
 
 from . import ansible_service, db
 from .errors import friendly_error
+from .operation_diagnostics import DIAGNOSTICS_VERSION, analyze_output, job_status, result_status
 from .operations_probe import command_risks
 
 MUTATIONS = {'start', 'stop', 'restart', 'enable', 'disable'}
@@ -19,6 +20,35 @@ def recover_interrupted():
         conn.execute("UPDATE operation_results SET status='interrupted',error=?,finished_at=? WHERE status IN ('queued','running')",
                      (INTERRUPTED, db.now()))
         conn.execute("UPDATE operation_jobs SET status='interrupted',finished_at=? WHERE status='running'", (db.now(),))
+
+
+def backfill_output_diagnostics():
+    """Upgrade saved command results once, without rerunning any remote work."""
+    key = 'operation_output_diagnostics_version'
+    with db.connect() as conn:
+        version = conn.execute('SELECT value FROM settings WHERE key=?', (key,)).fetchone()
+        if version and version['value'] == str(DIAGNOSTICS_VERSION):
+            return
+        changed_jobs = set()
+        for row in conn.execute("""
+            SELECT r.job_id,r.server_name,r.status,r.error,r.result_json
+            FROM operation_results r JOIN operation_jobs j ON j.id=r.job_id
+            WHERE j.operation='command' AND j.status IN ('completed','completed_with_warnings','failed','partial')
+              AND r.status IN ('completed','completed_with_warnings','failed') AND r.result_json IS NOT NULL
+        """):
+            value = json.loads(row['result_json'])
+            if not isinstance(value, dict):
+                continue
+            value = analyze_output(value)
+            # Never turn a previously recorded failure into a successful result.
+            status = 'failed' if row['status'] == 'failed' or row['error'] else result_status(value)
+            conn.execute('UPDATE operation_results SET status=?,result_json=? WHERE job_id=? AND server_name=?',
+                         (status, json.dumps(value, ensure_ascii=False), row['job_id'], row['server_name']))
+            changed_jobs.add(row['job_id'])
+        for job_id in changed_jobs:
+            states = [row['status'] for row in conn.execute('SELECT status FROM operation_results WHERE job_id=?', (job_id,))]
+            conn.execute('UPDATE operation_jobs SET status=? WHERE id=?', (job_status(states), job_id))
+        conn.execute('INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)', (key, str(DIAGNOSTICS_VERSION)))
 
 
 def run_remote(name, payload):
@@ -48,9 +78,10 @@ def execute_job(job_id, names, payload, actor, lock):
                        (db.now(), job_id, name))
             try:
                 result = run_remote(name, payload)
-                failed = result.get('exit_code', 0) != 0 or result.get('timed_out', False) or result.get('syntax_ok') is False
+                if payload['operation'] == 'command':
+                    result = analyze_output(result)
                 db.execute("UPDATE operation_results SET status=?,result_json=?,finished_at=? WHERE job_id=? AND server_name=?",
-                           ('failed' if failed else 'completed', json.dumps(result, ensure_ascii=False), db.now(), job_id, name))
+                           (result_status(result), json.dumps(result, ensure_ascii=False), db.now(), job_id, name))
             except Exception as exc:
                 # Raw transport errors can include remote content. Store only a
                 # friendly error here; log contents are never copied into audit.
@@ -59,7 +90,7 @@ def execute_job(job_id, names, payload, actor, lock):
                            (error, db.now(), job_id, name))
             db.audit(actor, 'operation_host_finished', name, {'job_id': job_id, 'operation': payload['operation']}, None)
         states = [item['status'] for item in db.rows('SELECT status FROM operation_results WHERE job_id=?', (job_id,))]
-        status = 'completed' if all(s == 'completed' for s in states) else 'failed' if all(s == 'failed' for s in states) else 'partial'
+        status = job_status(states)
         db.execute('UPDATE operation_jobs SET status=?,finished_at=? WHERE id=?', (status, db.now(), job_id))
     except Exception:
         # A local persistence error must not leave a job looking live forever.

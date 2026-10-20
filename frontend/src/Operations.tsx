@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Checkbox, Code, Combobox, Group, Loader, Modal, MultiSelect, NumberInput, Pagination, ScrollArea, Stack, Table, Text, Title, Tooltip } from '@mantine/core';
-import { IconAlertTriangle, IconCheck, IconChevronRight, IconClock, IconPlayerPlay, IconTerminal2, IconTestPipe, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCheck, IconChevronRight, IconClock, IconExclamationMark, IconPlayerPlay, IconTerminal2, IconTestPipe, IconX } from '@tabler/icons-react';
 import { api } from './api';
 import { t } from './i18n';
 import { numericDate } from './dateFormat';
@@ -10,16 +10,34 @@ import BashEditor from './BashEditor';
 import type { Server } from './types';
 
 type Summary = { id: number; operation: string; status: string; created_at: string; finished_at: string | null };
-type CommandResult = ProbeResult & { syntax_ok?: boolean; dry_run?: boolean; stdout?: string; stderr?: string; exit_code?: number; timed_out?: boolean; truncated?: boolean; risk_warnings?: string[] };
+type OutputDiagnostic = { code: string; summary: string; stream: 'stdout' | 'stderr'; count: number; matches: { line: number; text: string; truncated: boolean }[] };
+type CommandResult = ProbeResult & { syntax_ok?: boolean; dry_run?: boolean; stdout?: string; stderr?: string; exit_code?: number; timed_out?: boolean; truncated?: boolean; risk_warnings?: string[]; output_diagnostics?: OutputDiagnostic[] };
 type Job = Summary & { payload: { unit?: string; command?: string; elevated?: boolean; timeout?: number }; results: { server_name: string; status: string; error: string | null; result: CommandResult | null }[] };
 const labels: Record<string, string> = { command: 'Run command', dry_run: 'Check syntax and risks', inspect: 'Health inspection', services: 'List services', logs: 'Query logs', start: 'Start service', stop: 'Stop service', restart: 'Restart service', enable: 'Enable at boot', disable: 'Disable at boot' };
-const statusLabels: Record<string, string> = { running: 'Running', queued: 'Queued', completed: 'Completed', failed: 'Failed', partial: 'Partially completed', interrupted: 'Interrupted' };
-const color = (status: string) => status === 'completed' ? 'teal' : status === 'failed' || status === 'interrupted' ? 'red' : 'blue';
+const statusLabels: Record<string, string> = { running: 'Running', queued: 'Queued', completed: 'Completed', completed_with_warnings: 'Completed with warnings', failed: 'Failed', partial: 'Partially completed', interrupted: 'Interrupted' };
+const color = (status: string) => status === 'completed_with_warnings' ? 'yellow' : status === 'completed' ? 'teal' : status === 'failed' || status === 'interrupted' ? 'red' : 'blue';
 const date = (value: string) => numericDate(value, { includeTime: true });
 const errorMessage = (cause: unknown) => cause instanceof Error ? cause.message : t('Operation failed');
 
 function Warnings({ warnings }: { warnings: string[] }) {
   return warnings.length > 0 && <Alert color="orange" icon={<IconAlertTriangle size={18} />} title={t('Command warnings')}><Stack gap={4}>{warnings.map(warning => <Text key={warning} size="sm">{t(warning)}</Text>)}</Stack></Alert>;
+}
+
+function OutputDiagnostics({ diagnostics }: { diagnostics: OutputDiagnostic[] }) {
+  return diagnostics.length > 0 && <Alert color="yellow" icon={<IconAlertTriangle size={18} />} title={t('Output diagnostics')}>
+    <Stack gap="sm">
+      <Text size="xs">{t('Log matches are hints for review; the original exit code is unchanged.')}</Text>
+      {diagnostics.map(item => <Stack key={`${item.stream}-${item.code}`} gap={4}>
+        <Text size="sm" fw={500}>{t(item.summary)}</Text>
+        {item.matches.map(match => <div key={match.line}>
+          <Text size="xs" c="dimmed">{item.stream} · {t('Line {0}', { 0: match.line })}</Text>
+          <Code block className="operation-output">{match.text}</Code>
+          {match.truncated && <Text size="xs">{t('Log excerpt truncated; see the captured output below.')}</Text>}
+        </div>)}
+        {item.count > item.matches.length && <Text size="xs">{t('Showing {0} of {1} matching lines; see the captured output below.', { 0: item.matches.length, 1: item.count })}</Text>}
+      </Stack>)}
+    </Stack>
+  </Alert>;
 }
 
 function Output({ value }: { value: CommandResult }) {
@@ -28,6 +46,7 @@ function Output({ value }: { value: CommandResult }) {
     {value.dry_run && <Text size="sm" c={value.syntax_ok ? 'teal' : 'red'}>{t(value.syntax_ok ? 'Bash syntax check passed. No commands were executed.' : 'Bash syntax check failed. No commands were executed.')}</Text>}
     {value.timed_out && <Alert color="orange">{t('Command timed out. Changes may already have taken effect; check the server before retrying.')}</Alert>}
     {value.truncated && <Text size="xs" c="orange">{t('Output was truncated to 256 KiB per stream.')}</Text>}
+    <OutputDiagnostics diagnostics={value.output_diagnostics || []} />
     {value.stdout && <div><Text size="xs" c="dimmed">stdout</Text><Code block className="operation-output">{value.stdout}</Code></div>}
     {value.stderr && <div><Text size="xs" c="dimmed">stderr</Text><Code block className="operation-output">{value.stderr}</Code></div>}
     {!value.stdout && !value.stderr && <Text size="sm" c="dimmed">{t('No output')}</Text>}
@@ -38,15 +57,18 @@ function ServerResult({ result }: { result: Job['results'][number] }) {
   const pending = result.status === 'running' || result.status === 'queued';
   const success = !pending && result.status === 'completed'
     && !result.result?.timed_out && (result.result?.exit_code ?? 0) === 0;
+  const warning = result.status === 'completed_with_warnings'
+    && !result.result?.timed_out && (result.result?.exit_code ?? 0) === 0;
   const status = t(statusLabels[result.status] || result.status);
   return <details className="operation-server-result">
     <summary>
       <IconChevronRight className="details-chevron" size={17} aria-hidden="true" />
       <Text fw={500} component="span" className="operation-server-name">{result.server_name}</Text>
+      {warning && <Badge color="yellow" variant="light">{status}</Badge>}
       <Text size="xs" c="dimmed" component="span">{result.result?.exit_code === undefined ? status : `${t('Exit code')}: ${result.result.exit_code}`}</Text>
-      <span className={`server-connection ${pending ? 'unknown' : success ? 'connected' : 'failed'}`}
+      <span className={`server-connection ${pending ? 'unknown' : warning ? 'warning' : success ? 'connected' : 'failed'}`}
         role="img" aria-label={`${result.server_name}: ${status}`}>
-        {result.status === 'running' ? <Loader size={13} /> : pending ? <IconClock size={15} aria-hidden="true" /> : success ? <IconCheck size={17} aria-hidden="true" /> : <IconX size={17} aria-hidden="true" />}
+        {result.status === 'running' ? <Loader size={13} /> : pending ? <IconClock size={15} aria-hidden="true" /> : warning ? <IconExclamationMark size={17} aria-hidden="true" /> : success ? <IconCheck size={17} aria-hidden="true" /> : <IconX size={17} aria-hidden="true" />}
       </span>
     </summary>
     <Stack gap="sm" className="operation-server-output">

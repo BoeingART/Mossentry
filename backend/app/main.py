@@ -65,6 +65,7 @@ async def desktop_access(request: Request, call_next):
 def startup() -> None:
     init_db()
     operations_service.recover_interrupted()
+    operations_service.backfill_output_diagnostics()
 
 
 def _client_ip(request: Request) -> str:

@@ -117,9 +117,16 @@ it cannot validate command options, installed programs or whether an operation i
 safe. Risk warnings are also shown when running directly.
 
 Execution uses the SSH account, or the saved sudo configuration when selected.
-Per-host results start collapsed, with green checkmarks for exit code zero and
-red crosses for failures. Expand a server to view its available stdout/stderr
-or an explicit no-output result. History remains available for review and export.
+Per-host results start collapsed, with green checkmarks for clean completion,
+yellow indicators for **Completed with warnings**, and red crosses for failures.
+Explicit diagnostic messages in stdout or stderr produce review hints, even when
+the exit code is zero; nonempty stderr alone is not a warning or failure.
+Expand a server to view diagnostic summaries, matching log lines and their source,
+and the available stdout/stderr or an explicit no-output result. Log detection is
+heuristic, not verification that the intended change succeeded. Original exit codes
+and captured output remain unchanged. History and JSON exports include the
+diagnostics; saved command history is reanalyzed locally on upgrade without
+rerunning commands.
 The existing SSH and Ansible transports require Linux, Python 3 and Bash
 on each target; the application adds no remote agents. **Servers** retains groups,
 notes and inventory import/export; imported hosts start paused.

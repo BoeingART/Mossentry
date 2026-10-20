@@ -77,11 +77,27 @@ captured output. The command process group is killed on timeout; detached proces
 or changes already made may remain. SSH/Ansible has an additional 30-second budget
 for syntax checking and transport overhead.
 
-Results are one collapsible row per server, initially closed. Completed commands
-with exit code zero have a green circled check; failed commands have a red circled
-cross. Running and queued hosts use separate pending indicators. Expanding a row
-shows only nonempty stdout/stderr streams, or **No output** when both are empty.
-The timestamp is inline with the task title.
+Results are one collapsible row per server, initially closed. Clean completion
+has a green circled check; zero-exit commands with explicit diagnostic messages
+have a yellow circled exclamation mark and **Completed with warnings** status.
+Nonzero exits, timeouts and other failures keep a red circled cross. Nonempty
+stderr alone does not change status. Local heuristic rules inspect both streams
+for shell/script errors, service problems, package configuration fallbacks,
+permission/storage problems, exceptions and explicit error/warning prefixes.
+These hints do not prove failure or guarantee the intended outcome.
+Expanding a row shows grouped diagnostic summaries with stream names, line
+numbers and verbatim matching excerpts, then nonempty stdout/stderr streams,
+or **No output** when both are empty. Each rule and stream retains up to five
+excerpts of 2,000 characters, with counts and truncation notices; the original
+captured output and exit code stay unchanged. The timestamp is inline with the
+task title.
+
+Jobs containing only successful and warning results have **Completed with
+warnings** status when at least one host has diagnostics. Mixed failures remain
+**Partially completed**. Diagnostics are persisted and included in JSON exports.
+On upgrade, saved completed/failed command results are analyzed locally once;
+timestamps, recorded failures and interrupted jobs are preserved, and no remote
+commands are rerun.
 
 Commands and output are kept in the owner-only local SQLite database. Do not put
 passwords or secrets in the command text. History supports pagination, JSON export
@@ -100,6 +116,8 @@ the actual server state before retrying.
 - `backend/app/operations_probe.py`: Bash checks, bounded command execution, risk rules and legacy probes; stdlib only.
 - `backend/ansible/operations.yml`: Ansible execution and private local results.
 - `backend/app/operations_service.py`: durable background execution and recovery.
+- `backend/app/operation_diagnostics.py`: local output diagnostics and status aggregation.
+- `backend/tests/test_operation_diagnostics.py`: diagnostic evidence, bounds, benign output and failure precedence.
 - `frontend/src/Operations.tsx`: command form, Dry run, risk review, results and history; English and Simplified Chinese.
 - `frontend/src/InventoryTransfer.tsx`: import preview and export.
 - `backend/tests/test_operations.py`: validation, authentication/CSRF, import

@@ -397,6 +397,79 @@ class OperationAPITests(unittest.TestCase):
             self.assertEqual(len(result['results']), len(names))
             self.assertEqual(remote.call_count, len(names))
 
+    def test_command_diagnostics_are_persisted_in_details_and_history(self):
+        base = {'checked_at': self.db.now(), 'syntax_ok': True, 'dry_run': False,
+                'exit_code': 0, 'stdout': '', 'stderr': ''}
+        samples = [
+            {**base, 'stdout': 'Could not execute systemctl: at /usr/bin/deb-systemd-invoke line 148.\n'},
+            {**base, 'stderr': 'debconf: unable to initialize frontend: Dialog\n'},
+            {**base, 'stderr': 'Downloading 100%\n0 errors\n'},
+        ]
+        with patch.object(self.service, 'run_remote', side_effect=samples):
+            response = self.post('/api/operations', {'operation': 'command', 'servers': ['cpu1', 'gpu1', 'gpu2'], 'command': 'echo ok'})
+            self.assertEqual(response.status_code, 202, response.text)
+            job = self.await_job(response.json()['id'])
+        self.assertEqual(job['status'], 'completed_with_warnings')
+        self.assertEqual([item['status'] for item in job['results']], ['completed_with_warnings', 'completed_with_warnings', 'completed'])
+        for item, sample in zip(job['results'], samples):
+            value = item['result']
+            self.assertEqual((value['exit_code'], value['stdout'], value['stderr']), (0, sample['stdout'], sample['stderr']))
+            saved = self.db.row('SELECT result_json FROM operation_results WHERE job_id=? AND server_name=?', (job['id'], item['server_name']))
+            self.assertEqual(json.loads(saved['result_json']), value)
+        self.assertEqual(job['results'][0]['result']['output_diagnostics'][0]['stream'], 'stdout')
+        self.assertEqual(job['results'][1]['result']['output_diagnostics'][0]['stream'], 'stderr')
+        self.assertEqual(job['results'][2]['result']['output_diagnostics'], [])
+        history = self.client.get('/api/operations').json()
+        self.assertEqual(history['jobs'][0]['status'], 'completed_with_warnings')
+        self.assertNotIn('Could not execute systemctl', json.dumps(self.db.rows('SELECT * FROM audit_log')))
+
+    def test_output_diagnostics_do_not_override_failures_or_classify_dry_runs(self):
+        body = {'operation': 'command', 'servers': ['cpu1', 'gpu1'], 'command': 'echo ok'}
+        warning = {'checked_at': self.db.now(), 'syntax_ok': True, 'exit_code': 0, 'stdout': 'ERROR: problem\n'}
+        with patch.object(self.service, 'run_remote', side_effect=[{**warning, 'exit_code': 100}, warning]):
+            job = self.await_job(self.post('/api/operations', body).json()['id'])
+        self.assertEqual(job['status'], 'partial')
+        self.assertEqual([item['status'] for item in job['results']], ['failed', 'completed_with_warnings'])
+        self.assertEqual([item['result']['exit_code'] for item in job['results']], [100, 0])
+        self.assertTrue(job['results'][0]['result']['output_diagnostics'])
+        with patch.object(self.service, 'run_remote', return_value=warning):
+            job = self.await_job(self.post('/api/operations', {**body, 'operation': 'dry_run'}).json()['id'])
+        self.assertEqual(job['status'], 'completed')
+        self.assertNotIn('output_diagnostics', job['results'][0]['result'])
+
+    def test_startup_backfills_saved_output_once_without_remote_work_or_changing_evidence(self):
+        created_at, finished_at = '2026-10-01T00:00:00+00:00', '2026-10-01T00:01:00+00:00'
+        original = {'syntax_ok': True, 'exit_code': 0, 'stdout': 'Could not execute systemctl: example\n',
+                    'stderr': 'debconf: falling back to frontend: Teletype\n', 'checked_at': finished_at}
+        def saved_job(operation, status, host_status):
+            job_id = self.db.execute('INSERT INTO operation_jobs(operation,payload_json,status,created_at,finished_at) VALUES(?,?,?,?,?)',
+                                     (operation, '{"command":"echo example"}', status, created_at, finished_at))
+            self.db.execute('INSERT INTO operation_results(job_id,server_name,status,result_json,started_at,finished_at) VALUES(?,?,?,?,?,?)',
+                            (job_id, 'cpu1', host_status, json.dumps(original), created_at, finished_at))
+            return job_id
+        completed = saved_job('command', 'completed', 'completed')
+        failed = saved_job('command', 'failed', 'failed')
+        interrupted = saved_job('command', 'interrupted', 'interrupted')
+        legacy = saved_job('inspect', 'completed', 'completed')
+        with patch.object(self.service, 'run_remote') as remote:
+            self.main.startup()
+            job = self.client.get(f'/api/operations/{completed}').json()
+            self.assertEqual(job['status'], 'completed_with_warnings')
+            item = job['results'][0]
+            self.assertEqual(item['status'], 'completed_with_warnings')
+            self.assertEqual((item['started_at'], item['finished_at']), (created_at, finished_at))
+            self.assertEqual((job['created_at'], job['finished_at']), (created_at, finished_at))
+            self.assertEqual({key: item['result'][key] for key in original}, original)
+            history = {entry['id']: entry['status'] for entry in self.client.get('/api/operations').json()['jobs']}
+            self.assertEqual(history, {completed: 'completed_with_warnings', failed: 'failed', interrupted: 'interrupted', legacy: 'completed'})
+            self.assertTrue(item['result']['output_diagnostics'])
+            before = self.db.rows('SELECT * FROM operation_results ORDER BY job_id')
+            with patch.object(self.service, 'analyze_output', side_effect=AssertionError('Already migrated')):
+                self.main.startup()
+            self.assertEqual(self.db.rows('SELECT * FROM operation_results ORDER BY job_id'), before)
+            remote.assert_not_called()
+        self.assertNotIn('output_diagnostics', self.service.job_detail(legacy)['results'][0]['result'])
+
     def test_dry_run_never_elevates_and_command_transport_budget_includes_timeout(self):
         from app import native_ssh
         sample = {'checked_at': self.db.now(), 'syntax_ok': True, 'exit_code': 0}

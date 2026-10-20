@@ -205,6 +205,7 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .host-administrator > span:first-child { flex-shrink: 0; white-space: nowrap; }
 .server-connection { display: inline-flex; align-items: center; justify-content: center; width: 23px; height: 23px; flex-shrink: 0; border: 1px solid currentColor; border-radius: 50%; }
 .server-connection.connected { color: #00897b; background: #e0f2f1; }
+.server-connection.warning { color: #946200; background: #fff8d6; }
 .server-connection.failed { color: #c34750; background: #fff4f4; }
 .server-connection.unknown { color: #9badb3; background: var(--surface-soft); }
 .server-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: auto; gap: 8px; }
@@ -403,6 +404,7 @@ i.cyan { background: #80deea; }
 [data-mantine-color-scheme='dark'] .nav-button:hover,
 [data-mantine-color-scheme='dark'] .mantine-SegmentedControl-label[data-active] { color: var(--tint-ink); }
 [data-mantine-color-scheme='dark'] .server-connection.failed { background: #422d2c; color: #f1a49a; }
+[data-mantine-color-scheme='dark'] .server-connection.warning { background: #44391f; color: #f5d36a; }
 [data-mantine-color-scheme='dark'] .server-actions .mantine-Button-root:disabled { background: var(--surface-soft); color: #858c96; border-color: var(--line); }
 [data-mantine-color-scheme='dark'] .disk-chart-bar-unknown { background: repeating-linear-gradient(135deg, #343941, #343941 6px, #282c32 6px, #282c32 12px); }
 [data-mantine-color-scheme='dark'] .disk-chart-bar::after { opacity: .12; }
