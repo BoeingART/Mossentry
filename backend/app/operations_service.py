@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 from threading import Thread
 
 from . import ansible_service, db
 from .errors import friendly_error
+from .operations_probe import command_risks
 
 MUTATIONS = {'start', 'stop', 'restart', 'enable', 'disable'}
 INTERRUPTED = 'The app stopped before a result was recorded. Check the server before retrying.'
@@ -24,9 +26,9 @@ def run_remote(name, payload):
     with tempfile.TemporaryDirectory(prefix='operation-', dir=db.DATA_DIR / 'jobs') as directory:
         result = ansible_service._run('operations.yml', name, {
             'operation_payload': payload,
-            'operation_become': payload['operation'] in MUTATIONS or payload.get('elevated', False),
+            'operation_become': payload['operation'] != 'dry_run' and (payload['operation'] in MUTATIONS or payload.get('elevated', False)),
             'operation_output_dir': directory,
-        }, timeout=100)
+        }, timeout=payload.get('timeout', 300) + 30 if payload['operation'] == 'command' else 100)
         path = Path(directory) / (name + '.json')
         if not result.ok or not path.exists():
             raise RuntimeError(result.output or 'No operation result received')
@@ -47,8 +49,9 @@ def execute_job(job_id, names, payload, actor, lock):
                        (db.now(), job_id, name))
             try:
                 result = run_remote(name, payload)
-                db.execute("UPDATE operation_results SET status='completed',result_json=?,finished_at=? WHERE job_id=? AND server_name=?",
-                           (json.dumps(result, ensure_ascii=False), db.now(), job_id, name))
+                failed = result.get('exit_code', 0) != 0 or result.get('timed_out', False) or result.get('syntax_ok') is False
+                db.execute("UPDATE operation_results SET status=?,result_json=?,finished_at=? WHERE job_id=? AND server_name=?",
+                           ('failed' if failed else 'completed', json.dumps(result, ensure_ascii=False), db.now(), job_id, name))
             except Exception as exc:
                 # Raw transport errors can include remote content. Store only a
                 # friendly error here; log contents are never copied into audit.
@@ -69,7 +72,9 @@ def execute_job(job_id, names, payload, actor, lock):
 
 
 def start_job(names, body, actor, lock):
-    payload = body.model_dump(exclude={'servers', 'confirmation'})
+    payload = body.model_dump(exclude={'servers', 'confirmation', 'dry_run_id', 'risk_acknowledged'})
+    if body.operation in {'dry_run', 'command'}:
+        payload['target_fingerprints'] = target_fingerprints(names)
     with db.connect() as conn:
         job_id = conn.execute("INSERT INTO operation_jobs(operation,payload_json,status,requested_by,created_at) VALUES(?,?,'running',?,?)",
                               (body.operation, json.dumps(payload), actor, db.now())).lastrowid
@@ -83,6 +88,30 @@ def start_job(names, body, actor, lock):
             conn.execute("UPDATE operation_results SET status='failed',error='Could not start local worker',finished_at=? WHERE job_id=?", (db.now(), job_id))
         raise
     return job_id
+
+
+def target_fingerprints(names):
+    result = {}
+    for name in names:
+        server = db.row('SELECT hostname,port,ssh_user,key_path,enabled FROM servers WHERE name=?', (name,))
+        result[name] = hashlib.sha256(json.dumps(server, sort_keys=True).encode()).hexdigest()
+    return result
+
+
+def validate_command_request(names, body):
+    if not body.command.strip():
+        raise ValueError('Enter a Linux command (up to 32768 characters)')
+    if body.operation == 'dry_run':
+        return
+    checked = job_detail(body.dry_run_id)
+    if (not checked or checked['operation'] != 'dry_run' or checked['status'] != 'completed'
+            or set(names) != {item['server_name'] for item in checked['results']}
+            or any(item['status'] != 'completed' or not (item['result'] or {}).get('syntax_ok') for item in checked['results'])
+            or any(checked['payload'].get(key) != getattr(body, key) for key in ('command', 'elevated', 'timeout'))
+            or checked['payload'].get('target_fingerprints') != target_fingerprints(names)):
+        raise ValueError('Run Dry run successfully for this command and the selected servers first.')
+    if command_risks(body.command, body.elevated) and not body.risk_acknowledged:
+        raise ValueError('Acknowledge the command warnings before execution.')
 
 
 def job_detail(job_id):

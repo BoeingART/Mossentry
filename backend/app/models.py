@@ -115,14 +115,25 @@ class InventoryImport(BaseModel):
 
 
 class OperationRequest(BaseModel):
-    servers: list[str] = Field(min_length=1, max_length=50)
-    operation: Literal["inspect", "services", "logs", "start", "stop", "restart", "enable", "disable"]
+    servers: list[str] = Field(min_length=1)
+    operation: Literal["inspect", "services", "logs", "start", "stop", "restart", "enable", "disable", "dry_run", "command"]
+    command: str = Field(default="", max_length=32768)
+    timeout: int = Field(default=300, ge=10, le=3600)
+    dry_run_id: int | None = Field(default=None, ge=1)
+    risk_acknowledged: bool = False
     unit: str = Field(default="", max_length=200)
     minutes: int = Field(default=60, ge=1, le=10080)
     lines: int = Field(default=100, ge=1, le=1000)
     priority: int = Field(default=6, ge=0, le=7)
     elevated: bool = False
     confirmation: str = Field(default="", max_length=220)
+
+    @field_validator("command")
+    @classmethod
+    def valid_command(cls, value: str) -> str:
+        if "\0" in value:
+            raise ValueError("Commands cannot contain NUL characters")
+        return value.replace("\r\n", "\n")
 
     @field_validator("unit")
     @classmethod

@@ -1,8 +1,4 @@
-"""Fixed Linux operations, using only Python stdlib and existing system utilities.
-
-Executed in memory over SSH or by the fixed Ansible playbook. Never installs
-software, changes unit definitions, or accepts shell commands from the client.
-"""
+"""Linux command checks/execution and legacy probes over the existing SSH transport."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -15,6 +11,8 @@ import shutil
 import subprocess
 import sys
 import selectors
+import shlex
+import signal
 import time
 
 UNIT = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_.@:-]{0,191}\.service')
@@ -22,6 +20,161 @@ MUTATIONS = {'start', 'stop', 'restart', 'enable', 'disable'}
 PROTECTED = {'ssh', 'sshd', 'network', 'networking', 'networkmanager', 'dbus',
              'systemd-networkd', 'systemd-resolved', 'systemd-logind',
              'systemd-journald', 'systemd-udevd', 'firewalld', 'ufw'}
+
+RISK_MESSAGES = {
+    'delete': 'Deletion commands may permanently remove files or accounts.',
+    'permissions': 'Permission or ownership changes may expose data or lock users out.',
+    'privilege': 'Elevated privileges can change system files and affect all users.',
+    'packages': 'Package changes may install, remove or upgrade software and restart services.',
+    'services': 'Service or process changes may interrupt running workloads or SSH access.',
+    'system': 'Shutdown or reboot commands may disconnect the server.',
+    'disk': 'Disk or filesystem commands may overwrite data or make storage unavailable.',
+    'network': 'Network or firewall changes may disconnect SSH access.',
+    'write': 'File writes or redirections may overwrite existing data.',
+    'dynamic': 'Dynamic commands, scripts or downloaded code cannot be fully checked before execution.',
+}
+
+
+def command_risks(script, elevated=False, _depth=0):
+    """Conservative hints, not a shell sandbox or a guarantee of safety."""
+    found = set()
+    # Keep operators and command words, including paths, wrappers and quoted
+    # shell bodies. False positives are preferable to a claim of safety.
+    try:
+        lexer = shlex.shlex(script, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError:
+        tokens = script.split()
+    words = {os.path.basename(word) for word in tokens}
+    rules = {
+        'delete': {'rm', 'rmdir', 'unlink', 'shred', 'userdel', 'deluser', 'groupdel'},
+        'permissions': {'chmod', 'chown', 'chgrp', 'setfacl', 'setcap', 'umask', 'usermod', 'passwd', 'chattr', 'visudo'},
+        'privilege': {'sudo', 'su', 'doas'},
+        'packages': {'apt', 'apt-get', 'dpkg', 'yum', 'dnf', 'rpm', 'pacman', 'zypper', 'apk', 'snap', 'pip', 'pip3'},
+        'services': {'systemctl', 'service', 'kill', 'pkill', 'killall'},
+        'system': {'reboot', 'shutdown', 'poweroff', 'halt', 'init', 'telinit'},
+        'disk': {'dd', 'fdisk', 'sfdisk', 'parted', 'wipefs', 'mount', 'umount', 'mkswap', 'lvremove', 'vgremove', 'pvremove'},
+        'network': {'iptables', 'ip6tables', 'nft', 'ufw', 'firewall-cmd', 'ip', 'ifconfig', 'nmcli', 'netplan'},
+        'write': {'tee', 'truncate', 'cp', 'mv', 'install', 'touch'},
+        'dynamic': {'eval', 'exec', 'source', '.', 'bash', 'sh', 'dash', 'zsh', 'python', 'python3', 'perl', 'ruby', 'node', 'curl', 'wget', 'xargs', 'ssh'},
+    }
+    for kind, commands in rules.items():
+        if words & commands:
+            found.add(kind)
+    if ('find' in words and '-delete' in tokens) or ('rsync' in words and any(t.startswith('--delete') for t in tokens)):
+        found.add('delete')
+    if any(word.startswith(('mkfs', 'fsck')) for word in words):
+        found.add('disk')
+    if any('>' in token for token in tokens) or ('sed' in words and any(t.startswith('-i') for t in tokens)):
+        found.add('write')
+    if '$' in script or '`' in script or any(word.endswith('.sh') for word in words) or ('find' in words and any(t in tokens for t in ('-exec', '-execdir'))):
+        found.add('dynamic')
+    if 'dynamic' in found and _depth < 3:
+        for token in tokens:
+            if any(c.isspace() for c in token):
+                nested = command_risks(token, _depth=_depth + 1)
+                found.update(kind for kind, message in RISK_MESSAGES.items() if message in nested)
+    if elevated:
+        found.add('privilege')
+    return [message for kind, message in RISK_MESSAGES.items() if kind in found]
+
+
+def capture_script(script, *, syntax_only, timeout):
+    """Feed Bash through a private pipe and give commands an empty stdin."""
+    bash = shutil.which('bash')
+    if not bash:
+        raise RuntimeError('Bash is not available on this host.')
+    # In particular, never inherit BASH_ENV, ENV, exported functions or shell
+    # options: even a syntax check must not execute a startup file.
+    env = {key: os.environ[key] for key in ('HOME', 'USER', 'LOGNAME') if key in os.environ}
+    env.update(PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', LC_ALL='C', TERM='dumb')
+    buffers = {'stdout': bytearray(), 'stderr': bytearray()}
+    limit = 256 * 1024
+    pending = memoryview((script + '\n').encode('utf-8'))
+    timed_out = truncated = False
+    deadline = time.monotonic() + timeout
+    # Keep the script separate from command stdin. Programs such as `cat`, `ssh`
+    # or package managers must not consume the following script lines as input.
+    read_fd, write_fd = os.pipe()
+    script_input = os.fdopen(write_fd, 'wb')
+    argv = [bash, '--noprofile', '--norc', *(['-n'] if syntax_only else []), f'/dev/fd/{read_fd}']
+    try:
+        process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   env=env, start_new_session=True, pass_fds=(read_fd,))
+    except BaseException:
+        script_input.close()
+        raise
+    finally:
+        os.close(read_fd)
+    with process, script_input:
+        def kill_group():
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        try:
+            with selectors.DefaultSelector() as selector:
+                for stream, name in ((process.stdout, 'stdout'), (process.stderr, 'stderr')):
+                    os.set_blocking(stream.fileno(), False)
+                    selector.register(stream, selectors.EVENT_READ, name)
+                os.set_blocking(script_input.fileno(), False)
+                selector.register(script_input, selectors.EVENT_WRITE, 'stdin')
+                while selector.get_map():
+                    if time.monotonic() >= deadline:
+                        timed_out = True
+                        kill_group()
+                        break
+                    for key, _ in selector.select(min(0.2, max(0, deadline - time.monotonic()))):
+                        if key.data == 'stdin':
+                            try:
+                                pending = pending[os.write(key.fd, pending[:4096]):]
+                            except BrokenPipeError:
+                                pending = pending[:0]
+                            if not pending:
+                                selector.unregister(key.fileobj)
+                                script_input.close()
+                            continue
+                        chunk = os.read(key.fd, 65536)
+                        if not chunk:
+                            selector.unregister(key.fileobj)
+                            continue
+                        available = limit - len(buffers[key.data])
+                        buffers[key.data].extend(chunk[:available])
+                        truncated |= len(chunk) > available
+            try:
+                code = process.wait(timeout=max(0.01, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                kill_group()
+                code = process.wait()
+        except BaseException:
+            kill_group()
+            process.wait()
+            raise
+    return {name: value.decode('utf-8', errors='replace') for name, value in buffers.items()} | {
+        'exit_code': code, 'timed_out': timed_out, 'truncated': truncated,
+    }
+
+
+def shell_operation(payload):
+    script = payload.get('command', '')
+    timeout = payload.get('timeout', 300)
+    if not isinstance(script, str) or not script.strip() or len(script) > 32768 or '\0' in script:
+        raise ValueError('Enter a Linux command (up to 32768 characters)')
+    if type(timeout) is not int or not 10 <= timeout <= 3600:
+        raise ValueError('Invalid command timeout')
+    risk_warnings = command_risks(script, payload.get('elevated', False))
+    checked = capture_script(script, syntax_only=True, timeout=10)
+    syntax_ok = checked['exit_code'] == 0 and not checked['timed_out']
+    # Recheck on execution as well. A syntax failure must never run a valid
+    # prefix of a malformed multiline script.
+    if payload['operation'] == 'dry_run' or not syntax_ok:
+        result = checked
+    else:
+        result = capture_script(script, syntax_only=False, timeout=timeout)
+    return {**result, 'syntax_ok': syntax_ok, 'dry_run': payload['operation'] == 'dry_run',
+            'risk_warnings': risk_warnings, 'shell': 'bash'}
 
 
 def protected_unit(unit):
@@ -231,7 +384,9 @@ def run(payload):
     operation, unit = payload.get('operation'), payload.get('unit', '')
     if not isinstance(unit, str) or (unit and not UNIT.fullmatch(unit)):
         raise ValueError('Invalid service name')
-    if operation == 'inspect':
+    if operation in {'dry_run', 'command'}:
+        result = shell_operation(payload)
+    elif operation == 'inspect':
         result = inspect()
     elif operation == 'services':
         result = services()

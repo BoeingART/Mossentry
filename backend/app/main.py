@@ -575,7 +575,12 @@ def create_operation(body: OperationRequest, request: Request, session: dict[str
         raise HTTPException(409, 'Another server operation is running. Wait for it to finish and retry')
     try:
         names = _validate_servers(body.servers)
-        if body.operation in operations_service.MUTATIONS:
+        if body.operation in {'dry_run', 'command'}:
+            try:
+                operations_service.validate_command_request(names, body)
+            except ValueError as exc:
+                raise HTTPException(400, str(exc)) from exc
+        elif body.operation in operations_service.MUTATIONS:
             from .operations_probe import protected_unit
             if not body.unit or body.confirmation != f'{body.operation} {body.unit}':
                 raise HTTPException(400, 'Type the operation and service name to confirm')

@@ -4,7 +4,7 @@
   gather_facts: false
   become: "{{ operation_become | bool }}"
   tasks:
-    - name: Run fixed operation in memory
+    - name: Run operation probe in memory
       ansible.builtin.command:
         argv:
           - "{{ ansible_python_interpreter }}"
@@ -12,7 +12,7 @@
           - "{{ lookup('ansible.builtin.file', '../app/operations_probe.py') }}"
         stdin: "{{ operation_payload | to_json }}"
       register: operation_result
-      changed_when: operation_payload.operation in ['start', 'stop', 'restart', 'enable', 'disable']
+      changed_when: operation_payload.operation in ['start', 'stop', 'restart', 'enable', 'disable', 'command']
       no_log: true
     - name: Save bounded result locally
       ansible.builtin.copy:

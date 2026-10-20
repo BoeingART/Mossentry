@@ -2,30 +2,15 @@
 
 ## Scope and design
 
-The existing application covers inventory, account approvals and live resource
-monitoring. This iteration completes five missing day-to-day workflows:
+The Operations page runs operator-supplied, multiline Linux commands using the
+existing native SSH or Ansible transport. Both transports send the same Python
+probe. Targets require Linux, Python 3 and Bash. No remote agent is installed;
+Ansible may create its usual temporary module files. Existing SSH host-key
+verification and the saved sudo configuration remain in use.
 
-| Gap | Implemented workflow |
-| --- | --- |
-| Hosts lack operational context and portable inventory | Groups, notes, search/filter, JSON export, import preview and atomic creation |
-| Live charts do not give a durable health report | On-demand multi-host OS, load, memory, filesystem and inode inspection with threshold alerts |
-| Existing services cannot be managed | Service list with search, start/stop/restart and enable/disable at boot |
-| Troubleshooting requires another SSH session | Bounded journal queries by unit, age and severity, search within returned messages |
-| Multi-host maintenance has no durable per-host result | Background tasks, per-host status, partial failures, restart recovery, history pagination, JSON export and deletion |
-
-No dependencies were added. Both existing native SSH and Ansible transports run
-the same fixed Python operation implementation. Remote hosts retain the existing
-Linux, SSH and Python 3 prerequisites. Read-only inspection and service listing
-need no sudo. Service changes use the saved sudo configuration. Journal queries
-use the SSH account's existing visibility unless the operator selects sudo.
-Existing SSH host-key verification stays enabled.
-
-There are no agent, exporter, message broker, database server, scheduled remote
-job or monitoring daemon installations. `systemctl` and `journalctl` are optional
-capabilities of the remote OS: missing tools are reported as unavailable. Neither
-transport installs them. Python code runs in memory; subprocess output is drained into bounded
-in-memory buffers. Ansible may create its usual
-short-lived remote module files.
+The previous inspection/service/log presets are no longer offered in the form.
+Their historical results remain readable and exportable; legacy API operations
+remain supported for compatibility.
 
 ## Inventory
 
@@ -45,66 +30,79 @@ inventory, credentials or user history.
 
 ## Operations
 
-Choose up to 50 enabled hosts explicitly or select a group. Each task runs hosts
-sequentially, records each outcome and continues after an individual host fails.
-Configuration changes, account execution and other maintenance tasks share the
-existing operation lock. Live resource charts remain independent.
+Choose enabled hosts individually or use **Select all servers** beside the
+selector. All enabled hosts are selected; there is no silent truncation to the
+former 50-host limit. Paused hosts cannot be targeted. Enter Bash commands, choose
+whether to use sudo, and set a per-host timeout from 10 to 3,600 seconds (default
+300). Commands are non-interactive: use appropriate options such as `apt install
+-y`, and use the sudo checkbox for the saved privilege configuration.
 
-**Health inspection** reports OS/kernel/architecture, logical CPUs, uptime,
-1/5/15-minute load, memory/swap use, local filesystem space and inode use, and
-failed systemd services when available. Warnings trigger at 90% memory, disk or
-inode use, five-minute load above logical CPU count, or a failed service. These
-are fixed on-demand thresholds, not continuous monitoring or notifications.
-Unsupported data is shown as unavailable. Network filesystems and non-data
-pseudo-filesystems are excluded; bind mounts are deduplicated by device.
+**Dry run** connects to every selected host and feeds the script to
+`bash --noprofile --norc -n` through a private pipe. It runs as the SSH account without sudo, even
+when sudo is selected for later execution. The checker uses a clean environment
+without `BASH_ENV`, `ENV`, exported shell functions or inherited shell options.
+The entered commands, substitutions and redirections are not executed. Syntax
+errors and diagnostics are saved per host. This is a shell grammar check, not a
+simulation of application behavior: `apt update xxx` can pass shell syntax while
+still having invalid apt arguments. Missing commands, permissions and outcomes
+are not verified. See the [Bash manual](https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html).
 
-**Services** includes loaded and installed inactive units (up to 2,000), with
-runtime state and boot policy. Actions require an exact `.service` name and a
-confirmation showing selected hosts. `enable`/`disable` affect boot policy only;
-they do not include `--now`. Unit files are not edited or installed. SSH, common
-network, firewall and core system services are protected. The remote probe also
-checks canonical names/aliases and `RefuseManualStart`/`RefuseManualStop` before
-mutating. This is a guardrail, not a complete analysis of unit dependencies;
-application services can still affect workloads or dependent units.
+Static rules warn about deletion, permissions/ownership, elevated privileges,
+packages, services/processes, shutdown, storage, networking, file writes and
+dynamic/downloaded scripts. These rules are conservative and incomplete; warnings
+are advisory and do not constitute a security sandbox. The execution review shows
+the exact command and hosts, and requires acknowledgement when warnings exist.
 
-**Logs** queries the existing journal for 1 minute–7 days, with 1–1,000 entries
-and severity filtering. Empty service means all accessible units. Read-only
-users may see a partial journal; the UI reports that scope and any journal
-warnings. Captured stdout is capped at 2 MiB, individual displayed messages at
-8,192 characters. Results are plain text, never HTML or executable commands.
+Execution requires a successful saved Dry run for the identical command, host
+set, sudo selection, timeout and target connection settings. The API independently
+checks this condition and the risk acknowledgement; changing the form invalidates
+the UI check. Execution also rechecks syntax on the target before starting the
+script. Bash runs without startup files, with standard system executable paths,
+and with its usual exit semantics. Script input is passed on a separate descriptor
+while command stdin is `/dev/null`, so a program cannot consume later script lines
+as interactive responses. To stop on earlier failures or detect failed
+pipeline stages, include the appropriate Bash options in the script.
 
-Tasks keep per-host results in the owner-only local SQLite database. Export
-results before deleting a task when needed; deletion removes saved results but
-retains audit events. This is logical deletion, not secure erasure of SQLite
-pages or external backups. Journal results may contain operational secrets, so
-only export to intended recipients. No log content is copied to audit events.
+Each task processes hosts sequentially and continues after a host fails.
+Configuration changes, account execution and maintenance tasks share the existing
+operation lock. Live resource charts remain independent. Each host records stdout,
+stderr, exit code and timeout state. Each output stream is capped at 256 KiB and
+truncation is displayed. Nonzero exits and timeouts fail that host while preserving
+captured output. The command process group is killed on timeout; detached processes
+or changes already made may remain. SSH/Ansible has an additional 30-second budget
+for syntax checking and transport overhead.
 
-Closing a page does not stop a task. Closing the app can interrupt it. On next
-startup, unfinished tasks become **Interrupted**, never automatically retried.
-A lost connection or timeout can occur after a remote change took effect;
-inspect the actual service state before manually rerunning a failed mutation.
-Task history is paginated at 25 rows. Each remote host has a 100-second transport
-budget, with shorter command deadlines.
+Commands and output are kept in the owner-only local SQLite database. Do not put
+passwords or secrets in the command text. History supports pagination, JSON export
+and deletion; deleting a task retains its audit events. Deletion is logical, not
+secure erasure of SQLite pages or backups. Command text and output are excluded
+from audit events. Historic inspection/service/log records retain their original
+result format.
+
+Closing the page does not stop a job. Closing the app can interrupt it; unfinished
+jobs become **Interrupted** at the next startup and are never automatically
+retried. A failure or lost connection may occur after changes took effect. Check
+the actual server state before retrying.
 
 ## Implementation and verification
 
-- `backend/app/operations_probe.py`: fixed remote operations, stdlib only.
+- `backend/app/operations_probe.py`: Bash checks, bounded command execution, risk rules and legacy probes; stdlib only.
 - `backend/ansible/operations.yml`: Ansible execution and private local results.
 - `backend/app/operations_service.py`: durable background execution and recovery.
-- `frontend/src/Operations.tsx`: batch form, review, inspection/service/log results
-  and history; English and Simplified Chinese.
+- `frontend/src/Operations.tsx`: command form, Dry run, risk review, results and history; English and Simplified Chinese.
 - `frontend/src/InventoryTransfer.tsx`: import preview and export.
 - `backend/tests/test_operations.py`: validation, authentication/CSRF, import
-  conflicts, credential exclusion, command injection rejection, protected aliases,
-  thresholds, partial failures, operation locking, recovery and both transports.
+  conflicts, credential exclusion, non-executing syntax checks, malformed scripts,
+  risk rules, check invalidation, output bounds, timeout cleanup, partial failures,
+  operation locking, recovery and both transports.
 - `scripts/test-remote-linux.py`: disposable CI container smoke checks, including
   read-only inspection and optional capability detection without new packages.
 
 Run `npm run check` for the complete suite. Automated tests use isolated local
 fixtures; they never manage the configured real servers. The Linux container
 smoke check requires a running Docker daemon and is run by the existing release
-workflow. Service mutations still need end-to-end verification against a
-purpose-built systemd test host before a production rollout.
+workflow. Real SSH/Ansible command execution should be verified against a disposable Linux
+host before production use.
 
 System command semantics follow the upstream [systemctl documentation](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html)
 and [journalctl documentation](https://www.freedesktop.org/software/systemd/man/255/journalctl.html).

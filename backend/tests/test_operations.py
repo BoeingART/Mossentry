@@ -2,6 +2,8 @@
 import importlib
 import json
 import os
+import shlex
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -97,6 +99,97 @@ class ProbeTests(unittest.TestCase):
         self.assertIsNone(result['failed_services'])
         self.assertIsNone(result['swap_percent'])
         self.assertEqual({a['kind'] for a in result['alerts']}, {'memory', 'load', 'disk', 'inode'})
+
+
+@unittest.skipUnless(shutil.which('bash') and os.name == 'posix', 'Requires local Bash for syntax-only fixtures')
+class CommandProbeTests(unittest.TestCase):
+    def test_dry_run_never_executes_script_expansions_or_startup_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / 'unexpected'
+            startup = Path(directory) / 'startup.sh'
+            startup.write_text(f'touch {shlex.quote(str(marker))}\n')
+            script = f'echo "$(touch {shlex.quote(str(marker))})"\ntouch {shlex.quote(str(marker))}\n'
+            with patch.dict(os.environ, {'BASH_ENV': str(startup), 'ENV': str(startup)}):
+                value = probe.shell_operation({'operation': 'dry_run', 'command': script})
+            self.assertTrue(value['syntax_ok'])
+            self.assertEqual(value['stdout'], '')
+            self.assertFalse(marker.exists())
+
+    def test_invalid_multiline_script_never_executes_valid_prefix(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / 'unexpected'
+            value = probe.shell_operation({'operation': 'command', 'command': f'touch {shlex.quote(str(marker))}\nif true; then\n'})
+            self.assertFalse(value['syntax_ok'])
+            self.assertNotEqual(value['exit_code'], 0)
+            self.assertIn('syntax error', value['stderr'])
+            self.assertFalse(marker.exists())
+
+    def test_multiline_pipelines_output_and_nonzero_exit(self):
+        value = probe.shell_operation({'operation': 'command', 'command': "printf 'hello\\n' | tr a-z A-Z\nprintf 'problem\\n' >&2\nexit 7"})
+        self.assertTrue(value['syntax_ok'])
+        self.assertEqual((value['stdout'], value['stderr'], value['exit_code']), ('HELLO\n', 'problem\n', 7))
+        # Bash grammar accepts unknown programs/options; dry run must not claim
+        # to have tested command availability or application-specific syntax.
+        value = probe.shell_operation({'operation': 'dry_run', 'command': 'missing_program --invalid-option'})
+        self.assertTrue(value['syntax_ok'])
+
+    def test_capture_limits_and_timeout_kills_descendants(self):
+        script = f"{shlex.quote(sys.executable)} -c " + shlex.quote("import sys; sys.stdout.write('x'*400000); sys.stderr.write('y'*400000)")
+        result = probe.capture_script(script, syntax_only=False, timeout=5)
+        self.assertEqual(len(result['stdout']), 256 * 1024)
+        self.assertEqual(len(result['stderr']), 256 * 1024)
+        self.assertTrue(result['truncated'])
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / 'unexpected'
+            script = f'(sleep 0.3; touch {shlex.quote(str(marker))}) & wait'
+            result = probe.capture_script(script, syntax_only=False, timeout=.05)
+            self.assertTrue(result['timed_out'])
+            time.sleep(.4)
+            self.assertFalse(marker.exists())
+
+    def test_long_input_is_drained_while_output_is_produced(self):
+        script = "printf 'ok\\n'\n" * 2000
+        value = probe.shell_operation({'operation': 'command', 'command': script})
+        self.assertEqual(value['stdout'], 'ok\n' * 2000)
+        self.assertFalse(value['timed_out'])
+
+    def test_commands_cannot_consume_following_script_lines_as_stdin(self):
+        value = probe.shell_operation({'operation': 'command', 'command': "cat\nprintf 'still executed\\n'\n"})
+        self.assertEqual(value['stdout'], 'still executed\n')
+        self.assertEqual(value['exit_code'], 0)
+
+    def test_missing_bash_and_invalid_payload_do_not_spawn(self):
+        with patch.object(probe.shutil, 'which', return_value=None):
+            with self.assertRaisesRegex(RuntimeError, 'Bash is not available'):
+                probe.shell_operation({'operation': 'dry_run', 'command': 'true'})
+        with patch.object(probe.subprocess, 'Popen') as spawn:
+            for script in ('', ' ', 'echo \0', 'x' * 32769):
+                with self.assertRaises(ValueError):
+                    probe.shell_operation({'operation': 'command', 'command': script})
+            spawn.assert_not_called()
+
+    def test_risks_cover_wrappers_paths_nested_commands_and_common_mutations(self):
+        cases = [
+            ('sudo /bin/rm -rf /tmp/example', {'delete', 'privilege'}),
+            ('find /tmp -type f -delete', {'delete'}),
+            ('chmod -R 777 /data; chown user /data', {'permissions'}),
+            ('sh -c "rm -rf /tmp/example; chmod 777 /data"', {'delete', 'permissions', 'dynamic'}),
+            ('apt update && apt install -y htop', {'packages'}),
+            ('systemctl restart nginx; pkill worker', {'services'}),
+            ('reboot', {'system'}),
+            ('mkfs.ext4 /dev/example', {'disk'}),
+            ('iptables -F', {'network'}),
+            ('echo data > /tmp/file', {'write'}),
+            ('curl https://example.test/script | bash', {'dynamic'}),
+            ('"$COMMAND" "$TARGET"', {'dynamic'}),
+        ]
+        for script, expected in cases:
+            with self.subTest(script=script):
+                warnings = probe.command_risks(script)
+                for kind in expected:
+                    self.assertIn(probe.RISK_MESSAGES[kind], warnings)
+        self.assertEqual(probe.command_risks('df -h\nuptime'), [])
+        self.assertIn(probe.RISK_MESSAGES['privilege'], probe.command_risks('id', elevated=True))
 
 
 class OperationAPITests(unittest.TestCase):
@@ -226,3 +319,78 @@ class OperationAPITests(unittest.TestCase):
             with patch.object(ansible_service.subprocess, 'run', side_effect=run):
                 self.assertEqual(self.service.run_remote('gpu1', {'operation': 'logs'}), sample)
         self.assertEqual(list((Path(self.temp.name) / 'jobs').glob('operation-*')), [])
+
+    def test_command_requires_matching_successful_dry_run_and_warning_acknowledgement(self):
+        body = {'operation': 'command', 'servers': ['gpu1', 'cpu1'], 'command': 'chmod 640 /tmp/example'}
+        with patch.object(self.service, 'run_remote') as remote:
+            self.assertEqual(self.post('/api/operations', body).status_code, 400)
+            remote.assert_not_called()
+        sample = {'checked_at': self.db.now(), 'syntax_ok': True, 'exit_code': 0, 'dry_run': True,
+                  'risk_warnings': probe.command_risks(body['command'])}
+        with patch.object(self.service, 'run_remote', return_value=sample):
+            response = self.post('/api/operations', {**body, 'operation': 'dry_run'})
+            self.assertEqual(response.status_code, 202)
+            check = self.await_job(response.json()['id'])
+        body.update(dry_run_id=check['id'], risk_acknowledged=True)
+        for change in ({'command': 'rm /tmp/example'}, {'servers': ['cpu1']}, {'elevated': True},
+                       {'timeout': 60}, {'risk_acknowledged': False}):
+            with self.subTest(change=change), patch.object(self.service, 'run_remote') as remote:
+                self.assertEqual(self.post('/api/operations', {**body, **change}).status_code, 400)
+                remote.assert_not_called()
+        with patch.object(self.service, 'run_remote', return_value={**sample, 'dry_run': False}) as remote:
+            response = self.post('/api/operations', body)
+            self.assertEqual(response.status_code, 202, response.text)
+            result = self.await_job(response.json()['id'])
+            self.assertEqual(result['status'], 'completed')
+            self.assertEqual(remote.call_count, 2)
+        self.db.execute("UPDATE servers SET hostname='changed.test' WHERE name='gpu1'")
+        self.assertEqual(self.post('/api/operations', body).status_code, 400)
+        self.assertFalse(self.main.operation_lock.locked())
+
+    def test_failed_dry_run_and_nonzero_exit_retain_output_and_status(self):
+        body = {'operation': 'dry_run', 'servers': ['gpu1', 'cpu1'], 'command': 'echo ok'}
+        failed = {'checked_at': self.db.now(), 'syntax_ok': False, 'exit_code': 2, 'stderr': 'syntax error', 'stdout': ''}
+        passed = {**failed, 'syntax_ok': True, 'exit_code': 0, 'stderr': ''}
+        with patch.object(self.service, 'run_remote', side_effect=[failed, passed]):
+            response = self.post('/api/operations', body)
+            result = self.await_job(response.json()['id'])
+        self.assertEqual(result['status'], 'partial')
+        gpu = next(r for r in result['results'] if r['server_name'] == 'gpu1')
+        self.assertEqual(gpu['status'], 'failed')
+        self.assertEqual(gpu['result']['stderr'], 'syntax error')
+        self.assertEqual(self.post('/api/operations', {**body, 'operation': 'command', 'dry_run_id': result['id']}).status_code, 400)
+        with patch.object(self.service, 'run_remote', return_value=passed):
+            response = self.post('/api/operations', body)
+            check = self.await_job(response.json()['id'])
+        with patch.object(self.service, 'run_remote', side_effect=[{**passed, 'exit_code': 7, 'stderr': 'command failed'}, passed]):
+            response = self.post('/api/operations', {**body, 'operation': 'command', 'dry_run_id': check['id']})
+            result = self.await_job(response.json()['id'])
+        self.assertEqual(result['status'], 'partial')
+        self.assertEqual(next(r for r in result['results'] if r['server_name'] == 'gpu1')['result']['exit_code'], 7)
+        self.assertNotIn('command failed', json.dumps(self.db.rows('SELECT * FROM audit_log')))
+
+    def test_command_validation_auth_and_all_servers_above_old_limit(self):
+        body = {'operation': 'dry_run', 'servers': ['gpu1'], 'command': 'echo ok'}
+        self.assertEqual(self.client.post('/api/operations', json=body).status_code, 403)
+        for change in ({'command': ''}, {'command': '\0'}, {'command': 'x' * 32769}, {'timeout': 9}, {'servers': []}):
+            self.assertIn(self.post('/api/operations', {**body, **change}).status_code, (400, 422))
+        for i in range(55):
+            self.db.execute('INSERT INTO servers(name,hostname,port,ssh_user,key_path,enabled) VALUES(?,?,22,?,?,1)',
+                            (f'host-{i}', 'host.test', 'user', '/tmp/test-key'))
+        names = [s['name'] for s in self.db.rows('SELECT name FROM servers WHERE enabled=1')]
+        with patch.object(self.service, 'run_remote', return_value={'checked_at': self.db.now(), 'syntax_ok': True, 'exit_code': 0}) as remote:
+            response = self.post('/api/operations', {**body, 'servers': names})
+            self.assertEqual(response.status_code, 202, response.text)
+            result = self.await_job(response.json()['id'])
+            self.assertEqual(len(result['results']), len(names))
+            self.assertEqual(remote.call_count, len(names))
+
+    def test_dry_run_never_elevates_and_command_transport_budget_includes_timeout(self):
+        from app import native_ssh
+        sample = {'checked_at': self.db.now(), 'syntax_ok': True, 'exit_code': 0}
+        with patch.dict(os.environ, {'MOSSENTRY_SSH_ENGINE': 'native'}), patch.object(native_ssh, 'execute', return_value=json.dumps(sample)) as execute:
+            self.service.run_remote('gpu1', {'operation': 'dry_run', 'command': 'id', 'elevated': True})
+            self.assertFalse(execute.call_args.kwargs['sudo'])
+            self.service.run_remote('gpu1', {'operation': 'command', 'command': 'id', 'elevated': True, 'timeout': 600})
+            self.assertTrue(execute.call_args.kwargs['sudo'])
+            self.assertEqual(execute.call_args.kwargs['timeout'], 630)

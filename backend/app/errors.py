@@ -3,6 +3,8 @@ def friendly_error(raw: str | None) -> str | None:
     if not raw:
         return None
     text = raw.lower()
+    if "bash is not available on this host" in text:
+        return "Bash is not available on this host."
     if "protected system or ssh service" in text:
         return "System or SSH services are protected from changes."
     if "systemd is not available" in text:

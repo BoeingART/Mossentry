@@ -106,13 +106,19 @@ collect missing creation dates and any system accounts older scans omitted.
 
 ## Small-server operations
 
-The **Operations** page adds batch health inspection, existing systemd service
-management and bounded journal queries, with persistent per-host results and
-exportable task history. **Servers** now supports groups, notes, and inventory
-import/export with a conflict preview. Imported hosts start paused.
+The **Operations** page accepts multiline Linux commands. Select hosts individually
+or use **Select all servers** to include every enabled host, then run **Dry run**
+to check Bash syntax on each target without executing the entered commands.
+Deletion, permission changes and other potentially disruptive commands produce
+warnings that must be acknowledged before execution. Dry run checks shell grammar;
+it cannot validate command options, installed programs or whether an operation is
+safe. Changing the command, targets or execution options requires a new check.
 
-These workflows use the existing SSH or Ansible transport and add no dependencies
-or remote services. Missing systemd/journal tools are reported as unavailable.
+Execution uses the SSH account, or the saved sudo configuration when selected.
+Per-host stdout, stderr, exit codes and history remain available for review and
+export. The existing SSH and Ansible transports require Linux, Python 3 and Bash
+on each target; the application adds no remote agents. **Servers** retains groups,
+notes and inventory import/export; imported hosts start paused.
 See [dev-forward workflows and limits](docs/DEV-FORWARD.md) for details.
 
 ## Monitor pages

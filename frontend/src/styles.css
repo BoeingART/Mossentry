@@ -147,6 +147,14 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .filter-toolbar { padding: 15px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--mantine-radius-lg); gap: 12px; box-shadow: var(--panel-shadow); }
 .filter-toolbar .mantine-TextInput-root { flex: 1; min-width: min(100%, 210px); max-width: 310px; }
 .filter-toolbar > .mantine-Text-root:last-child { margin-left: auto; font-size: var(--text-control); }
+/* Command maintenance */
+.operation-command textarea, .operation-output { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.operation-output { max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.operation-targets > .mantine-Button-root { flex-shrink: 0; }
+@media (max-width: 480px) {
+  .operation-targets { flex-wrap: wrap; }
+  .operation-targets > .mantine-MultiSelect-root { flex-basis: 100% !important; }
+}
 /* Servers, permissions, and approvals */
 .host-grid, .monitor-host-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 275px), 1fr)); gap: 18px; align-items: stretch; }
 .host-card { min-width: 0; display: flex; flex-direction: column; gap: 20px; border: 1px solid var(--line); border-radius: var(--mantine-radius-lg); }
