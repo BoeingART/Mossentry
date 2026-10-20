@@ -37,7 +37,11 @@ whether to use sudo, and set a per-host timeout from 10 to 3,600 seconds (defaul
 300). Commands are non-interactive: use appropriate options such as `apt install
 -y`, and use the sudo checkbox for the saved privilege configuration.
 
-**Dry run** connects to every selected host and feeds the script to
+The form uses a Bash syntax-highlighting editor. The selected/available host
+count appears beside the selector arrows. Timeout and sudo share an inline row,
+and the two action buttons sit below them.
+
+The optional **Check syntax and risks** button connects to every selected host and feeds the script to
 `bash --noprofile --norc -n` through a private pipe. It runs as the SSH account without sudo, even
 when sudo is selected for later execution. The checker uses a clean environment
 without `BASH_ENV`, `ENV`, exported shell functions or inherited shell options.
@@ -53,10 +57,11 @@ dynamic/downloaded scripts. These rules are conservative and incomplete; warning
 are advisory and do not constitute a security sandbox. The execution review shows
 the exact command and hosts, and requires acknowledgement when warnings exist.
 
-Execution requires a successful saved Dry run for the identical command, host
-set, sudo selection, timeout and target connection settings. The API independently
-checks this condition and the risk acknowledgement; changing the form invalidates
-the UI check. Execution also rechecks syntax on the target before starting the
+**Run command** does not require a prior check, including after a failed check.
+Its confirmation dialog obtains current risk warnings locally, without opening
+SSH connections or creating a separate check task. The API still requires
+acknowledgement for commands with detected risks. Changing the form invalidates
+the open confirmation. Execution checks syntax on the target before starting the
 script. Bash runs without startup files, with standard system executable paths,
 and with its usual exit semantics. Script input is passed on a separate descriptor
 while command stdin is `/dev/null`, so a program cannot consume later script lines
@@ -71,6 +76,12 @@ truncation is displayed. Nonzero exits and timeouts fail that host while preserv
 captured output. The command process group is killed on timeout; detached processes
 or changes already made may remain. SSH/Ansible has an additional 30-second budget
 for syntax checking and transport overhead.
+
+Results are one collapsible row per server, initially closed. Completed commands
+with exit code zero have a green circled check; failed commands have a red circled
+cross. Running and queued hosts use separate pending indicators. Expanding a row
+shows only nonempty stdout/stderr streams, or **No output** when both are empty.
+The timestamp is inline with the task title.
 
 Commands and output are kept in the owner-only local SQLite database. Do not put
 passwords or secrets in the command text. History supports pagination, JSON export
@@ -93,7 +104,8 @@ the actual server state before retrying.
 - `frontend/src/InventoryTransfer.tsx`: import preview and export.
 - `backend/tests/test_operations.py`: validation, authentication/CSRF, import
   conflicts, credential exclusion, non-executing syntax checks, malformed scripts,
-  risk rules, check invalidation, output bounds, timeout cleanup, partial failures,
+  risk rules, direct execution without a prior check, local risk review,
+  output bounds, timeout cleanup, partial failures,
   operation locking, recovery and both transports.
 - `scripts/test-remote-linux.py`: disposable CI container smoke checks, including
   read-only inspection and optional capability detection without new packages.

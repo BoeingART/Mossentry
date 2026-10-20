@@ -148,9 +148,44 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .filter-toolbar .mantine-TextInput-root { flex: 1; min-width: min(100%, 210px); max-width: 310px; }
 .filter-toolbar > .mantine-Text-root:last-child { margin-left: auto; font-size: var(--text-control); }
 /* Command maintenance */
-.operation-command textarea, .operation-output { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.bash-editor .cm-scroller, .operation-output { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .operation-output { max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bash-editor { border: 1px solid var(--control-border); border-radius: var(--mantine-radius-sm); background: var(--surface); overflow: hidden; }
+.bash-editor:focus-within { border-color: #26a69a; }
+.bash-editor[data-disabled] { opacity: .65; }
+.bash-editor .cm-editor.cm-focused { outline: none; }
+.bash-editor .cm-scroller { max-height: 360px; overflow: auto; font-size: var(--text-control); line-height: 1.65; }
+.bash-editor .cm-content { min-height: 150px; padding: 10px 4px; caret-color: var(--ink); color: var(--ink); }
+.bash-editor .cm-line { padding-inline: 8px; }
+.bash-editor .cm-placeholder { color: var(--muted); }
+.bash-editor .tok-keyword { color: #7d46a1; }
+.bash-editor .tok-string, .bash-editor .tok-string2 { color: #32824e; }
+.bash-editor .tok-variableName, .bash-editor .tok-variableName2 { color: #007c91; }
+.bash-editor .tok-number, .bash-editor .tok-atom, .bash-editor .tok-bool { color: #a05b1d; }
+.bash-editor .tok-comment, .bash-editor .tok-meta { color: var(--muted); }
+.bash-editor .tok-operator { color: #b24853; }
+[data-mantine-color-scheme='dark'] .bash-editor .tok-keyword { color: #d6a6ed; }
+[data-mantine-color-scheme='dark'] .bash-editor .tok-string,
+[data-mantine-color-scheme='dark'] .bash-editor .tok-string2 { color: #9ad4a5; }
+[data-mantine-color-scheme='dark'] .bash-editor .tok-variableName,
+[data-mantine-color-scheme='dark'] .bash-editor .tok-variableName2 { color: #8dd3de; }
+[data-mantine-color-scheme='dark'] .bash-editor .tok-number,
+[data-mantine-color-scheme='dark'] .bash-editor .tok-atom,
+[data-mantine-color-scheme='dark'] .bash-editor .tok-bool { color: #e6bc81; }
+[data-mantine-color-scheme='dark'] .bash-editor .tok-operator { color: #f1a49a; }
 .operation-targets > .mantine-Button-root { flex-shrink: 0; }
+.operation-target-count { color: var(--muted); white-space: nowrap; padding-right: 10px; }
+.operation-target-count .mantine-ComboboxChevron-chevron { flex-shrink: 0; }
+.operation-timeout-label { font-size: var(--text-control); white-space: nowrap; }
+.operation-check-action { display: inline-flex; }
+.operation-server-list { border: 1px solid var(--line); border-radius: var(--mantine-radius-md); overflow: hidden; }
+.operation-server-result + .operation-server-result { border-top: 1px solid var(--line); }
+.operation-server-result > summary { display: flex; align-items: center; gap: 12px; list-style: none; padding: 15px 18px; cursor: pointer; }
+.operation-server-result > summary::-webkit-details-marker { display: none; }
+.operation-server-result > summary:hover { background: var(--surface-hover); }
+.operation-server-result[open] > summary .details-chevron { transform: rotate(90deg); }
+.operation-server-name { flex: 1; min-width: 0; }
+.operation-server-output { padding: 0 18px 18px; }
 @media (max-width: 480px) {
   .operation-targets { flex-wrap: wrap; }
   .operation-targets > .mantine-MultiSelect-root { flex-basis: 100% !important; }

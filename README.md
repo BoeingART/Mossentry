@@ -106,17 +106,21 @@ collect missing creation dates and any system accounts older scans omitted.
 
 ## Small-server operations
 
-The **Operations** page accepts multiline Linux commands. Select hosts individually
-or use **Select all servers** to include every enabled host, then run **Dry run**
-to check Bash syntax on each target without executing the entered commands.
+The **Operations** page accepts multiline Linux commands with Bash syntax
+highlighting. Select hosts individually or use **Select all servers** to include
+every enabled host. **Check syntax and risks** is optional and uses `bash -n` on
+each target without executing the entered commands; **Run command** can be used
+directly.
 Deletion, permission changes and other potentially disruptive commands produce
 warnings that must be acknowledged before execution. Dry run checks shell grammar;
 it cannot validate command options, installed programs or whether an operation is
-safe. Changing the command, targets or execution options requires a new check.
+safe. Risk warnings are also shown when running directly.
 
 Execution uses the SSH account, or the saved sudo configuration when selected.
-Per-host stdout, stderr, exit codes and history remain available for review and
-export. The existing SSH and Ansible transports require Linux, Python 3 and Bash
+Per-host results start collapsed, with green checkmarks for exit code zero and
+red crosses for failures. Expand a server to view its available stdout/stderr
+or an explicit no-output result. History remains available for review and export.
+The existing SSH and Ansible transports require Linux, Python 3 and Bash
 on each target; the application adds no remote agents. **Servers** retains groups,
 notes and inventory import/export; imported hosts start paused.
 See [dev-forward workflows and limits](docs/DEV-FORWARD.md) for details.

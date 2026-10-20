@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Checkbox, Code, Group, Loader, Modal, MultiSelect, NumberInput, Pagination, ScrollArea, Stack, Table, Text, Textarea, Title } from '@mantine/core';
-import { IconAlertTriangle, IconPlayerPlay, IconTerminal2, IconTestPipe } from '@tabler/icons-react';
+import { Alert, Badge, Button, Card, Checkbox, Code, Combobox, Group, Loader, Modal, MultiSelect, NumberInput, Pagination, ScrollArea, Stack, Table, Text, Title, Tooltip } from '@mantine/core';
+import { IconAlertTriangle, IconCheck, IconChevronRight, IconClock, IconPlayerPlay, IconTerminal2, IconTestPipe, IconX } from '@tabler/icons-react';
 import { api } from './api';
 import { t } from './i18n';
 import { numericDate } from './dateFormat';
 import { saveJson } from './InventoryTransfer';
 import LegacyOperationResult, { type ProbeResult } from './LegacyOperationResult';
+import BashEditor from './BashEditor';
 import type { Server } from './types';
 
 type Summary = { id: number; operation: string; status: string; created_at: string; finished_at: string | null };
 type CommandResult = ProbeResult & { syntax_ok?: boolean; dry_run?: boolean; stdout?: string; stderr?: string; exit_code?: number; timed_out?: boolean; truncated?: boolean; risk_warnings?: string[] };
 type Job = Summary & { payload: { unit?: string; command?: string; elevated?: boolean; timeout?: number }; results: { server_name: string; status: string; error: string | null; result: CommandResult | null }[] };
-const labels: Record<string, string> = { command: 'Run command', dry_run: 'Dry run', inspect: 'Health inspection', services: 'List services', logs: 'Query logs', start: 'Start service', stop: 'Stop service', restart: 'Restart service', enable: 'Enable at boot', disable: 'Disable at boot' };
+const labels: Record<string, string> = { command: 'Run command', dry_run: 'Check syntax and risks', inspect: 'Health inspection', services: 'List services', logs: 'Query logs', start: 'Start service', stop: 'Stop service', restart: 'Restart service', enable: 'Enable at boot', disable: 'Disable at boot' };
 const statusLabels: Record<string, string> = { running: 'Running', queued: 'Queued', completed: 'Completed', failed: 'Failed', partial: 'Partially completed', interrupted: 'Interrupted' };
 const color = (status: string) => status === 'completed' ? 'teal' : status === 'failed' || status === 'interrupted' ? 'red' : 'blue';
 const date = (value: string) => numericDate(value, { includeTime: true });
@@ -25,13 +26,35 @@ function Output({ value }: { value: CommandResult }) {
   if (value.syntax_ok === undefined) return <LegacyOperationResult value={value} />;
   return <Stack gap="sm">
     {value.dry_run && <Text size="sm" c={value.syntax_ok ? 'teal' : 'red'}>{t(value.syntax_ok ? 'Bash syntax check passed. No commands were executed.' : 'Bash syntax check failed. No commands were executed.')}</Text>}
-    {value.exit_code !== undefined && <Text size="xs" c="dimmed">{t('Exit code')}: {value.exit_code}</Text>}
     {value.timed_out && <Alert color="orange">{t('Command timed out. Changes may already have taken effect; check the server before retrying.')}</Alert>}
     {value.truncated && <Text size="xs" c="orange">{t('Output was truncated to 256 KiB per stream.')}</Text>}
     {value.stdout && <div><Text size="xs" c="dimmed">stdout</Text><Code block className="operation-output">{value.stdout}</Code></div>}
     {value.stderr && <div><Text size="xs" c="dimmed">stderr</Text><Code block className="operation-output">{value.stderr}</Code></div>}
-    {!value.dry_run && !value.stdout && !value.stderr && <Text size="sm" c="dimmed">{t('No output')}</Text>}
+    {!value.stdout && !value.stderr && <Text size="sm" c="dimmed">{t('No output')}</Text>}
   </Stack>;
+}
+
+function ServerResult({ result }: { result: Job['results'][number] }) {
+  const pending = result.status === 'running' || result.status === 'queued';
+  const success = !pending && result.status === 'completed'
+    && !result.result?.timed_out && (result.result?.exit_code ?? 0) === 0;
+  const status = t(statusLabels[result.status] || result.status);
+  return <details className="operation-server-result">
+    <summary>
+      <IconChevronRight className="details-chevron" size={17} aria-hidden="true" />
+      <Text fw={500} component="span" className="operation-server-name">{result.server_name}</Text>
+      <Text size="xs" c="dimmed" component="span">{result.result?.exit_code === undefined ? status : `${t('Exit code')}: ${result.result.exit_code}`}</Text>
+      <span className={`server-connection ${pending ? 'unknown' : success ? 'connected' : 'failed'}`}
+        role="img" aria-label={`${result.server_name}: ${status}`}>
+        {result.status === 'running' ? <Loader size={13} /> : pending ? <IconClock size={15} aria-hidden="true" /> : success ? <IconCheck size={17} aria-hidden="true" /> : <IconX size={17} aria-hidden="true" />}
+      </span>
+    </summary>
+    <Stack gap="sm" className="operation-server-output">
+      {result.error && <Alert color="red">{t(result.error)}</Alert>}
+      {result.result && <Output value={result.result} />}
+      {!result.result && !result.error && <Text size="sm" c="dimmed">{pending ? status : t('No output')}</Text>}
+    </Stack>
+  </details>;
 }
 
 export default function Operations({ servers }: { servers: Server[] }) {
@@ -45,8 +68,7 @@ export default function Operations({ servers }: { servers: Server[] }) {
   const [page, setPage] = useState(1);
   const [jobId, setJobId] = useState<number | null>(null);
   const [job, setJob] = useState<Job | null>(null);
-  const [checkId, setCheckId] = useState<number | null>(null);
-  const [checked, setChecked] = useState<Job | null>(null);
+  const [review, setReview] = useState<{ key: string; warnings: string[] } | null>(null);
   const [submittedId, setSubmittedId] = useState<number | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -57,15 +79,15 @@ export default function Operations({ servers }: { servers: Server[] }) {
     const s = servers.find(server => server.name === name);
     return [name, s?.hostname, s?.port, s?.ssh_user, s?.key_path, s?.enabled];
   }).sort());
-  const running = submittedId !== null || history.jobs.some(j => j.status === 'running') || job?.status === 'running' || checked?.status === 'running';
-  const warnings = [...new Set(checked?.results.flatMap(item => item.result?.risk_warnings || []) || [])];
-  const passed = checked?.status === 'completed' && checked.results.length === selected.length && checked.results.every(item => item.result?.syntax_ok && item.status === 'completed');
+  const running = submittedId !== null || history.jobs.some(j => j.status === 'running') || job?.status === 'running';
+  const formKey = JSON.stringify([command, elevated, timeout, targetKey]);
+  const warnings = review?.key === formKey ? review.warnings : [];
   const valid = selected.length > 0 && selected.every(name => eligible.some(s => s.name === name)) && command.trim().length > 0 && Number(timeout) >= 10 && Number(timeout) <= 3600;
 
-  // A check belongs to the exact form and connection settings that produced it.
+  // A risk acknowledgement only applies to the form shown in the review.
   useEffect(() => {
-    setCheckId(null); setChecked(null); setAcknowledged(false); setConfirm(false);
-  }, [command, elevated, timeout, targetKey]);
+    setReview(null); setAcknowledged(false); setConfirm(false);
+  }, [formKey]);
 
   useEffect(() => {
     const abort = new AbortController();
@@ -76,13 +98,12 @@ export default function Operations({ servers }: { servers: Server[] }) {
         const next = await api<{ jobs: Summary[]; total: number }>(`/api/operations?offset=${(page - 1) * 25}`, 'GET', undefined, abort.signal);
         if (abort.signal.aborted) return;
         setHistory(next);
-        for (const id of new Set([jobId, checkId, submittedId].filter((id): id is number => id !== null))) {
+        for (const id of new Set([jobId, submittedId].filter((id): id is number => id !== null))) {
           if (finished.has(id)) continue;
           const detail = await api<Job>(`/api/operations/${id}`, 'GET', undefined, abort.signal);
           if (abort.signal.aborted) return;
           if (detail.status !== 'running') finished.add(id);
           if (id === jobId) setJob(detail);
-          if (id === checkId) setChecked(detail);
           if (id === submittedId && detail.status !== 'running') setSubmittedId(null);
         }
       } catch (cause) { if (!abort.signal.aborted) setError(errorMessage(cause)); }
@@ -90,15 +111,21 @@ export default function Operations({ servers }: { servers: Server[] }) {
     }
     void refresh();
     return () => { abort.abort(); window.clearTimeout(timer); };
-  }, [page, jobId, checkId, submittedId, revision]);
+  }, [page, jobId, submittedId, revision]);
 
+  async function reviewCommand() {
+    setBusy(true); setError(''); setAcknowledged(false);
+    try {
+      const result = await api<{ warnings: string[] }>('/api/operations/review', 'POST', { servers: selected, operation: 'command', command, timeout: Number(timeout), elevated });
+      setReview({ key: formKey, warnings: result.warnings }); setConfirm(true);
+    } catch (cause) { setError(errorMessage(cause)); }
+    finally { setBusy(false); }
+  }
   async function start(operation: 'dry_run' | 'command') {
     setBusy(true); setError('');
-    if (operation === 'dry_run') { setCheckId(null); setChecked(null); setAcknowledged(false); }
     try {
-      const result = await api<{ id: number }>('/api/operations', 'POST', { servers: selected, operation, command, timeout: Number(timeout), elevated, dry_run_id: operation === 'command' ? checkId : null, risk_acknowledged: acknowledged });
+      const result = await api<{ id: number }>('/api/operations', 'POST', { servers: selected, operation, command, timeout: Number(timeout), elevated, risk_acknowledged: acknowledged });
       setSubmittedId(result.id);
-      if (operation === 'dry_run') setCheckId(result.id);
       setJob(null); setJobId(result.id); setConfirm(false); setPage(1); setRevision(v => v + 1);
     } catch (cause) { setError(errorMessage(cause)); }
     finally { setBusy(false); }
@@ -108,7 +135,6 @@ export default function Operations({ servers }: { servers: Server[] }) {
     setBusy(true); setError('');
     try {
       await api(`/api/operations/${job.id}`, 'DELETE');
-      if (checkId === job.id) { setCheckId(null); setChecked(null); setAcknowledged(false); }
       setJob(null); setJobId(null); setRemove(false); setPage(1); setRevision(v => v + 1);
     } catch (cause) { setError(errorMessage(cause)); }
     finally { setBusy(false); }
@@ -118,36 +144,34 @@ export default function Operations({ servers }: { servers: Server[] }) {
     {error && <Alert color="red" withCloseButton onClose={() => setError('')}>{t(error)}</Alert>}
     <Card withBorder radius="lg" p="lg"><Stack gap="md">
       <Group align="end" wrap="nowrap" className="operation-targets">
-        <MultiSelect label={t('Target servers')} placeholder={t('Choose servers')} searchable clearable value={selected} onChange={setSelected} data={eligible.map(s => ({ value: s.name, label: s.name }))} disabled={busy || running} style={{ flex: 1, minWidth: 0 }} />
+        <MultiSelect label={t('Target servers')} placeholder={t('Choose servers')} searchable clearable value={selected} onChange={setSelected} data={eligible.map(s => ({ value: s.name, label: s.name }))} disabled={busy || running} style={{ flex: 1, minWidth: 0 }}
+          rightSectionWidth={selected.length ? 126 : 96} rightSection={<Group gap={5} wrap="nowrap" className="operation-target-count"><Combobox.Chevron /><Text size="xs" component="span" aria-label={t('{0} of {1} enabled servers selected', { 0: selected.length, 1: eligible.length })}>{selected.length} / {eligible.length}</Text></Group>} />
         <Button variant="light" disabled={busy || running || !eligible.length} onClick={() => setSelected(eligible.map(s => s.name))}>{t('Select all servers')}</Button>
       </Group>
-      <Text size="xs" c="dimmed">{t('{0} of {1} enabled servers selected', { 0: selected.length, 1: eligible.length })} · {t('Paused servers are excluded.')}</Text>
-      <Textarea label={t('Operation')} description={t('Enter one or more Bash commands. Commands run non-interactively; use non-interactive options when needed.')} placeholder={'apt update\napt install -y htop'} autosize minRows={5} maxRows={16} value={command} onChange={e => setCommand(e.currentTarget.value)} maxLength={32768} disabled={busy || running} spellCheck={false} className="operation-command" />
-      <Group justify="space-between" align="end">
+      <BashEditor label={t('Operation')} hint={t('Enter one or more Bash commands. Commands run non-interactively; use non-interactive options when needed.')} value={command} onChange={setCommand} disabled={busy || running} />
+      <Group justify="start" gap="lg" className="operation-options">
+        <Group gap="xs" wrap="nowrap">
+          <label htmlFor="operation-timeout" className="operation-timeout-label">{t('Server timeout (s)')}</label>
+          <NumberInput id="operation-timeout" min={10} max={3600} allowDecimal={false} value={timeout} onChange={setTimeout} disabled={busy || running} w={100} />
+        </Group>
         <Checkbox label={t('Run with sudo')} checked={elevated} onChange={e => setElevated(e.currentTarget.checked)} disabled={busy || running} />
-        <NumberInput label={t('Timeout per server (seconds)')} min={10} max={3600} allowDecimal={false} value={timeout} onChange={setTimeout} disabled={busy || running} w={220} />
       </Group>
-      <Text size="xs" c="dimmed">{t('Commands and output are saved in local task history. Do not include passwords or secrets.')}</Text>
-    </Stack></Card>
-    <Card withBorder radius="lg" p="lg"><Stack gap="md">
-      <Group justify="space-between"><Group gap="xs"><IconTestPipe size={20} /><Title order={3}>{t('Dry run')}</Title></Group><Button variant="light" leftSection={<IconTestPipe size={16} />} loading={busy || checked?.status === 'running' || (submittedId === checkId && checkId !== null)} disabled={!valid || running} onClick={() => void start('dry_run')}>{t('Check syntax and risks')}</Button></Group>
-      <Text size="sm" c="dimmed">{t('Dry run uses bash -n on each target without executing the commands. It checks shell syntax, not command options, installed programs, permissions or execution results.')}</Text>
-      {!checked && <Text size="sm" c="dimmed">{t('Run Dry run before execution. Changing the command, targets or options requires a new check.')}</Text>}
-      {checked && <>
-        <Group><Badge color={color(checked.status)}>{t(passed ? 'Syntax check passed' : statusLabels[checked.status] || checked.status)}</Badge><Text size="xs" c="dimmed">{checked.results.filter(r => r.status === 'completed').length} / {checked.results.length} {t('servers passed')}</Text></Group>
-        <Warnings warnings={warnings} />
-        {passed && <Text size="sm" c="dimmed">{t('Risk detection is heuristic. A passing check does not guarantee safety.')}</Text>}
-      </>}
-      <Group justify="end">{running && <Text size="sm">{t('A server task is running')}</Text>}<Button leftSection={<IconPlayerPlay size={16} />} disabled={busy || running || !valid || !passed} onClick={() => { setAcknowledged(false); setConfirm(true); }}>{t('Review and run')}</Button></Group>
+      <Group justify="start">
+        <Tooltip label={t('Check syntax using bash -n')} withArrow events={{ hover: true, focus: true, touch: true }}>
+          <span className="operation-check-action"><Button variant="light" leftSection={<IconTestPipe size={16} />} disabled={busy || !valid || running} onClick={() => void start('dry_run')}>{t('Check syntax and risks')}</Button></span>
+        </Tooltip>
+        <Button leftSection={<IconPlayerPlay size={16} />} loading={busy} disabled={running || !valid} onClick={() => void reviewCommand()}>{t('Run command')}</Button>
+        {running && <Text size="sm" c="dimmed">{t('A server task is running')}</Text>}
+      </Group>
     </Stack></Card>
     {jobId !== null && !job && <Loader size="sm" />}
     {job && <Card withBorder radius="lg" p="lg"><Stack>
-      <Group justify="space-between"><Group><IconTerminal2 size={20} /><Title order={3}>#{job.id} {t(labels[job.operation] || job.operation)}</Title><Badge color={color(job.status)}>{t(statusLabels[job.status] || job.status)}</Badge></Group><Group><Button size="xs" variant="default" onClick={() => saveJson(job, `mossentry-task-${job.id}.json`)}>{t('Export results')}</Button><Button size="xs" variant="light" color="red" disabled={running || busy} onClick={() => setRemove(true)}>{t('Delete saved task')}</Button></Group></Group>
-      <Text size="xs" c="dimmed">{date(job.created_at)} {job.payload.unit && `· ${job.payload.unit}`} {job.payload.elevated && '· sudo'}</Text>
+      <Group justify="space-between"><Group gap="sm"><IconTerminal2 size={20} /><Title order={3}>#{job.id} {t(labels[job.operation] || job.operation)}</Title><Text size="xs" c="dimmed">{date(job.created_at)}</Text><Badge color={color(job.status)}>{t(statusLabels[job.status] || job.status)}</Badge>{job.payload.elevated && <Badge variant="light">sudo</Badge>}</Group><Group><Button size="xs" variant="default" onClick={() => saveJson(job, `mossentry-task-${job.id}.json`)}>{t('Export results')}</Button><Button size="xs" variant="light" color="red" disabled={running || busy} onClick={() => setRemove(true)}>{t('Delete saved task')}</Button></Group></Group>
+      {job.payload.unit && <Text size="sm">{job.payload.unit}</Text>}
       {job.payload.command && <Code block className="operation-output">{job.payload.command}</Code>}
       {!['dry_run', 'inspect', 'services', 'logs'].includes(job.operation) && ['failed', 'partial', 'interrupted'].includes(job.status) && <Alert color="orange">{t('Remote changes may have taken effect. Check the server before retrying; tasks are never retried automatically.')}</Alert>}
       <Warnings warnings={[...new Set(job.results.flatMap(item => item.result?.risk_warnings || []))]} />
-      {job.results.map(result => <Card key={result.server_name} withBorder radius="md"><Stack><Group justify="space-between"><Text fw={600}>{result.server_name}</Text><Badge color={color(result.status)}>{t(statusLabels[result.status] || result.status)}</Badge></Group>{result.error && <Alert color="red">{t(result.error)}</Alert>}{result.result && <Output value={result.result} />}</Stack></Card>)}
+      <div className="operation-server-list">{job.results.map(result => <ServerResult key={`${job.id}-${result.server_name}`} result={result} />)}</div>
     </Stack></Card>}
     <Card withBorder radius="lg" p="lg"><Stack><Title order={3}>{t('Task history')}</Title><ScrollArea><Table miw={560} highlightOnHover><Table.Thead><Table.Tr>{['Task', 'State', 'Time', 'Actions'].map(label => <Table.Th key={label}>{t(label)}</Table.Th>)}</Table.Tr></Table.Thead><Table.Tbody>{history.jobs.map(item => <Table.Tr key={item.id}><Table.Td>#{item.id} {t(labels[item.operation] || item.operation)}</Table.Td><Table.Td><Badge color={color(item.status)}>{t(statusLabels[item.status] || item.status)}</Badge></Table.Td><Table.Td>{date(item.created_at)}</Table.Td><Table.Td><Button size="compact-xs" variant="light" onClick={() => { setJob(null); setJobId(item.id); setRevision(v => v + 1); }}>{t('View results')}</Button></Table.Td></Table.Tr>)}</Table.Tbody></Table></ScrollArea>{!history.jobs.length && <Text size="sm" c="dimmed">{t('No tasks yet')}</Text>}{history.total > 25 && <Pagination total={Math.ceil(history.total / 25)} value={page} onChange={setPage} />}</Stack></Card>
     <Modal opened={confirm} onClose={() => !busy && setConfirm(false)} title={t('Review and run')} centered size="lg"><Stack>
@@ -158,7 +182,7 @@ export default function Operations({ servers }: { servers: Server[] }) {
       <Warnings warnings={warnings} />
       {warnings.length > 0 && <Checkbox label={t('I understand these risks and want to execute this command.')} checked={acknowledged} onChange={e => setAcknowledged(e.currentTarget.checked)} />}
       {error && <Alert color="red">{t(error)}</Alert>}
-      <Button color={warnings.length ? 'orange' : 'teal'} loading={busy} disabled={running || !valid || !passed || (warnings.length > 0 && !acknowledged)} onClick={() => void start('command')}>{t('Confirm and run')}</Button>
+      <Button color={warnings.length ? 'orange' : 'teal'} loading={busy} disabled={running || !valid || review?.key !== formKey || (warnings.length > 0 && !acknowledged)} onClick={() => void start('command')}>{t('Confirm and run')}</Button>
     </Stack></Modal>
     <Modal opened={remove} onClose={() => !busy && setRemove(false)} title={t('Delete saved task')} centered><Stack><Text>{t('Remove this task and its saved results from local history? The audit trail is kept.')}</Text><Button color="red" loading={busy} onClick={() => void deleteJob()}>{t('Delete')}</Button></Stack></Modal>
   </Stack>;

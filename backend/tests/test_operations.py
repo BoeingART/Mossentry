@@ -320,32 +320,46 @@ class OperationAPITests(unittest.TestCase):
                 self.assertEqual(self.service.run_remote('gpu1', {'operation': 'logs'}), sample)
         self.assertEqual(list((Path(self.temp.name) / 'jobs').glob('operation-*')), [])
 
-    def test_command_requires_matching_successful_dry_run_and_warning_acknowledgement(self):
+    def test_command_can_run_without_dry_run_and_still_requires_warning_acknowledgement(self):
         body = {'operation': 'command', 'servers': ['gpu1', 'cpu1'], 'command': 'chmod 640 /tmp/example'}
         with patch.object(self.service, 'run_remote') as remote:
-            self.assertEqual(self.post('/api/operations', body).status_code, 400)
-            remote.assert_not_called()
-        sample = {'checked_at': self.db.now(), 'syntax_ok': True, 'exit_code': 0, 'dry_run': True,
-                  'risk_warnings': probe.command_risks(body['command'])}
-        with patch.object(self.service, 'run_remote', return_value=sample):
-            response = self.post('/api/operations', {**body, 'operation': 'dry_run'})
-            self.assertEqual(response.status_code, 202)
-            check = self.await_job(response.json()['id'])
-        body.update(dry_run_id=check['id'], risk_acknowledged=True)
-        for change in ({'command': 'rm /tmp/example'}, {'servers': ['cpu1']}, {'elevated': True},
-                       {'timeout': 60}, {'risk_acknowledged': False}):
-            with self.subTest(change=change), patch.object(self.service, 'run_remote') as remote:
-                self.assertEqual(self.post('/api/operations', {**body, **change}).status_code, 400)
-                remote.assert_not_called()
-        with patch.object(self.service, 'run_remote', return_value={**sample, 'dry_run': False}) as remote:
             response = self.post('/api/operations', body)
+            self.assertEqual(response.status_code, 400)
+            self.assertIn('Acknowledge', response.json()['detail'])
+            remote.assert_not_called()
+        sample = {'checked_at': self.db.now(), 'syntax_ok': True, 'exit_code': 0, 'dry_run': False,
+                  'risk_warnings': probe.command_risks(body['command'])}
+        with patch.object(self.service, 'run_remote', return_value=sample) as remote:
+            response = self.post('/api/operations', {**body, 'risk_acknowledged': True})
             self.assertEqual(response.status_code, 202, response.text)
             result = self.await_job(response.json()['id'])
             self.assertEqual(result['status'], 'completed')
             self.assertEqual(remote.call_count, 2)
-        self.db.execute("UPDATE servers SET hostname='changed.test' WHERE name='gpu1'")
-        self.assertEqual(self.post('/api/operations', body).status_code, 400)
+        with patch.object(self.service, 'run_remote', return_value={**sample, 'risk_warnings': []}):
+            response = self.post('/api/operations', {**body, 'command': 'echo ok', 'servers': ['gpu1']})
+            self.assertEqual(response.status_code, 202, response.text)
+            self.assertEqual(self.await_job(response.json()['id'])['status'], 'completed')
+        self.assertFalse(self.db.rows("SELECT id FROM operation_jobs WHERE operation='dry_run'"))
         self.assertFalse(self.main.operation_lock.locked())
+
+    def test_local_risk_review_requires_auth_and_never_contacts_servers_or_creates_jobs(self):
+        body = {'operation': 'command', 'servers': ['gpu1'], 'command': 'rm /tmp/example; chmod 640 /tmp/other'}
+        self.assertEqual(self.client.post('/api/operations/review', json=body).status_code, 403)
+        with patch.object(self.service, 'run_remote') as remote:
+            response = self.post('/api/operations/review', body)
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.headers['cache-control'], 'no-store')
+            self.assertIn(probe.RISK_MESSAGES['delete'], response.json()['warnings'])
+            self.assertIn(probe.RISK_MESSAGES['permissions'], response.json()['warnings'])
+            self.assertNotIn(body['command'], response.text)
+            self.assertEqual(self.post('/api/operations/review', {**body, 'command': 'id', 'elevated': True}).json()['warnings'], [probe.RISK_MESSAGES['privilege']])
+            self.assertEqual(self.post('/api/operations/review', {**body, 'command': 'echo ok'}).json()['warnings'], [])
+            for change in ({'command': ' '}, {'servers': ['unknown']}, {'operation': 'inspect'}):
+                self.assertEqual(self.post('/api/operations/review', {**body, **change}).status_code, 400)
+            remote.assert_not_called()
+        self.assertFalse(self.db.rows('SELECT * FROM operation_jobs'))
+        self.db.execute("UPDATE servers SET enabled=0 WHERE name='gpu1'")
+        self.assertEqual(self.post('/api/operations/review', body).status_code, 400)
 
     def test_failed_dry_run_and_nonzero_exit_retain_output_and_status(self):
         body = {'operation': 'dry_run', 'servers': ['gpu1', 'cpu1'], 'command': 'echo ok'}
@@ -358,12 +372,10 @@ class OperationAPITests(unittest.TestCase):
         gpu = next(r for r in result['results'] if r['server_name'] == 'gpu1')
         self.assertEqual(gpu['status'], 'failed')
         self.assertEqual(gpu['result']['stderr'], 'syntax error')
-        self.assertEqual(self.post('/api/operations', {**body, 'operation': 'command', 'dry_run_id': result['id']}).status_code, 400)
-        with patch.object(self.service, 'run_remote', return_value=passed):
-            response = self.post('/api/operations', body)
-            check = self.await_job(response.json()['id'])
+        # A previous failed optional check does not block the execution route.
         with patch.object(self.service, 'run_remote', side_effect=[{**passed, 'exit_code': 7, 'stderr': 'command failed'}, passed]):
-            response = self.post('/api/operations', {**body, 'operation': 'command', 'dry_run_id': check['id']})
+            response = self.post('/api/operations', {**body, 'operation': 'command'})
+            self.assertEqual(response.status_code, 202, response.text)
             result = self.await_job(response.json()['id'])
         self.assertEqual(result['status'], 'partial')
         self.assertEqual(next(r for r in result['results'] if r['server_name'] == 'gpu1')['result']['exit_code'], 7)

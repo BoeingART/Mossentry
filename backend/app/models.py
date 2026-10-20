@@ -119,7 +119,6 @@ class OperationRequest(BaseModel):
     operation: Literal["inspect", "services", "logs", "start", "stop", "restart", "enable", "disable", "dry_run", "command"]
     command: str = Field(default="", max_length=32768)
     timeout: int = Field(default=300, ge=10, le=3600)
-    dry_run_id: int | None = Field(default=None, ge=1)
     risk_acknowledged: bool = False
     unit: str = Field(default="", max_length=200)
     minutes: int = Field(default=60, ge=1, le=10080)

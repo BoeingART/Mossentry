@@ -569,6 +569,16 @@ def import_inventory(body: InventoryImport, request: Request, session: dict[str,
     return {'ok': True, 'count': len(names)}
 
 
+@app.post('/api/operations/review')
+def review_operation(body: OperationRequest, session: dict[str, Any] = Depends(csrf_admin)):
+    _validate_servers(body.servers)
+    if body.operation != 'command' or not body.command.strip():
+        raise HTTPException(400, 'Enter a Linux command (up to 32768 characters)')
+    # Risk review is local and does not start a job or perform a syntax check.
+    return JSONResponse({'warnings': operations_service.command_risks(body.command, body.elevated)},
+                        headers={'Cache-Control': 'no-store'})
+
+
 @app.post('/api/operations', status_code=202)
 def create_operation(body: OperationRequest, request: Request, session: dict[str, Any] = Depends(csrf_admin)):
     if not operation_lock.acquire(blocking=False):
@@ -577,7 +587,7 @@ def create_operation(body: OperationRequest, request: Request, session: dict[str
         names = _validate_servers(body.servers)
         if body.operation in {'dry_run', 'command'}:
             try:
-                operations_service.validate_command_request(names, body)
+                operations_service.validate_command_request(body)
             except ValueError as exc:
                 raise HTTPException(400, str(exc)) from exc
         elif body.operation in operations_service.MUTATIONS:

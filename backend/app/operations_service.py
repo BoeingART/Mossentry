@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import hashlib
 from pathlib import Path
 import tempfile
 from threading import Thread
@@ -72,9 +71,7 @@ def execute_job(job_id, names, payload, actor, lock):
 
 
 def start_job(names, body, actor, lock):
-    payload = body.model_dump(exclude={'servers', 'confirmation', 'dry_run_id', 'risk_acknowledged'})
-    if body.operation in {'dry_run', 'command'}:
-        payload['target_fingerprints'] = target_fingerprints(names)
+    payload = body.model_dump(exclude={'servers', 'confirmation', 'risk_acknowledged'})
     with db.connect() as conn:
         job_id = conn.execute("INSERT INTO operation_jobs(operation,payload_json,status,requested_by,created_at) VALUES(?,?,'running',?,?)",
                               (body.operation, json.dumps(payload), actor, db.now())).lastrowid
@@ -90,26 +87,11 @@ def start_job(names, body, actor, lock):
     return job_id
 
 
-def target_fingerprints(names):
-    result = {}
-    for name in names:
-        server = db.row('SELECT hostname,port,ssh_user,key_path,enabled FROM servers WHERE name=?', (name,))
-        result[name] = hashlib.sha256(json.dumps(server, sort_keys=True).encode()).hexdigest()
-    return result
-
-
-def validate_command_request(names, body):
+def validate_command_request(body):
     if not body.command.strip():
         raise ValueError('Enter a Linux command (up to 32768 characters)')
     if body.operation == 'dry_run':
         return
-    checked = job_detail(body.dry_run_id)
-    if (not checked or checked['operation'] != 'dry_run' or checked['status'] != 'completed'
-            or set(names) != {item['server_name'] for item in checked['results']}
-            or any(item['status'] != 'completed' or not (item['result'] or {}).get('syntax_ok') for item in checked['results'])
-            or any(checked['payload'].get(key) != getattr(body, key) for key in ('command', 'elevated', 'timeout'))
-            or checked['payload'].get('target_fingerprints') != target_fingerprints(names)):
-        raise ValueError('Run Dry run successfully for this command and the selected servers first.')
     if command_risks(body.command, body.elevated) and not body.risk_acknowledged:
         raise ValueError('Acknowledge the command warnings before execution.')
 
