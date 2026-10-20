@@ -1,9 +1,10 @@
-@font-face { font-family: "Poppins"; src: url('./assets/fonts/Poppins-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face { font-family: "Poppins"; src: url('./assets/fonts/Poppins-Medium.ttf') format('truetype'); font-weight: 500; font-style: normal; font-display: swap; }
-@font-face { font-family: "Poppins"; src: url('./assets/fonts/Poppins-SemiBold.ttf') format('truetype'); font-weight: 600; font-style: normal; font-display: swap; }
-@font-face { font-family: "Poppins"; src: url('./assets/fonts/Poppins-Bold.ttf') format('truetype'); font-weight: 700; font-style: normal; font-display: swap; }
-@font-face { font-family: "Outfit"; src: url('./assets/fonts/Outfit-Variable.ttf') format('truetype'); font-weight: 100 900; font-style: normal; font-display: swap; }
-:root { --font-heading: "Poppins", sans-serif; --font-body: "Outfit", sans-serif; font-synthesis: none; --ink: #182c32; --muted: #71838a; --line: #e8eef0; --canvas: #f5f8f9; --teal: #00897b; --panel-shadow: 0 2px 9px #163e4903; --surface: #fff; --surface-soft: #f7f9fa; --surface-hover: #f0f7f7; --control-border: #e2e9eb; --secondary: #52646b; --tint: #e0f2f1; --tint-ink: #00796b; --subtle-line: #f0f4f5; --chart-grid: #f0f1f3; --brand-entry: #000; }
+/* A shared native sans-serif stack keeps English and Chinese UI text consistent. */
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", Arial, sans-serif;
+  --font-heading: var(--font-sans);
+  --font-body: var(--font-sans);
+}
+:root { font-synthesis: none; --ink: #182c32; --muted: #71838a; --line: #e8eef0; --canvas: #f5f8f9; --teal: #00897b; --panel-shadow: 0 2px 9px #163e4903; --surface: #fff; --surface-soft: #f7f9fa; --surface-hover: #f0f7f7; --control-border: #e2e9eb; --secondary: #52646b; --tint: #e0f2f1; --tint-ink: #00796b; --subtle-line: #f0f4f5; --chart-grid: #f0f1f3; --brand-entry: #000; }
 /* Shared type scale: headings, reading text, controls, and supporting data. */
 :root {
   --text-micro: 0.75rem; /* 12px: badges and compact status */
@@ -23,7 +24,7 @@ html, body, #root { min-height: 100%; }
 body { font-family: var(--font-body); font-weight: 400; font-size: var(--text-body); line-height: var(--leading-body); margin: 0; background: var(--canvas); color: var(--ink); -webkit-font-smoothing: antialiased; }
 button { cursor: pointer; }
 button, input, textarea, select { font-family: var(--font-body); }
-/* Only typographic headings use Poppins; copy, controls, tables, and chart values use Outfit. */
+/* Headings share the UI family; size and weight establish the hierarchy. */
 h1, h2, h3, h4, h5, h6,
 .mantine-Title-root, .mantine-Modal-title, .mantine-Alert-title, .mantine-Notification-title,
 .brand-name, .nav-section-label, .workspace-card strong, .approval-title,
