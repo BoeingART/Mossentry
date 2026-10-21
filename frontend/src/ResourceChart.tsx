@@ -2,13 +2,13 @@ import { t } from './i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Group, Paper, Text } from '@mantine/core';
-import { chartSegments, timePosition, WINDOW_MS } from './monitorData';
+import { chartSegments, minuteTicks, timePosition, WINDOW_MS } from './monitorData';
 import type { ChartPoint } from './monitorData';
 
 export type ChartSeries = { id: string; label: string; color: string; points: ChartPoint[]; current: number | null };
 const percentLabel = (value: number) => `${value.toFixed(1)}%`;
 const percentTick = (value: number) => `${value}%`;
-const timeLabel = (time: number) => new Date(time).toLocaleTimeString([], { hour12: false });
+const timeLabel = (time: number) => new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
 export default function ResourceChart({ title, control, series, end, emptyMessage, maximum = 100, formatValue = percentLabel, formatTick = percentTick, axisWidth = 54 }: {
   title: string; control?: ReactNode; series: ChartSeries[]; end: number; emptyMessage: string;
@@ -29,7 +29,7 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
   const y = (value: number) => bottom - value / maximum * (bottom - top);
   const segments = series.map(item => ({ ...item, segments: chartSegments(item.points, end, maximum) }));
   const populated = segments.some(item => item.segments.length > 0);
-  const tickCount = width < 460 ? 2 : 5;
+  const ticks = minuteTicks(end, width < 460 ? 120_000 : 60_000);
   const hoverTime = hover === null ? null : end - WINDOW_MS + hover * WINDOW_MS;
   const hovered = hoverTime === null ? [] : series.map(item => {
     const point = item.points.reduce<ChartPoint | null>((nearest, point) =>
@@ -50,11 +50,9 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
           <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="var(--chart-grid)" strokeDasharray={value ? '4 4' : undefined} />
           <text x={left - 9} y={y(value) + 4} textAnchor="end" className="chart-axis-label">{formatTick(value)}</text>
         </g>)}
-        {Array.from({ length: tickCount + 1 }, (_, index) => {
-          const time = end - WINDOW_MS + WINDOW_MS * index / tickCount;
-          return <g key={index}><line x1={x(time)} x2={x(time)} y1={top} y2={bottom} stroke="transparent" />
-            <text x={x(time)} y={bottom + 23} textAnchor={index === 0 ? 'start' : index === tickCount ? 'end' : 'middle'} className="chart-axis-label">{timeLabel(time)}</text></g>;
-        })}
+        {ticks.map(time => <g key={time}>
+          <text x={x(time)} y={bottom + 23} textAnchor="middle" className="chart-axis-label">{timeLabel(time)}</text>
+        </g>)}
         <line x1={left} x2={left} y1={top} y2={bottom} stroke="transparent" />
         <g clipPath={`url(#${clipId})`}>{segments.map(item => <g key={item.id}>
           {item.segments.map((segment, index) => <g key={index}>
@@ -72,7 +70,7 @@ export default function ResourceChart({ title, control, series, end, emptyMessag
     </div>
     <Group gap="md">{series.map(item => <Group gap={6} key={item.id} wrap="nowrap">
       <span style={{ background: item.color, width: 9, height: 9, borderRadius: '50%', flexShrink: 0 }} />
-      <Text size="xs">{item.label}</Text><Text size="xs" fw={700}>{item.current === null ? 'N/A' : formatValue(item.current)}</Text>
+      <Text size="xs">{item.label}</Text>
     </Group>)}</Group>
   </Paper>;
 }

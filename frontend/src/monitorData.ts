@@ -66,3 +66,9 @@ export function rateMaximum(values: (number | null)[]): number {
   const peak = Math.max(1024, ...values.filter((value): value is number => value !== null && Number.isFinite(value)));
   return 2 ** Math.ceil(Math.log2(peak));
 }
+
+// Tick identities are real minute boundaries; their positions scroll with time.
+export function minuteTicks(end: number, interval = 60_000): number[] {
+  const first = Math.ceil((end - WINDOW_MS) / interval) * interval;
+  return Array.from({ length: Math.max(0, Math.floor((end - first) / interval) + 1) }, (_, i) => first + i * interval);
+}

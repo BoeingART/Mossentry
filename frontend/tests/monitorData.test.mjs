@@ -106,3 +106,13 @@ test('network units and dynamic range preserve rates above 100 across missing sa
   assert.deepEqual(chartSegments([{ time: 0, value: 1000000 }, { time: 5000, value: null },
     { time: 15000, value: 2000000 }], 15000, maximum), [[{ time: 0, value: 1000000 }, { time: 15000, value: 2000000 }]]);
 });
+
+test('minute ticks retain their timestamps while scrolling left between samples', async () => {
+  const { minuteTicks } = await import('../src/monitorData.ts');
+  const end = 9 * 60_000 + 12_000;
+  const before = minuteTicks(end), after = minuteTicks(end + 5_000);
+  assert.deepEqual(before, after);
+  assert.ok(before.every(time => time % 60_000 === 0));
+  assert.ok(timePosition(before[2], end + 5_000) < timePosition(before[2], end));
+  assert.deepEqual(minuteTicks(10 * 60_000), [5, 6, 7, 8, 9, 10].map(n => n * 60_000));
+});
