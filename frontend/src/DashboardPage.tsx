@@ -1,6 +1,6 @@
 import { dateAxisTicks, numericDate } from './dateFormat';
 import { t, locale } from './i18n';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ActionIcon, Badge, Button, Group, ScrollArea, Select, Table, TextInput, Title, Tooltip } from '@mantine/core';
 import { IconArrowUpRight, IconSearch, IconClock, IconCalendar, IconChevronRight, IconRefresh, IconServer, IconShieldCheck, IconUsers, IconUserCheck } from '@tabler/icons-react';
 import type { Dashboard } from './types';
@@ -15,6 +15,8 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(750);
   const gradient = useId();
+  const tooltip = useRef<HTMLDivElement>(null);
+  const [tooltipWidth, setTooltipWidth] = useState(240);
   useEffect(() => {
     const observer = new ResizeObserver(entries => setWidth(Math.max(240, entries[0].contentRect.width)));
     if (ref.current) observer.observe(ref.current);
@@ -33,6 +35,9 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
   const hoverTime = hover === null ? null : Math.max(start, Math.min(end, Math.round((start + hover * (end - start)) / DAY) * DAY));
   const hoverTotal = hoverTime === null ? 0 : totalAt(history, hoverTime);
   const dateTicks = dateAxisTicks(start, end, right - left);
+  useLayoutEffect(() => {
+    if (tooltip.current) setTooltipWidth(tooltip.current.getBoundingClientRect().width);
+  }, [hoverTime, hoverTotal, width]);
   return <section className="dashboard-panel user-number-panel" aria-labelledby="user-number-title">
     <div className="dashboard-panel-heading"><div><Title order={3} id="user-number-title">{t("User number")}</Title></div>
       <Select aria-label={t("User number time range")} value={range} allowDeselect={false} onChange={value => { setRange(value || '365'); setHover(null); }}
@@ -68,7 +73,7 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
         </>}
       </svg>
       {!history.length && <div className="growth-empty"><IconUsers size={25} stroke={1.5} /><strong>{t("No creation dates yet")}</strong></div>}
-      {!!history.length && hoverTime !== null && <div className="growth-tooltip" style={{ left: Math.max(8, Math.min(width - 280, x(hoverTime) - 130)) }} aria-live="polite">
+      {!!history.length && hoverTime !== null && <div ref={tooltip} className="growth-tooltip" style={{ left: Math.max(8, Math.min(width - tooltipWidth - 8, x(hoverTime) - tooltipWidth / 2)) }} aria-live="polite">
         <span>{numericDate(hoverTime, { utc: true })}</span><span>{t("Unique users")} <b>{count(hoverTotal)}</b></span>
       </div>}
     </div>
