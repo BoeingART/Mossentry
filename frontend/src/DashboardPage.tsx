@@ -73,7 +73,6 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
         <strong>{numericDate(hoverTime, { utc: true })}</strong><div><span><i className="blue" />{t("Unique users")}</span><b>{count(hoverTotal)}</b></div><div><span><i className="teal" />{t("New that day")}</span><b>{count(added)}</b></div>
       </div>}
     </div>
-    <div className="growth-footer"><span className="chart-key"><i className="blue" />{t("Unique users")}</span><span>{count(statistics.dated_users)} {t("dated")}{statistics.undated_users > 0 ? t(" · {0} without a known date", { 0: count(statistics.undated_users) }) : ''}</span></div>
   </section>;
 }
 
