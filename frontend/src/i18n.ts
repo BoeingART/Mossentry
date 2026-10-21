@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { persistPreference, savedLanguage } from './preferences.ts';
-import { zh } from './translations.ts';
+import { en, zh } from './translations.ts';
 
 export type Language = 'en' | 'zh';
 const storageKey = 'mossentry-language';
@@ -28,7 +28,7 @@ export function setLanguage(next: Language) {
 }
 export function locale() { return language === 'zh' ? 'zh-CN' : 'en-US'; }
 export function t(source: string, values: Record<string, unknown> = {}): string {
-  const text = language === 'zh' ? (zh[source] ?? source) : source;
+  const text = language === 'zh' ? (zh[source] ?? en[source] ?? source) : (en[source] ?? source);
   return text.replace(/\{(\w+)\}/g, (match, key: string) =>
     Object.hasOwn(values, key) ? String(values[key] ?? '') : match);
 }
