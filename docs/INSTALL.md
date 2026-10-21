@@ -1,37 +1,29 @@
-# Mossentry v0.1.0
+# Install the Rust edition
+
+This document describes the `dev-rust` branch. Previously published v0.1.0 Electron installers remain historical builds until a Rust release is published.
 
 ## macOS
 
-- Requires macOS 13 or later.
-- Apple Silicon (M1/M2/M3/M4 and later): download `Mossentry-0.1.0-macOS-arm64.dmg`.
-- Intel: download `Mossentry-0.1.0-macOS-x64.dmg`.
-- Open the disk image and drag Mossentry to Applications. ZIP copies are also available.
-- Python, the SSH client and the interface are bundled. No separate runtime setup is needed.
-- This release is not Developer ID signed or notarized. macOS may require allowing
-  the application in System Settings → Privacy & Security after the first launch attempt.
+Use the Apple Silicon or Intel DMG matching your Mac, then drag Mossentry to Applications. The application uses the system WebKit and contains the Rust executable, interface assets and embedded remote probes. No separate Python, Node.js, Ansible or SSH client is needed. Unsigned development builds may need approval in System Settings → Privacy & Security.
 
 ## Windows
 
-- Download `Mossentry-0.1.0-Windows-x64-Setup.exe` and run the installer.
-- Requires 64-bit Windows 10/11. Python and the SSH client are bundled.
-- No WSL, Python, Ansible or OpenSSH installation is required on the client.
-- This release is unsigned, so Windows may show an unverified-publisher warning.
-- Configure SSH private-key paths using Windows paths, such as
-  `C:\Users\yourname\.ssh\id_ed25519`. Known hosts are read from
-  `%USERPROFILE%\.ssh\known_hosts`. Encrypted private keys requiring a passphrase
-  are not supported by this release.
-- Application data is stored under `%APPDATA%\Mossentry\data` and is preserved
-  during uninstall.
+Use the x64 NSIS installer on Windows 10/11. Tauri uses Microsoft WebView2; the installer can bootstrap it if missing. No WSL, Python, Ansible or OpenSSH installation is required. Private-key paths may use `C:\Users\yourname\.ssh\id_ed25519`; host keys are read from `%USERPROFILE%\.ssh\known_hosts`. Passphrase-encrypted SSH keys are not supported.
+
+## Existing data
+
+The application reuses the existing Mossentry or legacy application data directory and `mossentry.db` / `server_manager.db` in place, including WAL sidecars, saved sudo passwords, pending requests, credential archives, profiles and operation history. Quit the Electron build before opening the Rust build. The Rust instance lock does not protect against the older Electron application.
+
+The default directory is `~/Library/Application Support/Mossentry` on macOS, `%APPDATA%\Mossentry` on Windows and `~/.config/Mossentry` on Linux. Set `MOSSENTRY_USER_DATA_DIR` to select an isolated directory, or `MOSSENTRY_DATA_DIR` / `MOSSENTRY_DB_PATH` for specific storage overrides. Previous `SRVMGR_*` aliases are accepted. Back up the whole data directory while the application is closed before migrating valuable installations.
 
 ## SSH setup
 
-Use your own server addresses and SSH credentials. The initial inventory contains
-the project's example hosts; edit or remove them in Servers before connecting.
-Verify each server's SSH host-key fingerprint and add it to your local `known_hosts`
-before connecting in Mossentry. The bundled SSH client uses `~/.ssh/known_hosts` on each platform.
-Remote account management and resource monitoring currently require Linux, `/usr/bin/python3` and appropriate sudo permissions. SSH connection tests can also reach macOS hosts with `/usr/bin/python3`; macOS account management and monitoring are not implemented in v0.1.0. Merely launching the application does not change remote accounts.
+Edit or remove the initial example hosts before connecting. Verify each SSH fingerprint and add it to `~/.ssh/known_hosts`. The Rust transport rejects unknown or changed keys, uses only the configured private key and enforces owner-only key permissions on Unix.
 
-## Checksums
+Managed hosts require Linux, `/usr/bin/python3`, Bash and appropriate sudo permission. Python scripts execute on the remote host over SSH and are not installed as agents. Launching the application does not change remote accounts.
 
-The release includes `SHA256SUMS.txt` for the installers and ZIP archives.
-On macOS use `shasum -a 256 <file>`; on Windows use `Get-FileHash <file> -Algorithm SHA256`.
+## Build from source
+
+Install Node.js 24+, Rust stable and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). Run `npm ci`, then `npm start`. Build installers with `npm run dist:mac` or `npm run dist:win` on the target operating system. Output is under `src-tauri/target/release/bundle`.
+
+On Windows the OpenSSL source build also needs Perl; GitHub's Windows runner includes Strawberry Perl. On macOS the launcher automatically uses installed Command Line Tools if the active Xcode compiler is unavailable. It never accepts Xcode license terms or changes the global developer-directory selection.

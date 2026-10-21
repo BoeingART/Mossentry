@@ -1,0 +1,39 @@
+[package]
+name = "mossentry"
+version = "0.1.0"
+description = "Rust desktop manager for SSH hosts and access requests"
+edition = "2021"
+default-run = "mossentry"
+
+[lib]
+name = "mossentry"
+path = "src/lib.rs"
+
+[features]
+default = ["desktop"]
+custom-protocol = ["tauri/custom-protocol"]
+desktop = ["dep:tauri", "dep:tauri-plugin-single-instance", "dep:rfd"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+dirs = "6"
+fs2 = "0.4"
+rand = "0.8"
+ssh2 = { version = "0.9", features = ["vendored-openssl"] }
+ssh-key = { version = "0.6", features = ["ed25519", "rand_core"] }
+sha-crypt = "0.5"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+shell-words = "1"
+tauri = { version = "2", optional = true, features = [] }
+tauri-plugin-single-instance = { version = "2", optional = true }
+rfd = { version = "0.15", optional = true }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dev-dependencies]
+tempfile = "3"

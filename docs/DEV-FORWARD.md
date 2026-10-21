@@ -1,11 +1,11 @@
-# dev-forward: small-server operations
+# Small-server operations
 
 ## Scope and design
 
 The Operations page runs operator-supplied, multiline Linux commands using the
-existing native SSH or Ansible transport. Both transports send the same Python
+Rust SSH transport. It sends an embedded Python
 probe. Targets require Linux, Python 3 and Bash. No remote agent is installed;
-Ansible may create its usual temporary module files. Existing SSH host-key
+Existing SSH host-key
 verification and the saved sudo configuration remain in use.
 
 The previous inspection/service/log presets are no longer offered in the form.
@@ -74,7 +74,7 @@ operation lock. Live resource charts remain independent. Each host records stdou
 stderr, exit code and timeout state. Each output stream is capped at 256 KiB and
 truncation is displayed. Nonzero exits and timeouts fail that host while preserving
 captured output. The command process group is killed on timeout; detached processes
-or changes already made may remain. SSH/Ansible has an additional 30-second budget
+or changes already made may remain. SSH has an additional 30-second budget
 for syntax checking and transport overhead.
 
 Results are one collapsible row per server, initially closed. Clean completion
@@ -113,25 +113,18 @@ the actual server state before retrying.
 
 ## Implementation and verification
 
-- `backend/app/operations_probe.py`: Bash checks, bounded command execution, risk rules and legacy probes; stdlib only.
-- `backend/ansible/operations.yml`: Ansible execution and private local results.
-- `backend/app/operations_service.py`: durable background execution and recovery.
-- `backend/app/operation_diagnostics.py`: local output diagnostics and status aggregation.
-- `backend/tests/test_operation_diagnostics.py`: diagnostic evidence, bounds, benign output and failure precedence.
-- `frontend/src/Operations.tsx`: command form, Dry run, risk review, results and history; English and Simplified Chinese.
-- `frontend/src/InventoryTransfer.tsx`: import preview and export.
-- `backend/tests/test_operations.py`: validation, authentication/CSRF, import
-  conflicts, credential exclusion, non-executing syntax checks, malformed scripts,
-  risk rules, direct execution without a prior check, local risk review,
-  output bounds, timeout cleanup, partial failures,
-  operation locking, recovery and both transports.
-- `scripts/test-remote-linux.py`: disposable CI container smoke checks, including
-  read-only inspection and optional capability detection without new packages.
+- `src-tauri/remote/operations_probe.py`: Bash checks, bounded execution and legacy probes; remote stdlib only.
+- `src-tauri/src/operations.rs`: Rust risk review, durable jobs, diagnostics and recovery.
+- `src-tauri/tests/workflows.rs`: Rust workflow, persistence, locking and migration regression tests.
+- `frontend/src/Operations.tsx`: command form, results and history in English and Simplified Chinese.
+- `frontend/src/InventoryTransfer.tsx`: import preview and native JSON export.
+- `remote-tests/test_operations.py`: non-executing syntax checks, malformed scripts, output bounds and timeout cleanup.
+- `scripts/test-remote-linux.py`: disposable Linux container checks for actual account changes and file preservation.
 
 Run `npm run check` for the complete suite. Automated tests use isolated local
 fixtures; they never manage the configured real servers. The Linux container
 smoke check requires a running Docker daemon and is run by the existing release
-workflow. Real SSH/Ansible command execution should be verified against a disposable Linux
+workflow. Real SSH command execution should be verified against a disposable Linux
 host before production use.
 
 System command semantics follow the upstream [systemctl documentation](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html)

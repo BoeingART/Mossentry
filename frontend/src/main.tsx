@@ -54,9 +54,6 @@ const theme = createTheme({
   },
 });
 
-if (navigator.userAgent.includes('Electron')) {
-  document.documentElement.classList.add(navigator.platform.startsWith('Mac') ? 'electron-mac' : 'electron-other');
-}
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -2,45 +2,35 @@
 
 <img src="icon.svg" width="112" height="112" alt="Mossentry icon" />
 
-Electron desktop application for managing Linux servers over SSH. The interface uses React, Mantine, and TypeScript. A local FastAPI service handles host scans, access requests, approvals, audit events, and one-time credential downloads.
-
-## Downloads
-
-See [Releases](https://github.com/BoeingART/Mossentry/releases) for macOS (Apple Silicon and Intel) and Windows x64 installers. Read [installation instructions](docs/INSTALL.md) first; Windows runs natively without WSL.
+Rust desktop application for managing Linux servers over SSH, built with Tauri 2. The existing React, Mantine and TypeScript interface runs in the operating system WebView. SQLite persistence, SSH transport, account approvals, credentials, monitoring coordination and operation history run in Rust in the desktop process. Electron, the local HTTP server, Python runtime and Ansible are no longer shipped.
 
 ## Run
 
-Requires macOS or Linux, Node.js, Python 3.12, SSH, and Ansible.
+Install Node.js 24+, Rust stable and the platform's [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). On macOS, Command Line Tools are sufficient. Windows builds need the Microsoft C++ build tools, WebView2 and Perl for the bundled OpenSSL build. Linux builds need WebKitGTK 4.1 and the other packages listed in the prerequisites.
 
 ```bash
-npm install
-npm run setup:backend
+npm ci
 npm start
 ```
 
-`npm start` builds the React interface and launches Electron. Desktop mode opens without an administrator password. The interface has no sign-in screen or account controls. To run the project checks:
+`npm start` opens the native application and Vite development server. There is no sign-in screen. `npm run build` only builds the interface; `npm run dist` builds the native application and installer. The launch helper locates Rust under `~/.cargo/bin` and uses working macOS Command Line Tools when the active Xcode compiler is unavailable, without changing system settings.
 
 ```bash
-npm run setup:test
 npm run check
+npm run check:rust
+npm run dist:mac   # on macOS
+npm run dist:win   # on Windows
 ```
 
-Scrollable pages, lists, dialogs, and dropdowns use top/bottom edge shadows
-instead of scrollbars. Each shadow disappears when that end is reached.
-Mouse-wheel, touchpad, touch, and keyboard scrolling remain available.
+`check` runs the frontend build, chart tests, Rust workflow tests and remote Linux probe tests. Python 3 is only needed locally to run those probe tests, not to run or package the desktop application. Tests use temporary databases and simulated SSH connections. See [Rust migration and verification](docs/DEV-RUST.md) and [installation](docs/INSTALL.md).
+
+Scrollable pages, lists, dialogs, and dropdowns use top/bottom edge shadows instead of scrollbars. Mouse-wheel, touchpad, touch and keyboard scrolling remain available.
 
 ## Development
 
-`frontend/src` contains the React interface and typed API client. `npm run build` writes the production interface to `backend/app/frontend`, where FastAPI serves it to Electron. That generated directory is ignored by Git.
+`frontend/src` retains the interface and calls Rust through Tauri IPC. The string routes in `api.ts` preserve the existing typed interface contract; they are not HTTP endpoints. `npm run dev:ui` alone is useful for frontend compilation, but functional use requires `npm start` inside the native WebView.
 
-The backend can also run directly after building the interface:
-
-```bash
-cd backend
-../.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
-
-For interface development, run `npm run dev:ui` in another terminal; Vite proxies `/api` to port 8000. The interface is intended for the desktop app. When developing through Vite against the standalone backend, establish a session with `POST /api/login` first; administrator authentication remains available through the backend API.
+`src-tauri/src` implements the application in Rust. `src-tauri/remote` contains fixed, embedded Python programs sent over SSH to the target Linux host. They use that host's existing `/usr/bin/python3` and Bash; no local Python service or remote resident agent is required.
 
 ## Appearance and language
 
@@ -54,31 +44,29 @@ Typography sizes are shared between the Mantine theme and CSS through semantic v
 
 ## Branding and icons
 
-`icon.svg` is the source artwork for the interface logo and browser favicon. Vite includes it in the built assets served by FastAPI. `desktop/icons/icon.png` supplies the desktop window and macOS Dock icon; `icon.ico` and `icon.icns` provide Windows and macOS application icon resources. Regenerate all desktop formats after editing the SVG with `npm run build:icons`, then restart the app. The name shown in the window, application menu, About panel, and backend is **Mossentry**.
+`icon.svg` is the source artwork for the interface logo and browser favicon. Vite includes it in the built assets embedded in the native application. `src-tauri/icons/icon.png` supplies the desktop window and macOS Dock icon; `icon.ico` and `icon.icns` provide Windows and macOS application icon resources. Regenerate all desktop formats after editing the SVG with `npm run build:icons`, then restart the app. The name shown in the window, application menu, About panel, and backend is **Mossentry**.
 
 ## Host connections and data
 
-Add, edit, pause, or remove servers from the **Servers** page. The five hosts in `backend/app/config.py` seed new installations once; subsequent changes live in SQLite, and removed hosts stay removed after restart. The connection form accepts a hostname or IPv4/IPv6 address, SSH port, login account and an absolute or `~/` private-key path. The default management key is `~/.ssh/id_rsa`; existing servers keep their saved key paths. Set `MOSSENTRY_SSH_DIR` to use another key directory for the initial server inventory. Keys must have mode `0600`. Each remote host must accept SSH and grant the `srvmgr` account the configured sudo access.
+Add, edit, pause, or remove servers from the **Servers** page. The five hosts in `src-tauri/src/db.rs` seed new installations once; subsequent changes live in SQLite, and removed hosts stay removed after restart. The connection form accepts a hostname or IPv4/IPv6 address, SSH port, login account and an absolute or `~/` private-key path. The default management key is `~/.ssh/id_rsa`; existing servers keep their saved key paths. Set `MOSSENTRY_SSH_DIR` to use another key directory for the initial server inventory. Keys must have mode `0600`. Each remote host must accept SSH and grant the `srvmgr` account the configured sudo access.
 
 If sudo needs a password, enter the SSH login account's password in **Sudo password (optional)** when adding or editing a server. The field starts empty and never displays the saved password. Leave it blank when editing to keep the existing password, enter a new value to replace it, or select **Clear saved sudo password** to remove it. Changing the hostname, SSH port, or login account clears the old password unless a replacement is supplied. Each server uses its own password for sync and account management; SSH tests and resource monitoring do not need it.
 
-Passwords are stored locally in a separate SQLite credentials table, protected by owner-only permissions on the data directory (`0700`) and database (`0600`); they are not encrypted at rest. Passwords are excluded from API responses and audit details. Ansible receives host-specific passwords through a private temporary inventory that is deleted after execution, including failures and timeouts. For servers without a saved password, the existing `srvmgr.passwd` file (one nonempty line, mode `0600`), or `MOSSENTRY_BECOME_PASSWORD_FILE`, remains the fallback. If no password is configured, passwordless sudo is used.
+Passwords are stored locally in a separate SQLite credentials table, protected by owner-only permissions on the data directory (`0700`) and database (`0600`); they are not encrypted at rest. Passwords are excluded from API responses and audit details. Rust passes host-specific passwords over the encrypted SSH stdin stream; credentials are not put in process arguments or temporary inventories. For servers without a saved password, the existing `srvmgr.passwd` file (one nonempty line, mode `0600`), or `MOSSENTRY_BECOME_PASSWORD_FILE`, remains the fallback. If no password is configured, passwordless sudo is used.
 
-Runtime data lives under `data` in the Electron user-data directory. Set `MOSSENTRY_USER_DATA_DIR` to choose another parent directory. New installations use the `Mossentry` user-data directory and `mossentry.db`. Existing databases and their containing directories from earlier builds are reused in place, including SQLite sidecars and saved credentials. The `MOSSENTRY_*` environment variables take precedence; their previous `SRVMGR_*` equivalents remain supported. Remote SSH usernames such as `srvmgr` and the existing `srvmgr.passwd` file keep their operational meaning.
+Runtime data lives under `data` in the compatible Mossentry user-data directory. Set `MOSSENTRY_USER_DATA_DIR` to choose another parent directory. New installations use the `Mossentry` user-data directory and `mossentry.db`. Existing databases and their containing directories from earlier builds are reused in place, including SQLite sidecars and saved credentials. The `MOSSENTRY_*` environment variables take precedence; their previous `SRVMGR_*` equivalents remain supported. Remote SSH usernames such as `srvmgr` and the existing `srvmgr.passwd` file keep their operational meaning.
 
-SSH connection-reuse sockets use a private temporary directory under `/tmp`, removed after each operation. This keeps socket paths within macOS limits even when the application data directory has a long name.
-
-The input archive `server_manager.tar.gz` is retained for reference. It includes runtime data and sensitive paths and must not be distributed with the application.
+The Rust SSH client connects directly over TCP and does not create connection-reuse sockets or local child processes. Known-host verification remains required.
 
 ## Layout
 
-- `desktop/main.cjs`: Electron window, local service lifecycle, and access restrictions.
-- `frontend/src`: React and Mantine interface.
-- `backend/app`: FastAPI routes, SQLite, and application logic.
-- `backend/ansible`: fixed Ansible playbooks.
-- `backend/tests`: backend and desktop-mode checks.
+- `src-tauri/src`: Rust desktop entry point, SQLite storage, SSH and application workflows.
+- `src-tauri/remote`: embedded programs executed only on remote Linux hosts.
+- `frontend/src`: preserved React and Mantine interface.
+- `src-tauri/tests`: Rust workflow and migration regression tests.
+- `remote-tests` and `frontend/tests`: remote probe and chart regression tests.
 
-The desktop service listens only on a random `127.0.0.1` port and requires a fresh access token on every launch. Closing the window stops the service. Do not run another backend instance against the same data directory while the desktop app is open.
+Only the local main WebView can invoke application commands. There is no listening HTTP service. A file lock prevents multiple Rust instances from opening the same database. Do not run the old Electron build and the Rust build against the same data directory at the same time. Interrupted jobs are marked for review at startup and are never retried automatically.
 
 ## Management workflows
 
@@ -127,7 +115,7 @@ heuristic, not verification that the intended change succeeded. Original exit co
 and captured output remain unchanged. History and JSON exports include the
 diagnostics; saved command history is reanalyzed locally on upgrade without
 rerunning commands.
-The existing SSH and Ansible transports require Linux, Python 3 and Bash
+The Rust SSH transport requires Linux, Python 3 and Bash
 on each target; the application adds no remote agents. **Servers** retains groups,
 notes and inventory import/export; imported hosts start paused.
 See [dev-forward workflows and limits](docs/DEV-FORWARD.md) for details.
@@ -150,8 +138,10 @@ Restricted `/proc` visibility, container PID namespaces, MIG/MPS and driver limi
 
 SSH host-key verification remains enabled. Verify a new server's fingerprint and add it to the local SSH known-hosts file before testing its connection. Remote servers require Linux and Python 3; account changes also require sudo privileges.
 
-Automated tests use temporary databases and mocked remote execution; they never change accounts on configured servers.
+Automated tests use temporary databases and mocked remote execution. The optional `npm run test:ssh` also exercises the real SSH transport and account lifecycle inside a disposable Linux container bound to loopback; it requires Docker and never contacts configured servers.
 
 ## Release builds
 
-`Desktop release` builds and checks macOS arm64/x64 and Windows x64 packages. Pushing a version tag matching `package.json` publishes a GitHub Release only after every platform build passes. Manual workflow runs build artifacts without publishing. Native Python runtimes are prepared with `python scripts/build-runtime.py` using uv 0.8.22 on each target operating system. Packaged clients use the bundled SSH transport; development can retain Ansible, or select native SSH with `MOSSENTRY_SSH_ENGINE=native`. Run `npm run dist:mac` or `npm run dist:win` after preparing the runtime. Credentials, local databases and the development virtual environment are excluded from packages.
+The `Desktop release` workflow builds Rust/Tauri macOS arm64/x64 and Windows x64 packages. Manual runs upload build artifacts; version tags publish only after every platform succeeds and the npm, Cargo and Tauri versions match. Builds use the committed npm and Cargo lockfiles. Packages contain the Rust executable and embedded UI/probes, with no Electron, Python, Node or Ansible runtime.
+
+Native JSON exports and credential downloads use a save dialog. Cancelling or failing to write an export does not consume credentials. Credential exports require a new destination filename and retain owner-only file permissions on Unix.

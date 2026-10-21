@@ -1,13 +1,12 @@
+import { invoke } from '@tauri-apps/api/core';
 import { useState } from 'react';
 import { Alert, Button, Group, Modal, Stack, Text, Textarea } from '@mantine/core';
 import { api } from './api';
 import { t } from './i18n';
 
-export function saveJson(value: unknown, name: string) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
-  const link = document.createElement('a');
-  link.href = url; link.download = name; document.body.append(link); link.click(); link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+export async function saveJson(value: unknown, name: string) {
+  try { return await invoke<boolean>('save_json', { filename: name, value }); }
+  catch (cause) { throw new Error(t((cause as { detail?: string })?.detail || 'Could not save export')); }
 }
 
 export default function InventoryTransfer({ saved }: { saved: () => Promise<void> }) {
@@ -18,7 +17,7 @@ export default function InventoryTransfer({ saved }: { saved: () => Promise<void
   const [preview, setPreview] = useState<{ count: number; names: string[]; conflicts: string[] } | null>(null);
   async function exportFile() {
     setBusy(true); setError('');
-    try { saveJson(await api('/api/inventory/export'), 'mossentry-inventory.json'); }
+    try { await saveJson(await api('/api/inventory/export'), 'mossentry-inventory.json'); }
     catch (cause) { setError(String(cause instanceof Error ? cause.message : cause)); setOpened(true); }
     finally { setBusy(false); }
   }

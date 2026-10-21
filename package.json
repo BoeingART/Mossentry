@@ -4,29 +4,31 @@
   "version": "0.1.0",
   "private": true,
   "description": "Desktop manager for SSH hosts and access requests",
-  "main": "desktop/main.cjs",
   "scripts": {
-    "setup:backend": "python3.12 -m venv .venv && .venv/bin/python -m pip install -r backend/requirements.txt",
-    "setup:test": ".venv/bin/python -m pip install -r backend/requirements-dev.txt",
-    "build:icons": "electron desktop/generate-icons.cjs",
-    "test:desktop": "node --test desktop/tests/*.test.cjs",
     "build": "tsc --noEmit && vite build",
-    "start": "npm run build && electron .",
-    "dev:ui": "vite --host 127.0.0.1",
-    "check": "npm run build && npm run test:monitor && npm run test:desktop && node --check desktop/main.cjs && .venv/bin/python -m compileall -q backend/app && cd backend && ../.venv/bin/python -m unittest discover -s tests -v",
+    "start": "node scripts/rust-tool.cjs tauri dev",
+    "dev": "node scripts/rust-tool.cjs tauri dev",
+    "dev:ui": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "build:icons": "node scripts/rust-tool.cjs tauri icon icon.svg --output src-tauri/icons",
+    "check": "npm run build && npm run test:monitor && npm run test:rust && npm run test:remote",
+    "check:rust": "node scripts/rust-tool.cjs cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "fmt:rust": "node scripts/rust-tool.cjs cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "test:rust": "node scripts/rust-tool.cjs cargo test --manifest-path src-tauri/Cargo.toml --no-default-features",
     "test:monitor": "node --experimental-strip-types --test frontend/tests/*.test.mjs",
-    "build:runtime": "python scripts/build-runtime.py",
-    "dist:mac": "npm run build && electron-builder --mac --publish never",
-    "dist:win": "npm run build && electron-builder --win --x64 --publish never"
+    "test:remote": "python3 -m unittest discover -s remote-tests -v",
+    "dist": "node scripts/rust-tool.cjs tauri build",
+    "dist:mac": "node scripts/rust-tool.cjs tauri build --bundles app,dmg",
+    "dist:win": "node scripts/rust-tool.cjs tauri build --bundles nsis",
+    "tauri": "node scripts/rust-tool.cjs tauri",
+    "test:ssh": "python3 scripts/test-ssh.py"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "electron": "44.4.4",
-    "electron-builder": "26.17.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.1"
+    "vite": "^8.3.1",
+    "@tauri-apps/cli": "^2"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",
@@ -40,6 +42,8 @@
     "@mantine/notifications": "^9.6.3",
     "@tabler/icons-react": "^3.48.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
-  }
+    "react-dom": "^19.3.0",
+    "@tauri-apps/api": "^2"
+  },
+  "type": "module"
 }

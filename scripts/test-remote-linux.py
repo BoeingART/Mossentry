@@ -9,8 +9,8 @@ import sys
 
 assert Path('/.dockerenv').exists(), 'This test requires an isolated Docker container'
 assert os.geteuid() == 0
-sys.path.insert(0, '/source/backend')
-from app.remote_actions import run
+sys.path.insert(0, '/source/src-tauri/remote')
+from remote_actions import run
 
 name = 'mossentry_release_fixture'
 base = {'managed_username': name, 'ssh_user': 'root'}
@@ -27,7 +27,7 @@ assert pwd.getpwnam(name).pw_shell == '/bin/bash'
 assert not subprocess.check_output(['getent', 'shadow', name], text=True).split(':')[1].startswith('!')
 run({**base, 'operation': 'set_sudo', 'managed_sudo': True})
 run({**base, 'operation': 'set_sudo', 'managed_sudo': False})
-scan = run({'operation': 'scan_users', 'creation_source': Path('/source/backend/ansible/user_creation_times.py').read_text()})
+scan = run({'operation': 'scan_users', 'creation_source': Path('/source/src-tauri/remote/user_creation_times.py').read_text()})
 assert name + ':' in scan['passwd']
 status = run({'operation': 'server_status'})
 assert 'MemTotal' in status['memory']
@@ -42,7 +42,7 @@ print('Native Linux account create/scan/disable/enable/sudo/delete and file pres
 
 # Read-only operations must work with the container's existing Python. No
 # systemd/journal packages or resident agents are installed for these checks.
-from app.operations_probe import run as maintenance
+from operations_probe import run as maintenance
 inspection = maintenance({'operation': 'inspect'})
 assert inspection['os'] and inspection['cores'] > 0
 assert isinstance(inspection['filesystems'], list)

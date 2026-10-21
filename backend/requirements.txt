@@ -1,5 +1,0 @@
-fastapi==0.116.1
-uvicorn==0.35.0
-ansible-core==2.19.1; sys_platform != "win32"
-passlib==1.7.4
-paramiko==3.5.1

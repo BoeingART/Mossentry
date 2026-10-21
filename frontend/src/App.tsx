@@ -1,3 +1,6 @@
+import { isTauri } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import WindowControls from './WindowControls';
 import { numericDate } from './dateFormat';
 import { t, useLanguage } from './i18n';
 import brandIcon from '../../icon.svg';
@@ -278,7 +281,7 @@ export default function App() {
     finally { setBusy(false); }
   }
   async function download(action: Action) {
-    try { await downloadCredentials(action.id, action.target_user); notify(t("Credentials downloaded. This copy cannot be downloaded again.")); await refresh(); }
+    try { if (!await downloadCredentials(action.id, action.target_user)) return; notify(t("Credentials downloaded. This copy cannot be downloaded again.")); await refresh(); }
     catch (cause) { notify(message(cause), true); await refresh(); }
   }
   if (loading) return <Center h="100vh"><Loader /></Center>;
@@ -298,9 +301,14 @@ export default function App() {
     if (next === 'monitor') setMonitorServerId(null);
     setMobileOpened(false);
   }
-  const nativeDesktop = navigator.userAgent.includes('Electron');
+  const nativeDesktop = isTauri();
   return <AppShell className="app-shell" data-language={language} data-sidebar-collapsed={compactSidebar || undefined} transitionDuration={reducedMotion ? 0 : 280} transitionTimingFunction="cubic-bezier(0.22, 1, 0.36, 1)" navbar={{ width: compactSidebar ? 76 : 232, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: nativeDesktop ? 100 : 76 }} padding={0}>
-    <AppShell.Header className="topbar">
+    <AppShell.Header className="topbar" onMouseDown={event => {
+      if (!nativeDesktop || event.button !== 0 || (event.target as HTMLElement).closest('button,input,a,select,textarea,[role="button"]')) return;
+      if (event.detail === 2) void getCurrentWindow().toggleMaximize();
+      else void getCurrentWindow().startDragging();
+    }}>
+      <WindowControls />
       <div className="topbar-brand" aria-label="Mossentry"><img className="brand-mark" src={brandIcon} width={42} height={42} alt="" /><span className="brand-name" aria-hidden={compactSidebar}><span className="brand-accent">Moss</span>entry</span></div>
       <div className="topbar-content">
         <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label={t("Toggle navigation")} />
