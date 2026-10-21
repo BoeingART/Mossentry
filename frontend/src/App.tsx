@@ -20,6 +20,7 @@ import {
   IconShieldCheck, IconUser, IconUsers, IconLayoutSidebarLeftCollapse,
 } from '@tabler/icons-react';
 import { api, downloadCredentials, fetchDashboard, setCsrf } from './api';
+import { filteredAccounts, type UserFilter } from './userData';
 import type { Action, Dashboard, Server, User } from './types';
 import Servers from './Servers';
 import Operations from './Operations';
@@ -77,19 +78,18 @@ function SectionHeading({ title, action }: { title: string; action?: React.React
 
 function Users({ data, openRequest, openProfile }: { data: Dashboard; openRequest: (draft: RequestDraft) => void; openProfile: (username: string, fullName: string) => void }) {
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('enabled');
+  const [filter, setFilter] = useState<UserFilter>('enabled');
   const [host, setHost] = useState<string | null>('all');
   const [page, setPage] = useState(1);
   const groups = useMemo(() => {
     const grouped = new Map<string, User[]>();
-    for (const user of data.users.filter(user => host === 'all' || user.server === host)) grouped.set(user.username, [...(grouped.get(user.username) || []), user]);
+    for (const user of filteredAccounts(data.users, filter, host)) grouped.set(user.username, [...(grouped.get(user.username) || []), user]);
     return [...grouped].map(([username, accounts]) => ({
       username, accounts: accounts.sort((a, b) => a.server.localeCompare(b.server, undefined, { numeric: true })),
       fullName: accounts.find(a => a.full_name)?.full_name || '',
     })).filter(group => {
       const match = [group.username, group.fullName, ...group.accounts.map(a => a.server)].some(value => value.toLowerCase().includes(search.toLowerCase()));
-      const selected = filter === 'all' || group.accounts.some(a => filter === 'sudo' ? !!a.is_sudo : filter === 'disabled' ? !!a.is_disabled : !a.is_disabled);
-      return match && selected;
+      return match;
     }).sort((a, b) => a.username.localeCompare(b.username, undefined, { numeric: true }));
   }, [data.users, search, filter, host]);
   const pages = Math.max(1, Math.ceil(groups.length / pageSize));
@@ -99,7 +99,7 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
     {data.servers.some(s => s.enabled && ['error', 'failed'].includes(s.last_scan_status || '')) && <Alert color="orange" mb="md">{t("Some servers could not sync. Their displayed accounts may be out of date. Sync those servers before making further changes.")}</Alert>}
     <Group className="filter-toolbar" mb="lg" justify="space-between" gap="sm">
       <TextInput leftSection={<IconSearch size={16} />} placeholder={t("Search a user or host")} value={search} onChange={e => { setSearch(e.currentTarget.value); setPage(1); }} w={{ base: '100%', sm: 290 }} />
-      <Select aria-label={t("Filter by server")} value={host} allowDeselect={false} onChange={value => { setHost(value); setPage(1); }} data={[{ value: 'all', label: t("All servers") }, ...data.servers.map(s => ({ value: s.name, label: s.name }))]} /><SegmentedControl value={filter} onChange={value => { setFilter(value); setPage(1); }} data={[t("Enabled"), t("Sudo"), t("Disabled"), t("All")].map(label => ({ label, value: label.toLowerCase() }))} />
+      <Select aria-label={t("Filter by server")} value={host} allowDeselect={false} onChange={value => { setHost(value); setPage(1); }} data={[{ value: 'all', label: t("All servers") }, ...data.servers.map(s => ({ value: s.name, label: s.name }))]} /><SegmentedControl value={filter} onChange={value => { setFilter(value as UserFilter); setPage(1); }} data={[{ value: 'enabled', label: t("Enabled") }, { value: 'sudo', label: t("Sudo") }, { value: 'disabled', label: t("Disabled") }, { value: 'all', label: t("All") }]} />
     </Group>
     <Card withBorder radius="lg" p={0}>
       <Box p="lg"><Title order={3}>{t("Server users")}</Title></Box>
