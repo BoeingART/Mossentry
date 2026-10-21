@@ -301,6 +301,8 @@ i.cyan { background: #80deea; }
 .access-gauge { position: relative; width: min(100%, 330px); margin: auto; }
 .access-gauge svg { display: block; width: 100%; }
 .access-gauge-total { position: absolute; inset: 47% 0 11%; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.access-gauge-ratio { display: flex; align-items: baseline; gap: 3px; }
+.access-gauge-ratio > span { font-size: var(--text-body); }
 .access-gauge-total strong { font-size: var(--text-display); font-weight: 600; letter-spacing: -.6px; }
 .access-gauge-total span { color: var(--muted); font-size: var(--text-caption); }
 .access-gauge-legend { display: flex; gap: 12px 18px; flex-wrap: wrap; justify-content: center; margin: 16px 0 8px; font-size: var(--text-caption); }

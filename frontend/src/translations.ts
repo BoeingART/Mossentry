@@ -1,5 +1,7 @@
 // English source messages map to Simplified Chinese. User and server data are never translated.
 export const zh: Record<string, string> = {
+  "Sudo access": "Sudo权限",
+  "Sudo users": "Sudo用户",
   "User number": "用户数量",
   "Check the server settings and try again.": "请检查服务器设置后重试。",
   "Check the operation settings and try again.": "请检查操作设置后重试。",
@@ -229,7 +231,6 @@ export const zh: Record<string, string> = {
   "dated": "个已知日期",
   "Access overview": "权限概览",
   "Total unique users": "独立用户总数",
-  "Sudo access": "Sudo 权限",
   "Standard": "普通",
   "No requests yet": "暂无请求",
   "Refresh dashboard": "刷新概览",

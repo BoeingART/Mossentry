@@ -78,16 +78,15 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
 function AccessOverview({ data }: { data: Dashboard }) {
   const { total, sudo, standard } = accessCounts(data.users);
   return <section className="dashboard-panel access-panel" aria-labelledby="access-overview-title">
-    <div className="dashboard-panel-heading"><div><Title order={3} id="access-overview-title">{t("Access overview")}</Title></div><span className="dashboard-small-icon"><IconShieldCheck size={19} /></span></div>
+    <div className="dashboard-panel-heading"><div><Title order={3} id="access-overview-title">{t("Sudo access")}</Title></div><span className="dashboard-small-icon"><IconShieldCheck size={19} /></span></div>
     <div className="access-gauge">
       <svg viewBox="0 0 200 118" role="img" aria-label={t("{0} users with sudo access, {1} standard users", { 0: sudo, 1: standard })}>
         <path d="M 13 100 A 87 87 0 0 1 187 100" stroke="var(--surface-soft)" strokeWidth={7} fill="none" />
         <path d="M 28 100 A 72 72 0 0 1 172 100" stroke={total ? '#80deea' : 'var(--line)'} strokeWidth={17} fill="none" />
         {total > 0 && <path d="M 28 100 A 72 72 0 0 1 172 100" pathLength={100} stroke="#009688" strokeWidth={17} fill="none" strokeDasharray={`${sudo / total * 100} 100`} />}
       </svg>
-      <div className="access-gauge-total"><span>{t("Total unique users")}</span><strong>{count(total)}</strong></div>
+      <div className="access-gauge-total"><span>{t("Sudo users")}</span><div className="access-gauge-ratio"><strong>{count(sudo)}</strong><span>/{count(total)}</span></div></div>
     </div>
-    <div className="access-gauge-legend"><span><i className="teal" />{t("Sudo access")} <b>{count(sudo)}</b></span><span><i className="cyan" />{t("Standard")} <b>{count(standard)}</b></span></div>
   </section>;
 }
 
