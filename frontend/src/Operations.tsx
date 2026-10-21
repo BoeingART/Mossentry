@@ -36,7 +36,6 @@ function OutputDiagnostics({ diagnostics }: { diagnostics: OutputDiagnostic[] })
       {diagnostics.map(item => <Stack key={`${item.stream}-${item.code}`} gap={4}>
         <Text size="sm" fw={500}>{t(item.summary)}</Text>
         {item.matches.map(match => <div key={match.line}>
-          <Text size="xs" c="dimmed">{item.stream} · {t('Line {0}', { 0: match.line })}</Text>
           <Code block className="operation-output">{match.text}</Code>
           {match.truncated && <Text size="xs">{t('Log excerpt truncated; see the captured output below.')}</Text>}
         </div>)}
@@ -196,7 +195,6 @@ export default function Operations({ servers }: { servers: Server[] }) {
       <Group justify="space-between"><Group gap="sm"><IconTerminal2 size={20} /><Title order={3}>#{job.id} {t(labels[job.operation] || job.operation)}</Title><Text size="xs" c="dimmed">{date(job.created_at)}</Text><Badge color={color(job.status)}>{t(statusLabels[job.status] || job.status)}</Badge>{job.payload.elevated && <Badge variant="light">sudo</Badge>}</Group><Group><Button size="xs" variant="default" onClick={() => void saveJson(job, `mossentry-task-${job.id}.json`).catch(cause => setError(cause instanceof Error ? cause.message : String(cause)))}>{t('Export results')}</Button><Button size="xs" variant="light" color="red" disabled={running || busy} onClick={() => setRemove(true)}>{t('Delete saved task')}</Button></Group></Group>
       {job.payload.unit && <Text size="sm">{job.payload.unit}</Text>}
       {job.payload.command && <Code block className="operation-output">{job.payload.command}</Code>}
-      {!['dry_run', 'inspect', 'services', 'logs'].includes(job.operation) && ['failed', 'partial', 'interrupted'].includes(job.status) && <Alert color="orange">{t('Remote changes may have taken effect. Check the server before retrying; tasks are never retried automatically.')}</Alert>}
       <Warnings warnings={[...new Set(job.results.flatMap(item => item.result?.risk_warnings || []))]} />
       <div className="operation-server-list">{job.results.map(result => <ServerResult key={`${job.id}-${result.server_name}`} result={result} />)}</div>
     </Stack></Card>}
