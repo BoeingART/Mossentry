@@ -7,7 +7,10 @@ const { homedir } = require('node:os');
 const [tool, ...args] = process.argv.slice(2);
 const env = { ...process.env };
 const cargoBin = join(process.env.CARGO_HOME || join(homedir(), '.cargo'), 'bin');
-env.PATH = `${cargoBin}${delimiter}${env.PATH || ''}`;
+// Windows commonly spells this key "Path". Spreading process.env produces a
+// case-sensitive object; creating a second "PATH" can discard all system tools.
+const pathKey = Object.keys(env).find(key => key.toLowerCase() === 'path') || 'PATH';
+env[pathKey] = `${cargoBin}${delimiter}${env[pathKey] || ''}`;
 if (process.platform === 'darwin' && !env.DEVELOPER_DIR) {
   const current = spawnSync('cc', ['--version'], { env, stdio: 'ignore' });
   const cli = '/Library/Developer/CommandLineTools';
