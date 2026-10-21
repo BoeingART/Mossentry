@@ -19,8 +19,14 @@ const color = (status: string) => status === 'completed_with_warnings' ? 'yellow
 const date = (value: string) => numericDate(value, { includeTime: true });
 const errorMessage = (cause: unknown) => cause instanceof Error ? cause.message : t('Operation failed');
 
+function RiskText({ warning }: { warning: string }) {
+  const text = t(warning);
+  const lead = text.match(/^.+?(?=可能|可以|无法| may | can | cannot )/)?.[0];
+  return lead ? <><strong>{lead}</strong>{text.slice(lead.length)}</> : <>{text}</>;
+}
+
 function Warnings({ warnings }: { warnings: string[] }) {
-  return warnings.length > 0 && <Alert color="orange" icon={<IconAlertTriangle size={18} />} title={t('Command warnings')}><Stack gap={4}>{warnings.map(warning => <Text key={warning} size="sm">{t(warning)}</Text>)}</Stack></Alert>;
+  return warnings.length > 0 && <Alert color="orange" icon={<IconAlertTriangle size={18} />} title={t('Command warnings')}><Stack gap={4}>{warnings.map(warning => <Text key={warning} size="sm"><RiskText warning={warning} /></Text>)}</Stack></Alert>;
 }
 
 function OutputDiagnostics({ diagnostics }: { diagnostics: OutputDiagnostic[] }) {
@@ -93,7 +99,6 @@ export default function Operations({ servers }: { servers: Server[] }) {
   const [review, setReview] = useState<{ key: string; warnings: string[] } | null>(null);
   const [submittedId, setSubmittedId] = useState<number | null>(null);
   const [confirm, setConfirm] = useState(false);
-  const [acknowledged, setAcknowledged] = useState(false);
   const [remove, setRemove] = useState(false);
   const [revision, setRevision] = useState(0);
   const eligible = servers.filter(s => s.enabled);
@@ -106,9 +111,9 @@ export default function Operations({ servers }: { servers: Server[] }) {
   const warnings = review?.key === formKey ? review.warnings : [];
   const valid = selected.length > 0 && selected.every(name => eligible.some(s => s.name === name)) && command.trim().length > 0 && Number(timeout) >= 10 && Number(timeout) <= 3600;
 
-  // A risk acknowledgement only applies to the form shown in the review.
+  // Confirmation applies only to the form shown in the review.
   useEffect(() => {
-    setReview(null); setAcknowledged(false); setConfirm(false);
+    setReview(null); setConfirm(false);
   }, [formKey]);
 
   useEffect(() => {
@@ -136,7 +141,7 @@ export default function Operations({ servers }: { servers: Server[] }) {
   }, [page, jobId, submittedId, revision]);
 
   async function reviewCommand() {
-    setBusy(true); setError(''); setAcknowledged(false);
+    setBusy(true); setError('');
     try {
       const result = await api<{ warnings: string[] }>('/api/operations/review', 'POST', { servers: selected, operation: 'command', command, timeout: Number(timeout), elevated });
       setReview({ key: formKey, warnings: result.warnings }); setConfirm(true);
@@ -146,7 +151,7 @@ export default function Operations({ servers }: { servers: Server[] }) {
   async function start(operation: 'dry_run' | 'command') {
     setBusy(true); setError('');
     try {
-      const result = await api<{ id: number }>('/api/operations', 'POST', { servers: selected, operation, command, timeout: Number(timeout), elevated, risk_acknowledged: acknowledged });
+      const result = await api<{ id: number }>('/api/operations', 'POST', { servers: selected, operation, command, timeout: Number(timeout), elevated, risk_acknowledged: operation === 'command' });
       setSubmittedId(result.id);
       setJob(null); setJobId(result.id); setConfirm(false); setPage(1); setRevision(v => v + 1);
     } catch (cause) { setError(errorMessage(cause)); }
@@ -199,12 +204,10 @@ export default function Operations({ servers }: { servers: Server[] }) {
     <Modal opened={confirm} onClose={() => !busy && setConfirm(false)} title={t('Review and run')} centered size="lg"><Stack>
       <Code block className="operation-output">{command}</Code>
       <Text size="sm">{t('Target servers')}: {selected.join(', ')}</Text>
-      <Text size="sm">{t(elevated ? 'Run with sudo' : 'Run as the SSH login account')} · {Number(timeout)} {t('seconds per server')}</Text>
-      <Text size="sm">{t('This changes the selected servers immediately. Failed or interrupted tasks are never retried automatically.')}</Text>
+      <Text size="sm">{t(elevated ? 'Commands will run with sudo.' : 'Commands will run as the SSH login account.')}</Text>
       <Warnings warnings={warnings} />
-      {warnings.length > 0 && <Checkbox label={t('I understand these risks and want to execute this command.')} checked={acknowledged} onChange={e => setAcknowledged(e.currentTarget.checked)} />}
       {error && <Alert color="red">{t(error)}</Alert>}
-      <Button color={warnings.length ? 'orange' : 'teal'} loading={busy} disabled={running || !valid || review?.key !== formKey || (warnings.length > 0 && !acknowledged)} onClick={() => void start('command')}>{t('Confirm and run')}</Button>
+      <Button color={warnings.length ? 'orange' : 'teal'} loading={busy} disabled={running || !valid || review?.key !== formKey} onClick={() => void start('command')}>{t('Confirm and run')}</Button>
     </Stack></Modal>
     <Modal opened={remove} onClose={() => !busy && setRemove(false)} title={t('Delete saved task')} centered><Stack><Text>{t('Remove this task and its saved results from local history? The audit trail is kept.')}</Text><Button color="red" loading={busy} onClick={() => void deleteJob()}>{t('Delete')}</Button></Stack></Modal>
   </Stack>;
