@@ -12,6 +12,7 @@ coverage/
 # Historical packaging output locations
 /build/
 /release/
+/release-stage/
 /*.dmg
 /*.exe
 /*.zip

@@ -13,6 +13,7 @@ Mossentry is a Rust desktop application for managing Linux servers over SSH. The
 - **Operations**: multiline Bash editing, optional syntax checks, risk review, sudo, per-server timeouts, output diagnostics and saved task history with JSON export.
 - **Monitoring**: CPU, NVIDIA GPU, memory, network and disk usage. Charts scroll over five minutes with fixed minute ticks and name-only legends. Disks sort by capacity and display media type and software RAID level when the host exposes them.
 - **Appearance**: English/Simplified Chinese and persistent light/dark preferences, using system fonts.
+- **Updates**: checks GitHub Releases at startup and every ten minutes. A newer version reveals the top-right Update button and downloads a signed package in the background; click when ready to install and restart. See [release setup](docs/UPDATES.md).
 
 ## Run from source
 

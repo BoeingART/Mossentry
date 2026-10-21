@@ -19,6 +19,20 @@ export const en: Record<string, string> = {
 
 // English source messages map to Simplified Chinese. User and server data are never translated.
 export const zh: Record<string, string> = {
+  "Update": "更新",
+  "Update · downloading": "更新 · 下载中",
+  "Update · {0}%": "更新 · {0}%",
+  "Updating…": "正在更新…",
+  "Retry update": "重试更新",
+  "Downloading Mossentry {0} in the background": "正在后台下载 Mossentry {0}",
+  "Installing the update and restarting Mossentry…": "正在安装更新并重启 Mossentry…",
+  "Mossentry {0} is ready. Click to install and restart.": "Mossentry {0} 已下载，点击安装并重启。",
+  "Click to retry.": "点击重试。",
+  "Could not download or verify the update. Please retry.": "更新下载或校验失败，请重试。",
+  "Could not install the update. Please retry.": "更新安装失败，请重试。",
+  "Could not prepare the update. Restart Mossentry and retry.": "更新准备失败，请重启 Mossentry 后重试。",
+  "Could not update Mossentry. Please retry.": "Mossentry 更新失败，请重试。",
+  "Another server operation is running. Wait for it to finish and retry": "另一个服务器操作正在进行，请等待完成后重试。",
   "Sudo users:": "Sudo用户：",
   "In approval list": "已加入审批",
   "Add to approval list": "加入审批清单",

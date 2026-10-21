@@ -97,12 +97,17 @@ pub fn run() {
                     let _ = w.set_focus();
                 }
             }))
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .manage(crate::updates::UpdateState::default())
             .invoke_handler(tauri::generate_handler![
                 request,
                 get_appearance,
                 set_appearance,
                 download_credentials,
-                save_json
+                save_json,
+                crate::updates::check_update,
+                crate::updates::download_update,
+                crate::updates::install_update
             ])
             .setup(|app| {
                 app.manage(Service::open(

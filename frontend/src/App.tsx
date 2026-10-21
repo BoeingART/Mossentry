@@ -29,6 +29,7 @@ import { flyToApprovals } from './approvalMotion';
 import ResourceMonitor from './ResourceMonitor';
 import DashboardPage from './DashboardPage';
 import AppearanceControls from './AppearanceControls';
+import UpdateButton from './UpdateButton';
 
 type View = 'operations' | 'dashboard' | 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
 type UserAction = 'disable_user' | 'enable_user' | 'set_sudo' | 'delete_user';
@@ -332,6 +333,7 @@ export default function App() {
           </ActionIcon>
         </Tooltip>
         <div className="topbar-actions">
+          <UpdateButton />
           <Tooltip label={pending ? t("{0} requests awaiting approval", { 0: pending }) : t("View approvals")}><ActionIcon data-approval-bell className="approval-bell" variant="subtle" color="gray" size="lg" aria-label={t("View pending approvals")} onClick={() => navigate('approvals')}><IconBell size={20} stroke={1.5} />{pending > 0 && <span className="notification-dot" />}</ActionIcon></Tooltip>
           <AppearanceControls />
         </div>

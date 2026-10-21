@@ -10,6 +10,12 @@ Use the Apple Silicon or Intel DMG matching your Mac, then drag Mossentry to App
 
 Use the x64 NSIS installer on Windows 10/11. Tauri uses Microsoft WebView2; the installer can bootstrap it if missing. No WSL, Python, Ansible or OpenSSH installation is required. Private-key paths may use `C:\Users\yourname\.ssh\id_ed25519`; host keys are read from `%USERPROFILE%\.ssh\known_hosts`. Passphrase-encrypted SSH keys are not supported.
 
+## In-app updates
+
+The Rust edition checks the latest stable GitHub Release on launch, every ten minutes and when the network reconnects. The top-right **Update / 更新** button appears only when a higher version is available for your platform, and the signed package downloads automatically. The button shows download progress, then installs and restarts Mossentry when clicked. Local configuration and data remain in their existing directory. Finish running server operations before applying an update; installation is blocked while an operation is active. Download and installation failures can be retried from the same button.
+
+Automatic updates require a release containing `latest.json` and signed updater packages. The historical Electron v0.1.0 release cannot gain this feature remotely; install the first Rust release with update support manually. Development runs do not check or install updates. Release maintainers should follow [UPDATES.md](UPDATES.md).
+
 ## Existing data
 
 The application reuses the existing Mossentry or legacy application data directory and `mossentry.db` / `server_manager.db` in place, including WAL sidecars, saved sudo passwords, pending requests, credential archives, profiles and operation history. Quit the Electron build before opening the Rust build. The Rust instance lock does not protect against the older Electron application.

@@ -10,3 +10,5 @@ pub mod model;
 pub mod operations;
 pub mod service;
 pub mod ssh;
+#[cfg(feature = "desktop")]
+pub mod updates;

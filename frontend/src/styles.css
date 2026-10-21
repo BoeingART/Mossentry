@@ -54,6 +54,8 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .topbar button, .topbar input, .topbar .mantine-Select-root { -webkit-app-region: no-drag; }
 .topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; -webkit-app-region: no-drag; }
 .topbar-actions .mantine-ActionIcon-root { color: var(--secondary); }
+.update-control { display: inline-flex; align-items: center; }
+.update-button { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .approval-bell { position: relative; }
 .notification-dot { width: 6px; height: 6px; border-radius: 50%; background: #009688; position: absolute; top: 5px; right: 6px; border: 1px solid #fff; }
 .navigation-toggle { flex-shrink: 0; }
