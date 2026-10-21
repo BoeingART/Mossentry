@@ -90,7 +90,7 @@ function AccessOverview({ data }: { data: Dashboard }) {
         <path d="M 28 100 A 72 72 0 0 1 172 100" stroke={total ? '#80deea' : 'var(--line)'} strokeWidth={17} fill="none" />
         {total > 0 && <path d="M 28 100 A 72 72 0 0 1 172 100" pathLength={100} stroke="#009688" strokeWidth={17} fill="none" strokeDasharray={`${sudo / total * 100} 100`} />}
       </svg>
-      <div className="access-gauge-total"><span>{t("Sudo users")}</span><div className="access-gauge-ratio"><strong>{count(sudo)}</strong><span>/{count(total)}</span></div></div>
+      <div className="access-gauge-total"><div className="access-gauge-ratio"><span>{t("Sudo users:")}</span><strong>{count(sudo)}</strong><span>/{count(total)}</span></div></div>
     </div>
   </section>;
 }
