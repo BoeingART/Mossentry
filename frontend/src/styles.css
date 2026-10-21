@@ -417,3 +417,5 @@ i.cyan { background: #80deea; }
 .window-controls button:last-child:hover { background: #c42b1c; color: white; }
 
 .dashboard-server-table th:last-child, .dashboard-server-table td:last-child { padding-right: 8px; }
+
+.approval-flight { position: fixed; z-index: 10000; display: inline-flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; white-space: nowrap; border-radius: var(--mantine-radius-sm); background: var(--mantine-primary-color-filled); color: white; box-shadow: 0 6px 18px #00968833; font-size: var(--text-control); transform-origin: center; will-change: transform, opacity; }

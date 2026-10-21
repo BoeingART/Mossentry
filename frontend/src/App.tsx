@@ -4,7 +4,7 @@ import WindowControls from './WindowControls';
 import { numericDate } from './dateFormat';
 import { t, useLanguage } from './i18n';
 import brandIcon from '../../icon.svg';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type * as React from 'react';
 import {
   ActionIcon, Alert, AppShell, Avatar, Badge, Box, Burger, Button, Card, Center, Checkbox,
@@ -25,6 +25,7 @@ import type { Action, Dashboard, Server, User } from './types';
 import Servers from './Servers';
 import Operations from './Operations';
 import { approvalLists, type ApprovalList } from './approvalData';
+import { flyToApprovals } from './approvalMotion';
 import ResourceMonitor from './ResourceMonitor';
 import DashboardPage from './DashboardPage';
 import AppearanceControls from './AppearanceControls';
@@ -78,7 +79,7 @@ function SectionHeading({ title, action }: { title: string; action?: React.React
   </Group>;
 }
 
-function Users({ data, openRequest, openProfile }: { data: Dashboard; openRequest: (draft: RequestDraft) => void; openProfile: (username: string, fullName: string) => void }) {
+function Users({ data, openRequest, openProfile }: { data: Dashboard; openRequest: (draft: RequestDraft, source?: HTMLElement) => void; openProfile: (username: string, fullName: string) => void }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<UserFilter>('enabled');
   const [host, setHost] = useState<string | null>('all');
@@ -118,10 +119,12 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
         <ScrollArea><Table striped highlightOnHover miw={650} verticalSpacing="sm" horizontalSpacing="lg"><Table.Thead><Table.Tr><Table.Th>{t("Host")}</Table.Th><Table.Th>{t("Access")}</Table.Th><Table.Th>{t("Sign-in")}</Table.Th><Table.Th>{t("Actions")}</Table.Th></Table.Tr></Table.Thead><Table.Tbody>
           {group.accounts.map(account => {
             const server = data.servers.find(s => s.name === account.server);
+            const pending = (type: UserAction) => data.actions.some(action => action.status === 'pending' && action.action_type === type && action.target_user === account.username && action.payload.servers?.includes(account.server));
+            const accessAction = account.is_disabled ? 'enable_user' : 'disable_user';
             const protectedAccount = !['srvmgr', 'sync'].includes(account.username) && (account.uid < 1000 || ['root', 'nobody', server?.ssh_user].includes(account.username));
             return <Table.Tr key={`${account.server}:${account.username}`}>
             <Table.Td><Badge variant="light" color="blue">{account.server}</Badge></Table.Td><Table.Td><Badge variant="light" color={account.is_sudo ? 'orange' : 'gray'}>{account.is_sudo ? t("Sudo") : t("Standard")}</Badge></Table.Td><Table.Td><Badge variant="light" color={account.is_disabled ? 'red' : 'teal'}>{account.is_disabled ? t("Disabled") : t("Enabled")}</Badge></Table.Td>
-            <Table.Td>{protectedAccount ? <Text size="xs" c="dimmed">{t("Protected account")}</Text> : !server?.enabled ? <Text size="xs" c="dimmed">{t("Server paused")}</Text> : <Group className="account-actions" gap="xs" wrap="nowrap"><Button size="compact-xs" variant="light" color={account.is_disabled ? 'teal' : 'orange'} onClick={() => openRequest({ mode: account.is_disabled ? 'enable_user' : 'disable_user', username: account.username, server: account.server, sudo: false })}>{account.is_disabled ? t("Enable") : t("Disable")}</Button><Button size="compact-xs" variant="light" onClick={() => openRequest({ mode: 'set_sudo', username: account.username, server: account.server, sudo: !account.is_sudo })}>{account.is_sudo ? t("Revoke sudo") : t("Grant sudo")}</Button><Button size="compact-xs" color="red" variant="light" onClick={() => openRequest({ mode: 'delete_user', username: account.username, server: account.server, sudo: false })}>{t("Delete")}</Button></Group>}</Table.Td>
+            <Table.Td>{protectedAccount ? <Text size="xs" c="dimmed">{t("Protected account")}</Text> : !server?.enabled ? <Text size="xs" c="dimmed">{t("Server paused")}</Text> : <Group className="account-actions" gap="xs" wrap="nowrap"><Button size="compact-xs" disabled={pending(accessAction)} variant="light" color={account.is_disabled ? 'teal' : 'orange'} onClick={e => openRequest({ mode: account.is_disabled ? 'enable_user' : 'disable_user', username: account.username, server: account.server, sudo: false }, e.currentTarget)}>{pending(accessAction) ? t("In approval list") : account.is_disabled ? t("Enable") : t("Disable")}</Button><Button size="compact-xs" disabled={pending('set_sudo')} variant="light" onClick={e => openRequest({ mode: 'set_sudo', username: account.username, server: account.server, sudo: !account.is_sudo }, e.currentTarget)}>{pending('set_sudo') ? t("In approval list") : account.is_sudo ? t("Revoke sudo") : t("Grant sudo")}</Button><Button size="compact-xs" disabled={pending('delete_user')} color="red" variant="light" onClick={e => openRequest({ mode: 'delete_user', username: account.username, server: account.server, sudo: false }, e.currentTarget)}>{pending('delete_user') ? t("In approval list") : t("Delete")}</Button></Group>}</Table.Td>
           </Table.Tr>; })}
         </Table.Tbody></Table></ScrollArea>
       </details>) : <Empty text={t("No users match your search")} />}
@@ -177,34 +180,30 @@ function RequestModal({ draft, servers, close, saved }: { draft: RequestDraft | 
   const [fullName, setFullName] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [sudo, setSudo] = useState(false);
-  const [deleteName, setDeleteName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { if (draft) { setUsername(draft.username); setFullName(''); setSelected(draft.server ? [draft.server] : []); setSudo(draft.sudo); setDeleteName(''); setError(''); } }, [draft]);
+  useEffect(() => { if (draft) { setUsername(''); setFullName(''); setSelected([]); setSudo(false); setError(''); } }, [draft]);
   if (!draft) return null;
-  const create = draft.mode === 'create_user';
-  async function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError('');
     if (!selected.length) { setError(t("Select at least one host")); return; }
-    if (draft?.mode === 'delete_user' && deleteName !== username) { setError(t("Type the username to confirm deletion")); return; }
+    const button = event.currentTarget.querySelector<HTMLElement>('button[type="submit"]');
     setBusy(true);
     try {
-      if (create) await api('/api/actions/create-user', 'POST', { username, full_name: fullName, servers: selected, sudo });
-      else await api('/api/actions/user', 'POST', { username, servers: selected, action: draft!.mode, ...(draft!.mode === 'set_sudo' ? { sudo } : {}) });
-      close(); notify(t("Request submitted for approval")); await saved();
+      await api('/api/actions/create-user', 'POST', { username, full_name: fullName, servers: selected, sudo });
+      if (button) flyToApprovals(button);
+      close(); await saved();
     } catch (cause) { setError(message(cause)); }
     finally { setBusy(false); }
   }
-  return <Modal opened onClose={() => !busy && close()} closeOnClickOutside={!busy} closeOnEscape={!busy} title={create ? t("New user") : t(actionLabels[draft.mode])} centered radius="lg">
+  return <Modal opened onClose={() => !busy && close()} closeOnClickOutside={!busy} closeOnEscape={!busy} title={t("New user")} centered radius="lg">
     <form onSubmit={submit}><Stack gap="md">
-      {create ? <><TextInput label={t("Linux username")} placeholder={t("e.g. alex")} value={username} onChange={e => setUsername(e.currentTarget.value)} pattern="[a-z_][a-z0-9_-]{0,31}" required /><TextInput label={t("Name or note (optional)")} placeholder={t("e.g. Alex Morgan · Research")} value={fullName} onChange={e => setFullName(e.currentTarget.value)} maxLength={100} />
-        <Checkbox.Group label={t("Allowed hosts")} value={selected} onChange={setSelected}><SimpleGrid cols={2} mt="sm">{servers.filter(s => s.enabled).map(server => <Checkbox key={server.id} value={server.name} label={server.name.toUpperCase()} />)}</SimpleGrid></Checkbox.Group>
-        <Switch label={t("Grant sudo access")} checked={sudo} onChange={e => setSudo(e.currentTarget.checked)} />
-        <Alert color="blue" variant="light" icon={<IconKey size={17} />}>{t("Approval generates an Ed25519 key. Credentials can be downloaded once; share them through a secure channel.")}</Alert>
-      </> : <><Paper withBorder p="sm"><Text size="xs" c="dimmed">{t("Linux user")}</Text><Text fw={700}>{username}</Text></Paper><Paper withBorder p="sm"><Text size="xs" c="dimmed">{t("Target host")}</Text><Text fw={700}>{draft.server?.toUpperCase()}</Text></Paper>{draft.mode === 'set_sudo' && <Text size="sm">{t("This request will")} {sudo ? t('grant') : t('revoke')} {t("sudo access.")}</Text>}</>}
-      {draft.mode === 'delete_user' && <><Alert color="red">{t("This removes the account from")} {draft.server}{t(". Its home directory and files will be kept. End running sessions first. Deletion runs after approval.")}</Alert><TextInput label={t("Type {0} to confirm", { 0: username })} value={deleteName} onChange={e => setDeleteName(e.currentTarget.value)} required /></>}
+      <TextInput label={t("Linux username")} placeholder={t("e.g. alex")} value={username} onChange={e => setUsername(e.currentTarget.value)} pattern="[a-z_][a-z0-9_-]{0,31}" required />
+      <TextInput label={t("Name or note (optional)")} value={fullName} onChange={e => setFullName(e.currentTarget.value)} maxLength={100} />
+      <Checkbox.Group label={t("Allowed hosts")} value={selected} onChange={setSelected}><SimpleGrid cols={2} mt="sm">{servers.filter(server => server.enabled).map(server => <Checkbox key={server.id} value={server.name} label={server.name.toUpperCase()} />)}</SimpleGrid></Checkbox.Group>
+      <Switch label={t("Grant sudo access")} checked={sudo} onChange={e => setSudo(e.currentTarget.checked)} />
       {error && <Alert color="red" role="alert">{t(error)}</Alert>}
-      <Group justify="end"><Button variant="default" disabled={busy} onClick={close}>{t("Cancel")}</Button><Button type="submit" color={draft.mode === 'delete_user' ? 'red' : 'blue'} disabled={!selected.length || (draft.mode === 'delete_user' && deleteName !== username)} loading={busy}>{create ? t("Submit for approval") : t("Submit request")}</Button></Group>
+      <Group justify="end"><Button variant="default" disabled={busy} onClick={close}>{t("Cancel")}</Button><Button type="submit" disabled={!selected.length} loading={busy}>{t("Add to approval list")}</Button></Group>
     </Stack></form>
   </Modal>;
 }
@@ -239,6 +238,8 @@ export default function App() {
   const compactSidebar = desktopLayout && sidebarCollapsed;
   const [monitorServerId, setMonitorServerId] = useState<number | null>(null);
   const [request, setRequest] = useState<RequestDraft | null>(null);
+  const queueChain = useRef(Promise.resolve());
+  const adding = useRef(new Set<string>());
   const [profile, setProfile] = useState<{ username: string; fullName: string } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmDraft | null>(null);
   const [busy, setBusy] = useState(false);
@@ -259,6 +260,22 @@ export default function App() {
     return () => clearInterval(timer);
   }, [data?.actions, refresh]);
 
+  function userRequest(draft: RequestDraft, source?: HTMLElement) {
+    if (draft.mode === 'create_user') { setRequest(draft); return; }
+    const key = JSON.stringify([draft.mode, draft.username, draft.server, draft.sudo]);
+    if (adding.current.has(key)) return;
+    adding.current.add(key);
+    // Rapid clicks enter one serial queue so the local operation lock cannot
+    // discard a second click while the first item is being persisted.
+    queueChain.current = queueChain.current.catch(() => {}).then(async () => {
+      try {
+        await api('/api/actions/user', 'POST', { username: draft.username, servers: [draft.server], action: draft.mode, ...(draft.mode === 'set_sudo' ? { sudo: draft.sudo } : {}) });
+        if (source) flyToApprovals(source);
+        await refresh();
+      } catch (cause) { notify(message(cause), true); }
+      finally { adding.current.delete(key); }
+    });
+  }
   function approvalConfirm(list: ApprovalList, kind: 'approve' | 'reject') {
     const count = list.items.filter(item => item.status === 'pending').length;
     setConfirm({ reject: kind === 'reject', title: t(kind === 'approve' ? "Approve this list?" : "Reject this list?"),
@@ -315,7 +332,7 @@ export default function App() {
           </ActionIcon>
         </Tooltip>
         <div className="topbar-actions">
-          <Tooltip label={pending ? t("{0} requests awaiting approval", { 0: pending }) : t("View approvals")}><ActionIcon className="approval-bell" variant="subtle" color="gray" size="lg" aria-label={t("View pending approvals")} onClick={() => navigate('approvals')}><IconBell size={20} stroke={1.5} />{pending > 0 && <span className="notification-dot" />}</ActionIcon></Tooltip>
+          <Tooltip label={pending ? t("{0} requests awaiting approval", { 0: pending }) : t("View approvals")}><ActionIcon data-approval-bell className="approval-bell" variant="subtle" color="gray" size="lg" aria-label={t("View pending approvals")} onClick={() => navigate('approvals')}><IconBell size={20} stroke={1.5} />{pending > 0 && <span className="notification-dot" />}</ActionIcon></Tooltip>
           <AppearanceControls />
         </div>
       </div>
@@ -326,7 +343,7 @@ export default function App() {
         <Stack component="nav" aria-label={t("Main navigation")} gap={7}>{nav.map(item => <div key={item.id}>
           {item.id === 'users' && <span className="nav-section-label nav-section-divider" aria-hidden={compactSidebar}>{t("Administration")}</span>}
           <Tooltip label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} position="right" disabled={!compactSidebar} events={{ hover: true, focus: true, touch: false }}>
-            <button type="button" aria-label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} aria-current={view === item.id || (view === 'monitor' && item.id === 'overview') ? 'page' : undefined} className={`nav-button ${view === item.id || (view === 'monitor' && item.id === 'overview') ? 'active' : ''}`} onClick={() => navigate(item.id)}><span className="nav-icon">{item.icon}</span><span className="nav-label" aria-hidden={compactSidebar}>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge className="nav-badge" aria-hidden size="sm" color={view === 'approvals' ? 'gray' : 'teal'} variant="light" circle ml="auto">{pending}</Badge>}</button>
+            <button type="button" data-approval-target={item.id === 'approvals' || undefined} aria-label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} aria-current={view === item.id || (view === 'monitor' && item.id === 'overview') ? 'page' : undefined} className={`nav-button ${view === item.id || (view === 'monitor' && item.id === 'overview') ? 'active' : ''}`} onClick={() => navigate(item.id)}><span className="nav-icon">{item.icon}</span><span className="nav-label" aria-hidden={compactSidebar}>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge className="nav-badge" aria-hidden size="sm" color={view === 'approvals' ? 'gray' : 'teal'} variant="light" circle ml="auto">{pending}</Badge>}</button>
           </Tooltip>
         </div>)}</Stack>
       </ScrollArea>
@@ -343,7 +360,7 @@ export default function App() {
       {view === 'overview' && <Servers data={data} saved={refresh} monitor={server => { setMonitorServerId(server.id); setView('monitor'); }} />}
       {view === 'monitor' && <ResourceMonitor data={data} serverId={monitorServerId} selectServer={setMonitorServerId} />}
       {view === 'operations' && <Operations servers={data.servers} />}
-      {view === 'users' && <Users data={data} openRequest={setRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}
+      {view === 'users' && <Users data={data} openRequest={userRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}
       {view === 'approvals' && <Approvals data={data} run={approvalConfirm} busy={busy} saved={refresh} download={action => void download(action)} />}
       {view === 'audit' && <AuditLog data={data} />}
     </main></ScrollArea></AppShell.Main>

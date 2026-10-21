@@ -19,6 +19,8 @@ export const en: Record<string, string> = {
 
 // English source messages map to Simplified Chinese. User and server data are never translated.
 export const zh: Record<string, string> = {
+  "In approval list": "已加入审批",
+  "Add to approval list": "加入审批清单",
   "Approval list #{0}": "审批清单#{0}",
   "{0} operations": "{0}项操作",
   "Reject list": "拒绝清单",
