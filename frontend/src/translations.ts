@@ -1,5 +1,6 @@
 // English source messages map to Simplified Chinese. User and server data are never translated.
 export const zh: Record<string, string> = {
+  "Enabled / Total: {0}/{1}": "已启用/总数：{0}/{1}",
   "Sudo access": "Sudo权限",
   "Sudo users": "Sudo用户",
   "User number": "用户数量",
