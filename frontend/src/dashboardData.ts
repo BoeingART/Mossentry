@@ -20,10 +20,12 @@ export function growthWindow(history: HistoryPoint[], through: string, range: st
   const end = dateTime(through);
   const first = history.length ? dateTime(history[0].date) - DAY : end - 30 * DAY;
   const start = range === 'all' ? Math.min(first, end - DAY) : end - Number(range) * DAY;
-  const points = [{ time: start, total: totalAt(history, start) },
-    ...history.filter(point => dateTime(point.date) > start && dateTime(point.date) <= end)
-      .map(point => ({ time: dateTime(point.date), total: point.total }))];
-  if (points.at(-1)!.time < end) points.push({ time: end, total: totalAt(history, end) });
+  // Daily vertices make the inspection marker an exact point on the curve.
+  // Counts remain cumulative integers, including days with no new users.
+  const points = Array.from({ length: Math.round((end - start) / DAY) + 1 }, (_, index) => {
+    const time = start + index * DAY;
+    return { time, total: totalAt(history, time) };
+  });
   return { start, end, points };
 }
 

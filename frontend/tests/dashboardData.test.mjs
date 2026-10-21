@@ -22,9 +22,8 @@ test('shorter ranges retain users created before the visible period', () => {
 
 test('quiet periods are flat and empty histories never invent users', () => {
   const window = growthWindow(history.slice(0, 1), '2026-10-06', '30');
-  assert.equal(window.points.length, 2);
-  assert.deepEqual(window.points.map(point => point.total), [2, 2]);
-  assert.deepEqual(growthWindow([], '2026-10-06', 'all').points.map(point => point.total), [0, 0]);
+  assert.ok(window.points.every(point => point.total === 2));
+  assert.ok(growthWindow([], '2026-10-06', 'all').points.every(point => point.total === 0));
 });
 
 test('access breakdown includes root and management accounts, deduplicated across hosts', () => {
@@ -53,4 +52,13 @@ test('dashboard excludes only low-UID disabled accounts before deduplicating acc
   assert.equal(dashboardAccounts(users).filter(user => user.server === 'one').length, 3);
   assert.deepEqual(accessCounts(users), { total: 4, sudo: 2, standard: 2 });
   assert.equal(users.length, 6);
+});
+
+ test('every inspectable date is a curve vertex with the actual cumulative count', () => {
+  const window = growthWindow(history, '2026-10-06', '365');
+  assert.equal(window.points.length, 366);
+  for (let i = 0; i < window.points.length; i++) {
+    assert.equal(window.points[i].time, window.start + i * DAY);
+    assert.equal(window.points[i].total, totalAt(history, window.points[i].time));
+  }
 });

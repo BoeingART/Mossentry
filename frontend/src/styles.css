@@ -289,12 +289,8 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .growth-chart .chart-axis-label { font-size: var(--text-caption); fill: var(--muted); }
 .growth-empty { position: absolute; inset: 30px 0 40px 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); background: color-mix(in srgb, var(--surface) 85%, transparent); text-align: center; }
 .growth-empty strong { color: var(--secondary); font-size: var(--text-body); font-weight: 500; }
-.growth-tooltip { top: 35px; width: 240px; max-width: calc(100% - 16px); font-size: var(--text-caption); }
-.growth-tooltip > strong { display: block; margin-bottom: 8px; font-weight: 500; font-size: var(--text-control); }
-.growth-tooltip > div { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-top: 6px; }
-.growth-tooltip > div > span { display: inline-flex; align-items: center; gap: 9px; color: #c1d3da; }
-.growth-tooltip b { font-size: var(--text-control); font-weight: 500; }
-.growth-tooltip i { width: 3px; height: 12px; border-radius: 2px; }
+.growth-tooltip { top: -19px; display: flex; align-items: center; gap: 16px; width: max-content; max-width: calc(100% - 16px); white-space: nowrap; padding: 8px 12px; font-size: var(--text-caption); }
+.growth-tooltip b { font-size: var(--text-control); font-weight: 600; }
 .growth-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--muted); font-size: var(--text-micro); margin-top: 6px; flex-wrap: wrap; }
 .chart-key { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); }
 .chart-key i, .access-gauge-legend i { width: 8px; height: 8px; display: inline-block; border-radius: 2px; flex-shrink: 0; }

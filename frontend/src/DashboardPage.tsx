@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { ActionIcon, Badge, Button, Group, ScrollArea, Select, Table, TextInput, Title, Tooltip } from '@mantine/core';
 import { IconArrowUpRight, IconSearch, IconClock, IconCalendar, IconChevronRight, IconRefresh, IconServer, IconShieldCheck, IconUsers, IconUserCheck } from '@tabler/icons-react';
 import type { Dashboard } from './types';
-import { accessCounts, dashboardAccounts, dateTime, DAY, growthWindow, smoothPath, totalAt } from './dashboardData';
+import { accessCounts, dashboardAccounts, DAY, growthWindow, smoothPath, totalAt } from './dashboardData';
 
 const count = (value: number) => value.toLocaleString(locale());
 
@@ -30,9 +30,8 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
   const x = (time: number) => left + (time - start) / (end - start) * (right - left);
   const y = (total: number) => bottom - total / maximum * (bottom - top);
   const path = smoothPath(points.map(point => ({ x: x(point.time), y: y(point.total) })));
-  const hoverTime = hover === null ? null : Math.round((start + hover * (end - start)) / DAY) * DAY;
+  const hoverTime = hover === null ? null : Math.max(start, Math.min(end, Math.round((start + hover * (end - start)) / DAY) * DAY));
   const hoverTotal = hoverTime === null ? 0 : totalAt(history, hoverTime);
-  const added = hoverTime === null ? 0 : history.find(point => dateTime(point.date) === hoverTime)?.added ?? 0;
   const dateTicks = dateAxisTicks(start, end, right - left);
   return <section className="dashboard-panel user-number-panel" aria-labelledby="user-number-title">
     <div className="dashboard-panel-heading"><div><Title order={3} id="user-number-title">{t("User number")}</Title></div>
@@ -69,8 +68,8 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
         </>}
       </svg>
       {!history.length && <div className="growth-empty"><IconUsers size={25} stroke={1.5} /><strong>{t("No creation dates yet")}</strong></div>}
-      {!!history.length && hoverTime !== null && <div className="growth-tooltip" style={{ left: Math.max(8, Math.min(width - 254, x(hoverTime) + 14)) }} aria-live="polite">
-        <strong>{numericDate(hoverTime, { utc: true })}</strong><div><span><i className="blue" />{t("Unique users")}</span><b>{count(hoverTotal)}</b></div><div><span><i className="teal" />{t("New that day")}</span><b>{count(added)}</b></div>
+      {!!history.length && hoverTime !== null && <div className="growth-tooltip" style={{ left: Math.max(8, Math.min(width - 280, x(hoverTime) - 130)) }} aria-live="polite">
+        <span>{numericDate(hoverTime, { utc: true })}</span><span>{t("Unique users")} <b>{count(hoverTotal)}</b></span>
       </div>}
     </div>
   </section>;
