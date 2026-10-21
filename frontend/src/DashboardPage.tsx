@@ -131,7 +131,6 @@ export default function DashboardPage({ data, refresh, openServers, openApproval
         return <Table.Tr key={server.id}><Table.Td><div className="dashboard-server-identity"><span className={`dashboard-server-avatar tone-${index % 3}`}><IconServer size={19} /></span><div className="dashboard-server-name"><strong>{server.name}</strong><span>{server.hostname}</span></div></div></Table.Td><Table.Td>{server.port}</Table.Td><Table.Td><Badge color={server.enabled ? 'teal' : 'gray'} variant="light">{server.enabled ? t("Enabled") : t("Paused")}</Badge></Table.Td><Table.Td><span className={`dashboard-server-status ${status === t("Synced") ? 'synced' : status === t("Needs sync") ? 'needs-sync' : ''}`}><i />{status}</span></Table.Td><Table.Td ta="right">{server.last_scan_at ? count(accounts.filter(user => user.server === server.name).length) : '—'}</Table.Td></Table.Tr>;
       })}</Table.Tbody></Table></ScrollArea>
       {!hosts.length && <div className="dashboard-no-data">{data.servers.length ? t("No servers match your search.") : <>{t("No servers yet.")} <button onClick={openServers}>{t("Add your first server")}</button></>}</div>}
-      <div className="dashboard-table-footer"><span>{t("Showing")} {Math.min(hosts.length, 5)} {t("of")} {hosts.length} {t("servers")}</span><Button variant="default" size="xs" rightSection={<IconChevronRight size={14} />} onClick={openServers}>{t("Manage servers")}</Button></div>
     </section>
   </div>;
 }
