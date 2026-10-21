@@ -148,4 +148,4 @@ jobs:
           sha256sum *.dmg *.exe *.tar.gz *.sig latest.json > SHA256SUMS.txt
           release_flags=()
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then release_flags+=(--prerelease); fi
-          gh release create "$GITHUB_REF_NAME" *.dmg *.exe *.tar.gz *.sig latest.json SHA256SUMS.txt ../docs/INSTALL.md --repo "$GITHUB_REPOSITORY" --verify-tag --title "Mossentry $GITHUB_REF_NAME" --notes-file ../docs/RELEASE.md "${release_flags[@]}"
+          gh release create "$GITHUB_REF_NAME" *.dmg *.exe *.tar.gz *.sig latest.json SHA256SUMS.txt ../docs/INSTALL.md --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" --notes-file ../docs/RELEASE.md "${release_flags[@]}"

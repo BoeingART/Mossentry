@@ -50,7 +50,50 @@ pub fn audit(c: &Connection, event: &str, target: Option<&str>, details: Value) 
     c.execute("INSERT INTO audit_log(actor_id,event,target,details_json,ip_address,created_at) VALUES((SELECT id FROM admins WHERE active=1 ORDER BY id LIMIT 1),?,?,?,NULL,?)", params![event,target,details.to_string(),now()])?;
     Ok(())
 }
-pub fn init(config: &Config, seed: bool) -> Result<File> {
+fn remove_unused_legacy_examples(c: &Connection) -> Result<()> {
+    if row(
+        c,
+        "SELECT 1 FROM settings WHERE key='empty_inventory_defaults_version'",
+        [],
+    )?
+    .is_some()
+    {
+        return Ok(());
+    }
+    if row(
+        c,
+        "SELECT 1 FROM settings WHERE key='servers_seeded' AND value='1'",
+        [],
+    )?
+    .is_some()
+    {
+        let ssh = config::setting("SSH_DIR")
+            .map(|path| config::expand_path(&path))
+            .unwrap_or_else(|| config::expand_path("~/.ssh"));
+        // Match the old templates exactly, and keep every server with evidence
+        // of configuration or use. This is a one-time migration, never a reset.
+        c.execute(
+            "DELETE FROM servers
+             WHERE hostname='server.luo-group.com' AND ssh_user='srvmgr' AND key_path=?
+               AND (name,port) IN (('gpu1',10901),('gpu2',11901),('gpu3',12901),('gpu4',13901),('cpu1',20901))
+               AND enabled=1 AND COALESCE(group_name,'')='' AND COALESCE(notes,'')=''
+               AND last_scan_at IS NULL AND last_scan_status='never' AND last_scan_error IS NULL
+               AND NOT EXISTS (SELECT 1 FROM server_users WHERE server_id=servers.id)
+               AND NOT EXISTS (SELECT 1 FROM server_credentials WHERE server_id=servers.id)
+               AND NOT EXISTS (SELECT 1 FROM operation_results WHERE server_name=servers.name)
+               AND NOT EXISTS (SELECT 1 FROM actions WHERE instr(','||target_server||',',','||servers.name||',')>0)
+               AND NOT EXISTS (SELECT 1 FROM audit_log WHERE target='all_servers' OR event='inventory_imported'
+                 OR instr(','||target||',',','||servers.name||',')>0)",
+            [ssh.join("id_rsa").to_string_lossy()],
+        )?;
+    }
+    c.execute(
+        "INSERT INTO settings(key,value) VALUES('empty_inventory_defaults_version','1')",
+        [],
+    )?;
+    Ok(())
+}
+pub fn init(config: &Config) -> Result<File> {
     config::private_dir(&config.home)?;
     config::private_dir(&config.data)?;
     config::private_dir(&config.data.join("keys"))?;
@@ -98,27 +141,7 @@ pub fn init(config: &Config, seed: bool) -> Result<File> {
             ))?;
         }
     }
-    if seed
-        && row(&tx, "SELECT 1 FROM settings WHERE key='servers_seeded'", [])?.is_none()
-        && row(&tx, "SELECT 1 FROM servers LIMIT 1", [])?.is_none()
-    {
-        let ssh = config::setting("SSH_DIR")
-            .map(|p| config::expand_path(&p))
-            .unwrap_or_else(|| config::expand_path("~/.ssh"));
-        for (name, port) in [
-            ("gpu1", 10901),
-            ("gpu2", 11901),
-            ("gpu3", 12901),
-            ("gpu4", 13901),
-            ("cpu1", 20901),
-        ] {
-            tx.execute("INSERT INTO servers(name,hostname,port,ssh_user,key_path) VALUES(?,'server.luo-group.com',?,'srvmgr',?)",params![name,port,ssh.join("id_rsa").to_string_lossy()])?;
-        }
-    }
-    tx.execute(
-        "INSERT OR IGNORE INTO settings(key,value) VALUES('servers_seeded','1')",
-        [],
-    )?;
+    remove_unused_legacy_examples(&tx)?;
     if row(&tx, "SELECT 1 FROM admins LIMIT 1", [])?.is_none() {
         tx.execute("INSERT INTO admins(username,password_hash,created_at) VALUES(?,'!rust-desktop-only',?)",params![config::setting("ADMIN_USER").unwrap_or_else(||"admin".into()),now()])?;
     }

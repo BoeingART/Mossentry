@@ -20,11 +20,13 @@ fn smoke_test() -> mossentry::error::Result<()> {
         let service = Service::open(
             Config::isolated(directory.clone()),
             std::sync::Arc::new(NativeSsh::default()),
-            false,
         )?;
         let dashboard = service.request("/api/dashboard", "GET", serde_json::Value::Null)?;
         if dashboard["admin"]["desktop_mode"] != true
             || dashboard["servers"] != serde_json::json!([])
+            || dashboard["users"] != serde_json::json!([])
+            || dashboard["statistics"]["total_unique_users"] != 0
+            || dashboard["statistics"]["history"] != serde_json::json!([])
         {
             return Err(mossentry::error::Error::new(
                 500,

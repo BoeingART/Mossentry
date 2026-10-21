@@ -15,7 +15,7 @@ const notify = (message: string, error = false) => notifications.show({ title: e
 type Draft = { name: string; hostname: string; port: number | string; ssh_user: string; key_path: string; enabled: boolean; group_name: string; notes: string };
 
 function ServerForm({ server, close, saved }: { server: Server | null; close: () => void; saved: () => Promise<void> }) {
-  const [draft, setDraft] = useState<Draft>({ name: server?.name || '', hostname: server?.hostname || '', port: server?.port || 22, ssh_user: server?.ssh_user || 'srvmgr', key_path: server?.key_path || '~/.ssh/id_rsa', enabled: server ? !!server.enabled : true, group_name: server?.group_name || '', notes: server?.notes || '' });
+  const [draft, setDraft] = useState<Draft>({ name: server?.name || '', hostname: server?.hostname || '', port: server?.port || 22, ssh_user: server?.ssh_user || '', key_path: server?.key_path || '~/.ssh/id_rsa', enabled: server ? !!server.enabled : true, group_name: server?.group_name || '', notes: server?.notes || '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sudoPassword, setSudoPassword] = useState('');

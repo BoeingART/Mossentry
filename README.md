@@ -56,7 +56,7 @@ See [installation and data migration](docs/INSTALL.md).
 
 Managed hosts require Linux, `/usr/bin/python3`, Bash, key-based SSH and suitable sudo privileges for account changes. Configure the login account and key path per server. Unix private keys must be owner-only (`0600`); passphrase-encrypted keys are not supported. Verify each host fingerprint and add it to the local `~/.ssh/known_hosts` before connecting. Unknown and changed host keys are rejected.
 
-The initial five example hosts are seeded once. Edit or remove them before use; subsequent inventory changes are stored in SQLite. Connection changes invalidate cached accounts. Pending approval operations must be handled before editing or removing their servers.
+New installations start with zero servers, no managed user accounts or profiles, and empty user statistics. Add servers manually or import an inventory, then sync their accounts. Upgrades remove untouched, unused legacy example servers once, preserving configured or used servers and user data. Connection changes invalidate cached accounts. Pending approval operations must be handled before editing or removing their servers.
 
 A saved sudo password is optional. Leaving its field blank during editing retains the saved value; changing the address, port or login account clears it unless a replacement is supplied. Saved sudo passwords are stored locally without encryption, excluded from responses and audit details, and sent over encrypted SSH stdin. Unix application directories/files use `0700`/`0600`. The existing private `srvmgr.passwd` file or `MOSSENTRY_BECOME_PASSWORD_FILE` can supply a fallback; otherwise passwordless sudo is used.
 

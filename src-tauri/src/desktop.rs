@@ -113,7 +113,6 @@ pub fn run() {
                 app.manage(Service::open(
                     Config::discover()?,
                     Arc::new(NativeSsh::default()),
-                    true,
                 )?);
                 let config = app.config().app.windows[0].clone();
                 let window = tauri::WebviewWindowBuilder::from_config(app, &config)?;

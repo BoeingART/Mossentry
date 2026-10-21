@@ -24,7 +24,7 @@ The default directory is `~/Library/Application Support/Mossentry` on macOS, `%A
 
 ## SSH setup
 
-Edit or remove the initial example hosts before connecting. Verify each SSH fingerprint and add it to `~/.ssh/known_hosts`. The Rust transport rejects unknown or changed keys, uses only the configured private key and enforces owner-only key permissions on Unix.
+New installations start with zero servers, no managed user information and empty user statistics. Add or import your own servers and supply the SSH login account before connecting. Upgrades remove only untouched, unused legacy example servers once; configured or used servers and saved user data remain available. Verify each SSH fingerprint and add it to `~/.ssh/known_hosts`. The Rust transport rejects unknown or changed keys, uses only the configured private key and enforces owner-only key permissions on Unix.
 
 Managed hosts require Linux, `/usr/bin/python3`, Bash and appropriate sudo permission. Python scripts execute on the remote host over SSH and are not installed as agents. Launching the application does not change remote accounts.
 

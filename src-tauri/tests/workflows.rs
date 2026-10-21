@@ -74,12 +74,8 @@ impl Fixture {
     fn new() -> Self {
         let dir = tempfile::tempdir().unwrap();
         let remote = Arc::new(Fake::default());
-        let service = Service::open(
-            Config::isolated(dir.path().join("app")),
-            remote.clone(),
-            false,
-        )
-        .unwrap();
+        let service =
+            Service::open(Config::isolated(dir.path().join("app")), remote.clone()).unwrap();
         Self {
             service,
             remote,
@@ -125,6 +121,212 @@ impl Fixture {
 fn server(name: &str) -> Value {
     json!({"name":name,"hostname":"example.test","port":22,"ssh_user":"operator","key_path":std::env::temp_dir().join("mossentry-fixture-key").to_string_lossy(),"enabled":true,"group_name":"lab","notes":"notes"})
 }
+#[test]
+fn first_launch_and_restart_have_no_default_inventory_or_managed_user_data() {
+    let directory = tempfile::tempdir().unwrap();
+    let config = Config::isolated(directory.path().join("app"));
+    let remote = Arc::new(Fake::default());
+    for _ in 0..2 {
+        let service = Service::open(config.clone(), remote.clone()).unwrap();
+        let dashboard = service
+            .request("/api/dashboard", "GET", Value::Null)
+            .unwrap();
+        for key in ["servers", "users", "actions", "approval_batches", "audit"] {
+            assert_eq!(dashboard[key], json!([]), "{key}");
+        }
+        for key in [
+            "total_unique_users",
+            "dated_users",
+            "undated_users",
+            "new_users_30d",
+            "new_accounts_30d",
+            "new_servers_30d",
+            "pending_approvals",
+            "new_pending_approvals_30d",
+        ] {
+            assert_eq!(dashboard["statistics"][key], 0, "{key}");
+        }
+        assert_eq!(dashboard["statistics"]["history"], json!([]));
+        let connection = service.connection().unwrap();
+        for table in ["servers", "server_users", "user_profiles", "user_history"] {
+            let count: i64 = connection
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            assert_eq!(count, 0, "{table}");
+        }
+        assert!(remote.calls.lock().unwrap().is_empty());
+    }
+}
+
+#[test]
+fn reopening_preserves_saved_inventory_users_and_profiles() {
+    let f = Fixture::new();
+    f.add("one");
+    f.scan();
+    f.req(
+        "/api/users/alice/profile",
+        "PUT",
+        json!({"full_name":"Alice Example"}),
+    )
+    .unwrap();
+    let before = f.dashboard();
+    let calls = f.remote.calls.lock().unwrap().len();
+    let config = f.service.config.clone();
+    drop(f.service);
+    let service = Service::open(config, f.remote.clone()).unwrap();
+    let after = service
+        .request("/api/dashboard", "GET", Value::Null)
+        .unwrap();
+    assert_eq!(after["servers"], before["servers"]);
+    assert_eq!(after["users"], before["users"]);
+    assert_eq!(
+        after["statistics"]["history"],
+        before["statistics"]["history"]
+    );
+    assert_eq!(
+        after["statistics"]["total_unique_users"],
+        before["statistics"]["total_unique_users"]
+    );
+    assert_eq!(f.remote.calls.lock().unwrap().len(), calls);
+}
+
+fn legacy_examples() -> Fixture {
+    let f = Fixture::new();
+    let c = f.service.connection().unwrap();
+    c.execute(
+        "DELETE FROM settings WHERE key='empty_inventory_defaults_version'",
+        [],
+    )
+    .unwrap();
+    c.execute(
+        "INSERT INTO settings(key,value) VALUES('servers_seeded','1')",
+        [],
+    )
+    .unwrap();
+    let ssh = mossentry::config::setting("SSH_DIR")
+        .map(|path| mossentry::config::expand_path(&path))
+        .unwrap_or_else(|| mossentry::config::expand_path("~/.ssh"));
+    for (name, port) in [
+        ("gpu1", 10901),
+        ("gpu2", 11901),
+        ("gpu3", 12901),
+        ("gpu4", 13901),
+        ("cpu1", 20901),
+    ] {
+        c.execute("INSERT INTO servers(name,hostname,port,ssh_user,key_path) VALUES(?,'server.luo-group.com',?,'srvmgr',?)",params![name,port,ssh.join("id_rsa").to_string_lossy()]).unwrap();
+    }
+    f
+}
+
+#[test]
+fn upgrade_removes_only_unused_legacy_examples_once() {
+    let f = legacy_examples();
+    let config = f.service.config.clone();
+    drop(f.service);
+    let service = Service::open(config.clone(), f.remote.clone()).unwrap();
+    let dashboard = service
+        .request("/api/dashboard", "GET", Value::Null)
+        .unwrap();
+    assert_eq!(dashboard["servers"], json!([]));
+    assert_eq!(dashboard["users"], json!([]));
+    assert_eq!(dashboard["statistics"]["total_unique_users"], 0);
+    assert_eq!(dashboard["statistics"]["history"], json!([]));
+    let c = service.connection().unwrap();
+    c.execute("INSERT INTO servers(name,hostname,port,ssh_user,key_path) VALUES('cpu1','server.luo-group.com',20901,'srvmgr',?)",[mossentry::config::expand_path("~/.ssh/id_rsa").to_string_lossy()]).unwrap();
+    drop(c);
+    drop(service);
+    let service = Service::open(config, f.remote.clone()).unwrap();
+    assert_eq!(
+        service
+            .request("/api/dashboard", "GET", Value::Null)
+            .unwrap()["servers"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(f.remote.calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn upgrade_keeps_modified_used_and_custom_servers_and_their_user_data() {
+    let f = legacy_examples();
+    f.add("own");
+    let gpu1 = n(&f.service.server_by_name("gpu1").unwrap(), "id");
+    f.req(&format!("/api/servers/{gpu1}/scan"), "POST", json!({}))
+        .unwrap();
+    f.req(
+        "/api/users/alice/profile",
+        "PUT",
+        json!({"full_name":"Alice Example"}),
+    )
+    .unwrap();
+    let c = f.service.connection().unwrap();
+    c.execute(
+        "UPDATE servers SET notes='My configuration' WHERE name='cpu1'",
+        [],
+    )
+    .unwrap();
+    c.execute("INSERT INTO server_credentials(server_id,sudo_password) SELECT id,'saved' FROM servers WHERE name='gpu2'", []).unwrap();
+    db::audit(&c, "connection_tested", Some("gpu3"), json!({})).unwrap();
+    drop(c);
+    let before = f.dashboard();
+    let config = f.service.config.clone();
+    drop(f.service);
+    let service = Service::open(config, f.remote.clone()).unwrap();
+    let after = service
+        .request("/api/dashboard", "GET", Value::Null)
+        .unwrap();
+    let names: Vec<_> = after["servers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|server| s(server, "name"))
+        .collect();
+    assert_eq!(names, ["cpu1", "gpu1", "gpu2", "gpu3", "own"]);
+    assert_eq!(after["users"], before["users"]);
+    assert_eq!(
+        after["statistics"]["history"],
+        before["statistics"]["history"]
+    );
+}
+
+#[test]
+fn upgrade_keeps_servers_referenced_by_jobs_and_pending_actions() {
+    let f = legacy_examples();
+    let c = f.service.connection().unwrap();
+    c.execute("INSERT INTO operation_jobs(operation,payload_json,status,created_at) VALUES('command','{}','completed',?)",[db::now()]).unwrap();
+    c.execute(
+        "INSERT INTO operation_results(job_id,server_name,status) VALUES(?,'gpu1','completed')",
+        [c.last_insert_rowid()],
+    )
+    .unwrap();
+    drop(c);
+    f.req(
+        "/api/actions/user",
+        "POST",
+        json!({"username":"alice","servers":["gpu2"],"action":"disable_user"}),
+    )
+    .unwrap();
+    let config = f.service.config.clone();
+    drop(f.service);
+    let service = Service::open(config, f.remote.clone()).unwrap();
+    let dashboard = service
+        .request("/api/dashboard", "GET", Value::Null)
+        .unwrap();
+    let names: Vec<_> = dashboard["servers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|server| s(server, "name"))
+        .collect();
+    assert_eq!(names, ["gpu1", "gpu2"]);
+    assert_eq!(dashboard["actions"][0]["status"], "pending");
+    assert!(f.remote.calls.lock().unwrap().is_empty());
+}
+
 #[test]
 fn inventory_crud_and_password_identity_rules() {
     let f = Fixture::new();
@@ -691,7 +893,7 @@ fn diagnostics_preserve_output_cap_matches_and_do_not_treat_stderr_as_failure() 
 #[test]
 fn data_lock_prevents_concurrent_instances() {
     let f = Fixture::new();
-    assert!(Service::open(f.service.config.clone(), Arc::new(Fake::default()), false).is_err());
+    assert!(Service::open(f.service.config.clone(), Arc::new(Fake::default())).is_err());
 }
 #[test]
 fn appearance_migrates_legacy_file_and_persists() {
@@ -732,7 +934,7 @@ fn startup_recovers_interrupted_jobs_and_approvals_without_rerunning() {
     drop(c);
     let config = f.service.config.clone();
     drop(f.service);
-    let svc = Service::open(config, f.remote.clone(), false).unwrap();
+    let svc = Service::open(config, f.remote.clone()).unwrap();
     let d = svc.request("/api/dashboard", "GET", Value::Null).unwrap();
     assert_eq!(d["actions"][0]["status"], "failed");
     assert_eq!(
@@ -758,7 +960,7 @@ fn old_database_migrates_in_place_and_deleted_inventory_stays_deleted() {
     drop(c);
     config.db = database_path(&config.data);
     assert_eq!(config.db, legacy);
-    let service = Service::open(config, Arc::new(Fake::default()), true).unwrap();
+    let service = Service::open(config, Arc::new(Fake::default())).unwrap();
     let d = service
         .request("/api/dashboard", "GET", Value::Null)
         .unwrap();
@@ -964,7 +1166,7 @@ fn legacy_pending_items_migrate_to_one_list_and_interrupted_lists_do_not_resume(
     drop(c);
     let config = f.service.config.clone();
     drop(f.service);
-    let svc = Service::open(config.clone(), f.remote.clone(), false).unwrap();
+    let svc = Service::open(config.clone(), f.remote.clone()).unwrap();
     let dashboard = svc.request("/api/dashboard", "GET", Value::Null).unwrap();
     assert_eq!(dashboard["approval_batches"].as_array().unwrap().len(), 1);
     let c = svc.connection().unwrap();
@@ -972,7 +1174,7 @@ fn legacy_pending_items_migrate_to_one_list_and_interrupted_lists_do_not_resume(
         .unwrap();
     drop(c);
     drop(svc);
-    let svc = Service::open(config, f.remote.clone(), false).unwrap();
+    let svc = Service::open(config, f.remote.clone()).unwrap();
     let dashboard = svc.request("/api/dashboard", "GET", Value::Null).unwrap();
     assert_eq!(dashboard["approval_batches"][0]["status"], "failed");
     assert!(dashboard["actions"]

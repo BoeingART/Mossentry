@@ -18,12 +18,7 @@ fn loopback_ssh_transport_and_complete_account_lifecycle() {
     assert!(directory.join("disposable-fixture").is_file());
     let ssh = Arc::new(NativeSsh::with_known_hosts(directory.join("known_hosts")));
     let home = tempfile::tempdir().unwrap();
-    let service = Service::open(
-        Config::isolated(home.path().join("app")),
-        ssh.clone(),
-        false,
-    )
-    .unwrap();
+    let service = Service::open(Config::isolated(home.path().join("app")), ssh.clone()).unwrap();
     let server = json!({"name":"fixture","hostname":"127.0.0.1","port":port,"ssh_user":"operator","key_path":directory.join("id_ed25519").to_string_lossy(),"sudo_password":"fixture-password"});
     let id = n(
         &service

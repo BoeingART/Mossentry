@@ -39,8 +39,8 @@ pub struct Service {
     _data_lock: File,
 }
 impl Service {
-    pub fn open(config: Config, transport: Arc<dyn Transport>, seed: bool) -> Result<Arc<Self>> {
-        let lock = db::init(&config, seed)?;
+    pub fn open(config: Config, transport: Arc<dyn Transport>) -> Result<Arc<Self>> {
+        let lock = db::init(&config)?;
         Ok(Arc::new(Self {
             config,
             transport,
