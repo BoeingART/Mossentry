@@ -200,8 +200,8 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .host-text-scroll { display: block; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; overflow-wrap: normal; overscroll-behavior-x: contain; }
 .host-name-scroll { max-width: 18ch; }
 .host-username-scroll { max-width: 14ch; }
-.host-accounts { padding-block: 13px; }
-.host-administrator { display: flex; align-items: baseline; gap: 4px; flex: 1; min-width: 0; }
+.host-accounts { padding-block: 13px; gap: 24px; justify-content: flex-start; }
+.host-administrator { display: flex; align-items: baseline; gap: 4px; flex: 0 1 auto; min-width: 0; max-width: calc(100% - 100px); }
 .host-administrator > span:first-child { flex-shrink: 0; white-space: nowrap; }
 .server-connection { display: inline-flex; align-items: center; justify-content: center; width: 23px; height: 23px; flex-shrink: 0; border: 1px solid currentColor; border-radius: 50%; }
 .server-connection.connected { color: #00897b; background: #e0f2f1; }
