@@ -38,7 +38,8 @@ export type ServerMetrics = {
 
 export type PhysicalDiskGroup = {
   id: string;
-  devices: { name: string; model: string; total_gb: number }[];
+  devices: { name: string; model: string; total_gb: number; storage_type?: 'SSD' | 'HDD' | null }[];
+  raid_levels?: string[];
   shared: boolean;
   total_gb: number;
   filesystem_total_gb: number | null;

@@ -144,7 +144,7 @@ def block_topology(root=Path('/sys/class/block')):
         resolved = entry.resolve()
         partition = (entry / 'partition').exists()
         parents = [resolved.parent.name] if partition else [item.name for item in (entry / 'slaves').iterdir()]
-        nodes[entry.name] = {'identity': identity, 'parents': parents}
+        nodes[entry.name] = {'identity': identity, 'parents': parents, 'raid_level': read_optional(entry / 'md/level')}
         # Never promote device-mapper, md, loop, zram or optical devices to disks.
         if partition or parents or 'virtual' in resolved.parts or re.match(r'^(loop|ram|zram|sr|fd)\d', entry.name):
             continue
@@ -160,6 +160,8 @@ def block_topology(root=Path('/sys/class/block')):
             'name': '/dev/' + entry.name,
             'model': read_optional(entry / 'device/model'),
             'size_bytes': int(sectors) * 512,
+            'storage_type': {'0': 'SSD', '1': 'HDD'}.get(read_optional(entry / 'queue/rotational'), 'SSD' if entry.name.startswith('nvme') else None),
+            'raid_levels': [],
         }
 
     def backing(name, visited):
@@ -182,6 +184,9 @@ def block_topology(root=Path('/sys/class/block')):
         owners, complete = backing(name, set())
         if complete and owners:
             mapping[node['identity']] = owners
+            if node['raid_level']:
+                for owner in owners:
+                    physical[owner]['raid_levels'].append(node['raid_level'])
     return physical, mapping
 
 
@@ -213,9 +218,11 @@ def group_disk_usage(physical, filesystems):
         available = sum(item['usage']['available'] for item in measured)
         complete = bool(mounted) and len(measured) == len(mounted)
         devices = [{'name': physical[name]['name'], 'model': physical[name]['model'],
-                    'total_gb': round(physical[name]['size_bytes'] / 1024 ** 3, 1)} for name in names]
+                    'total_gb': round(physical[name]['size_bytes'] / 1024 ** 3, 1),
+                    'storage_type': physical[name].get('storage_type')} for name in names]
         result.append({
             'id': '+'.join(names), 'devices': devices, 'shared': len(names) > 1,
+            'raid_levels': sorted({level for name in names for level in physical[name].get('raid_levels', [])}),
             'total_gb': round(sum(physical[name]['size_bytes'] for name in names) / 1024 ** 3, 1),
             'filesystem_total_gb': round(total / 1024 ** 3, 1) if complete else None,
             'used_gb': round(used / 1024 ** 3, 1) if complete else None,
@@ -223,7 +230,7 @@ def group_disk_usage(physical, filesystems):
             'mounts': sorted(mount for item in mounted for mount in item['mounts']),
             'status': 'ok' if complete else 'unavailable' if mounted else 'unmounted',
         })
-    return sorted(result, key=lambda item: item['id'])
+    return sorted(result, key=lambda item: (-item['total_gb'], item['id']))
 
 
 def disks():
