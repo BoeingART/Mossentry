@@ -415,3 +415,5 @@ i.cyan { background: #80deea; }
 .window-controls button { border: 0; background: transparent; color: var(--mantine-color-text); width: 46px; cursor: pointer; }
 .window-controls button:hover { background: var(--mantine-color-default-hover); }
 .window-controls button:last-child:hover { background: #c42b1c; color: white; }
+
+.dashboard-server-table th:last-child, .dashboard-server-table td:last-child { padding-right: 8px; }
