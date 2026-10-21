@@ -1,6 +1,6 @@
 # Install the Rust edition
 
-This document describes the `dev-rust` branch. Previously published v0.1.0 Electron installers remain historical builds until a Rust release is published.
+The `dev` branch now contains the Rust/Tauri application merged from `dev-rust`. Previously published Electron installers are historical builds and do not represent the current source.
 
 ## macOS
 

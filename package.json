@@ -10,7 +10,7 @@
     "dev": "node scripts/rust-tool.cjs tauri dev",
     "dev:ui": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build:icons": "node scripts/rust-tool.cjs tauri icon icon.svg --output src-tauri/icons",
-    "check": "npm run build && npm run test:monitor && npm run test:rust && npm run test:remote",
+    "check": "npm run build && npm run test:monitor && npm run test:tools && npm run test:rust && npm run test:remote",
     "check:rust": "node scripts/rust-tool.cjs cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "fmt:rust": "node scripts/rust-tool.cjs cargo fmt --manifest-path src-tauri/Cargo.toml",
     "test:rust": "node scripts/rust-tool.cjs cargo test --manifest-path src-tauri/Cargo.toml --no-default-features",
@@ -20,7 +20,10 @@
     "dist:mac": "node scripts/rust-tool.cjs tauri build --bundles app,dmg",
     "dist:win": "node scripts/rust-tool.cjs tauri build --bundles nsis",
     "tauri": "node scripts/rust-tool.cjs tauri",
-    "test:ssh": "python3 scripts/test-ssh.py"
+    "test:ssh": "python3 scripts/test-ssh.py",
+    "clean": "node scripts/clean.cjs",
+    "clean:all": "node scripts/clean.cjs --all",
+    "test:tools": "node --test scripts/tests/*.test.cjs"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

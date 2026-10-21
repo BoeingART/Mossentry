@@ -1,16 +1,26 @@
+# Dependencies and local environments
 node_modules/
 .venv/
-backend/data/
-backend/**/__pycache__/
-*.pyc
+
+# Generated frontend and Rust output
+/dist/
+/src-tauri/target/
+/src-tauri/gen/
+coverage/
+*.tsbuildinfo
+
+# Historical packaging output locations
+/build/
+/release/
+/*.dmg
+/*.exe
+/*.zip
+/*.tar.gz
+/*.blockmap
+/SHA256SUMS.txt
+
+# Interpreter, editor and operating-system caches
+__pycache__/
+*.py[cod]
 *.log
 .DS_Store
-server_manager.tar.gz
-backend/app/frontend/
-build/
-release/
-
-dist/
-src-tauri/target/
-src-tauri/gen/
-__pycache__/

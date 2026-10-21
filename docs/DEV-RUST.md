@@ -1,6 +1,6 @@
 # Rust migration
 
-The `dev-rust` branch starts from `dev-forward`. Tauri 2 replaces Electron. Rust replaces the local FastAPI/Ansible/Paramiko service; there is no Python sidecar or local HTTP listener. React, Mantine, CodeMirror, charts, translations and CSS remain the UI implementation so their appearance and interaction can be retained.
+The Rust migration started on `dev-rust` from `dev-forward` and is now merged into `dev`. Tauri 2 replaces Electron. Rust replaces the local FastAPI/Ansible/Paramiko service; there is no Python sidecar or local HTTP listener. React, Mantine, CodeMirror, charts, translations and CSS remain the UI implementation so their appearance and interaction can be retained.
 
 ## Feature coverage
 
@@ -11,9 +11,9 @@ The `dev-rust` branch starts from `dev-forward`. Tauri 2 replaces Electron. Rust
 | Inventory preview/import/export | Atomic Rust validation/inserts, original form, native JSON save |
 | SSH connection test and status | `ssh.rs`, embedded `remote_actions.py` |
 | Sync accounts and preserve creation history | Rust parsing/storage, unchanged remote creation probe |
-| Account protection, pending approvals, reject and execute | `actions.rs`, checks before queue and execution plus remote revalidation |
+| Account protection, shared approval lists, reject and execute | `actions.rs` and `batches.rs`, list-wide preflight plus per-item results and credentials |
 | Ed25519 credentials, initial password and one-time ZIP | Rust key generation, SHA-512 crypt, private archive and save dialog |
-| CPU/GPU/memory/network/disks and user filters | Unchanged remote resource probe and charts, Rust sample cache and concurrency limits |
+| CPU/GPU/memory/network/disks and user filters | Embedded resource probe, minute-aligned chart ticks, disk media/RAID detection, Rust sample cache and concurrency limits |
 | Multiline Bash, syntax checks, risk acknowledgement, sudo and timeout | Rust job coordinator, unchanged remote execution probe |
 | Diagnostic summaries, history, export, deletion and legacy results | `operations.rs`, original results interface |
 | Language, light/dark appearance and window behavior | Existing preferences migrated before UI startup, native window controls |
@@ -31,9 +31,9 @@ The native save dialog returns a selected destination only to Rust. Cancelling l
 
 ## Verification
 
-`npm run check` builds TypeScript and runs frontend chart, Rust workflow and remote-probe tests. `npm run check:rust` checks the full desktop build with Clippy. `npm run test:ssh` runs the actual Rust SSH transport and account lifecycle against a loopback-only disposable Docker container. Rust tests inject a fake transport and use temporary databases; remote probe tests use mocks or local shell fixtures. None contact the configured example hosts.
+`npm run check` builds TypeScript and runs cleanup-tool, frontend chart/data, Rust workflow and remote-probe tests. `npm run check:rust` checks the full desktop build with Clippy. `npm run test:ssh` runs the actual Rust SSH transport and account lifecycle against a loopback-only disposable Docker container. Rust tests inject a fake transport and use temporary databases; remote probe tests use mocks or local shell fixtures. None contact the configured example hosts.
 
-On 2026-10-21, the Apple Silicon build passed 15 chart tests, 32 Rust workflow tests, 42 remote-probe tests and the live SSH integration test. The integration covers Ed25519/RSA/ECDSA and hashed known-host entries, rejected unknown keys, timeout handling, password and passwordless sudo, credential export, the account lifecycle, monitoring and command diagnostics. The native WebView successfully loaded the dashboard through Rust IPC. The macOS app and DMG build, packaged startup smoke test and ad-hoc signature verification passed. Screen-by-screen visual acceptance was unavailable because computer-control permission was not granted.
+On 2026-10-21, the Apple Silicon build passed 15 chart tests, 32 Rust workflow tests, 42 remote-probe tests and the live SSH integration test. The integration covers Ed25519/RSA/ECDSA and hashed known-host entries, rejected unknown keys, timeout handling, password and passwordless sudo, credential export, the account lifecycle, monitoring and command diagnostics. The native WebView successfully loaded the dashboard through Rust IPC. The macOS app and DMG build, packaged startup smoke test and ad-hoc signature verification passed. A subsequent isolated-data UI pass verified the dashboard, user filtering, direct list entry, grouped approvals and command review; monitor/disk layouts were also checked using synthetic samples. The current regular suite contains 19 frontend tests, 37 Rust workflow tests, 42 remote-probe tests and four cleanup-tool tests.
 
 The release workflow builds the native app on macOS arm64/x64 and Windows x64, tests the Rust core on each platform, and exercises remote account changes inside a disposable Linux container. It uploads installers on manual runs and publishes only on an explicit version tag.
 
