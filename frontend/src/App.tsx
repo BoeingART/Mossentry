@@ -290,7 +290,6 @@ export default function App() {
   const nav: { id: View; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: t("Dashboard"), icon: <IconLayoutDashboard size={19} /> },
     { id: 'overview', label: t("Servers"), icon: <IconServer size={19} /> },
-    { id: 'monitor', label: t("Monitor"), icon: <IconActivity size={19} /> },
     { id: 'operations', label: t('Operations'), icon: <IconServer size={19} /> },
     { id: 'users', label: t("Users & access"), icon: <IconUsers size={19} /> },
     { id: 'approvals', label: t("Approvals"), icon: <IconShieldCheck size={19} /> },
@@ -326,10 +325,10 @@ export default function App() {
     <AppShell.Navbar id="main-sidebar" className="sidebar">
       <ScrollArea className="sidebar-scroll" type="never" viewportProps={{ tabIndex: 0, 'aria-label': t("Navigation") }}>
         <span className="nav-section-label" aria-hidden={compactSidebar}>{t("Workspace")}</span>
-        <Stack component="nav" aria-label={t("Main navigation")} gap={7}>{nav.map((item, index) => <div key={item.id}>
-          {index === 4 && <span className="nav-section-label nav-section-divider" aria-hidden={compactSidebar}>{t("Administration")}</span>}
+        <Stack component="nav" aria-label={t("Main navigation")} gap={7}>{nav.map(item => <div key={item.id}>
+          {item.id === 'users' && <span className="nav-section-label nav-section-divider" aria-hidden={compactSidebar}>{t("Administration")}</span>}
           <Tooltip label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} position="right" disabled={!compactSidebar} events={{ hover: true, focus: true, touch: false }}>
-            <button type="button" aria-label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} aria-current={view === item.id ? 'page' : undefined} className={`nav-button ${view === item.id ? 'active' : ''}`} onClick={() => navigate(item.id)}><span className="nav-icon">{item.icon}</span><span className="nav-label" aria-hidden={compactSidebar}>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge className="nav-badge" aria-hidden size="sm" color={view === 'approvals' ? 'gray' : 'teal'} variant="light" circle ml="auto">{pending}</Badge>}</button>
+            <button type="button" aria-label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} aria-current={view === item.id || (view === 'monitor' && item.id === 'overview') ? 'page' : undefined} className={`nav-button ${view === item.id || (view === 'monitor' && item.id === 'overview') ? 'active' : ''}`} onClick={() => navigate(item.id)}><span className="nav-icon">{item.icon}</span><span className="nav-label" aria-hidden={compactSidebar}>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge className="nav-badge" aria-hidden size="sm" color={view === 'approvals' ? 'gray' : 'teal'} variant="light" circle ml="auto">{pending}</Badge>}</button>
           </Tooltip>
         </div>)}</Stack>
       </ScrollArea>
