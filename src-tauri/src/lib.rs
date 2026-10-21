@@ -1,4 +1,5 @@
 pub mod actions;
+pub mod batches;
 pub mod config;
 pub mod db;
 #[cfg(feature = "desktop")]

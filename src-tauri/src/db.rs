@@ -76,6 +76,11 @@ pub fn init(config: &Config, seed: bool) -> Result<File> {
     let tx = c.transaction()?;
     tx.execute_batch(include_str!("schema.sql"))?;
     for (table, col, definition) in [
+        (
+            "actions",
+            "batch_id",
+            "INTEGER REFERENCES approval_batches(id)",
+        ),
         ("servers", "group_name", "TEXT NOT NULL DEFAULT ''"),
         ("servers", "notes", "TEXT NOT NULL DEFAULT ''"),
         ("server_users", "created_at", "TEXT"),
@@ -127,6 +132,8 @@ pub fn init(config: &Config, seed: bool) -> Result<File> {
         "UPDATE actions SET status='failed',error=?,executed_at=? WHERE status='approved'",
         params![crate::operations::INTERRUPTED, now()],
     )?;
+    tx.execute("UPDATE actions SET status='failed',error=?,executed_at=? WHERE status='pending' AND batch_id IN (SELECT id FROM approval_batches WHERE status='approved')",params![crate::operations::INTERRUPTED,now()])?;
+    crate::batches::migrate(&tx)?;
     crate::operations::backfill(&tx)?;
     tx.commit()?;
     let initial = config.data.join("initial_admin_password");

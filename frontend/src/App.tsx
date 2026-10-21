@@ -24,6 +24,7 @@ import { filteredAccounts, type UserFilter } from './userData';
 import type { Action, Dashboard, Server, User } from './types';
 import Servers from './Servers';
 import Operations from './Operations';
+import { approvalLists, type ApprovalList } from './approvalData';
 import ResourceMonitor from './ResourceMonitor';
 import DashboardPage from './DashboardPage';
 import AppearanceControls from './AppearanceControls';
@@ -45,6 +46,7 @@ const eventLabels: Record<string, string> = {
   action_requested: 'Request submitted', action_approved: 'Action approved',
   action_rejected: 'Action rejected', action_executed: 'Action completed',
   action_failed: 'Action failed', private_key_downloaded: 'Credentials downloaded',
+  approval_batch_approved: 'Approval list approved', approval_batch_rejected: 'Approval list rejected', approval_batch_finished: 'Approval list completed', approval_batch_failed: 'Approval list failed',
   operation_started: 'Server task started', operation_host_finished: 'Server task finished', operation_deleted: 'Saved task deleted', inventory_imported: 'Inventory imported',
   user_profile_updated: 'User profile updated', password_changed: 'Password changed',
 };
@@ -128,30 +130,35 @@ function Users({ data, openRequest, openProfile }: { data: Dashboard; openReques
   </>;
 }
 
-function Approvals({ data, run, busy, approveAll, download }: { data: Dashboard; run: (action: Action, kind: 'approve' | 'reject') => void; busy: boolean; approveAll: () => void; download: (action: Action) => void }) {
+function Approvals({ data, run, busy, download, saved }: { data: Dashboard; run: (list: ApprovalList, kind: 'approve' | 'reject') => void; busy: boolean; download: (action: Action) => void; saved: () => Promise<void> }) {
   const [page, setPage] = useState(1);
-  const pending = data.actions.filter(a => a.status === 'pending').length;
-  const pages = Math.max(1, Math.ceil(data.actions.length / 10));
+  const lists = approvalLists(data);
+  const pages = Math.max(1, Math.ceil(lists.length / 10));
+  async function removeItem(list: ApprovalList, action: Action) {
+    try { await api(`/api/approval-batches/${list.id}/items/${action.id}`, 'DELETE'); await saved(); }
+    catch (cause) { notify(message(cause), true); }
+  }
   return <>
-    <SectionHeading title={t("Approvals")} action={<Button leftSection={<IconCheck size={16} />} disabled={!pending || busy} onClick={approveAll}>{t("Approve all")} {pending ? `(${pending})` : ''}</Button>} />
+    <SectionHeading title={t("Approvals")} />
     <Stack gap="sm">
-      {data.actions.slice((Math.min(page, pages) - 1) * 10, Math.min(page, pages) * 10).map(action => <Card key={action.id} withBorder radius="lg" p="lg" className="approval-row">
+      {lists.slice((Math.min(page, pages) - 1) * 10, Math.min(page, pages) * 10).map(list => <Card key={`${list.legacy ? 'legacy' : 'batch'}-${list.id}`} withBorder radius="lg" p="lg" className="approval-row">
         <Group justify="space-between" align="start" gap="md">
-          <Group align="start" gap="md"><ThemeIcon variant="light" color={action.action_type === 'create_user' ? 'blue' : 'cyan'} size={40} radius="md">{action.action_type === 'create_user' ? <IconUser size={20} /> : <IconKey size={20} />}</ThemeIcon><div>
-            <Group gap="xs"><Text className="approval-title" fw={600}>#{action.id} {t(actionLabels[action.action_type])} · {action.target_user}</Text><Badge color={statusColors[action.status]} variant="light">{t(statusLabels[action.status])}</Badge></Group>
-            <Text size="sm" c="dimmed" mt={3}>{t("Target:")} {action.target_server}{action.action_type === 'set_sudo' ? ` · ${action.payload.sudo ? t("Grant sudo") : t("Revoke sudo")}` : ''}{action.action_type === 'create_user' ? ` · ${action.payload.sudo ? t("Sudo user") : t("Standard user")}` : ''}</Text>
-            <Text size="xs" c="dimmed" mt={4}>{t("Requested by")} {action.requested_by_name} · {formatDate(action.requested_at)}</Text>
-          </div></Group>
-          <Group gap="xs" className="approval-controls">
-            {action.status === 'pending' && <><Button variant="light" color="gray" size="xs" disabled={busy} onClick={() => run(action, 'reject')}>{t("Reject")}</Button><Button size="xs" disabled={busy} onClick={() => run(action, 'approve')}>{t("Approve and run")}</Button></>}
-            {action.private_key_ready && <Button size="xs" leftSection={<IconDownload size={15} />} onClick={() => download(action)}>{t("Download credentials once")}</Button>}
-            {action.key_downloaded_at && <Badge color="teal" variant="light">{t("Credentials downloaded")}</Badge>}
-          </Group>
+          <div><Group gap="xs"><Text fw={600}>{t("Approval list #{0}", { 0: list.id })}</Text><Badge color={statusColors[list.status]} variant="light">{t(statusLabels[list.status])}</Badge><Text size="sm" c="dimmed">{t("{0} operations", { 0: list.items.filter(item => item.status !== 'rejected').length })}</Text></Group><Text size="xs" c="dimmed" mt={4}>{formatDate(list.created_at)}</Text></div>
+          {list.status === 'pending' && <Group gap="xs"><Button variant="light" color="gray" size="xs" disabled={busy} onClick={() => run(list, 'reject')}>{t("Reject list")}</Button><Button size="xs" disabled={busy} onClick={() => run(list, 'approve')}>{t("Approve list and run")}</Button></Group>}
         </Group>
-        {action.error && <Alert color="red" mt="md" title={t("Execution failed")}><Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{t(action.error)}</Text></Alert>}
+        <Stack mt="md" gap="xs">{list.items.map(action => <Paper key={action.id} withBorder p="sm" radius="md">
+          <Group justify="space-between" gap="sm"><div><Text size="sm" fw={500}>{t(actionLabels[action.action_type])} · {action.target_user}{action.action_type === 'set_sudo' ? ` · ${t(action.payload.sudo ? 'Grant sudo' : 'Revoke sudo')}` : ''}</Text><Text size="xs" c="dimmed">{action.target_server}</Text></div>
+            <Group gap="xs"><Badge size="sm" color={statusColors[action.status]} variant="light">{t(statusLabels[action.status])}</Badge>
+              {!list.legacy && list.status === 'pending' && action.status === 'pending' && <Button size="compact-xs" variant="subtle" color="gray" disabled={busy} onClick={() => void removeItem(list, action)}>{t("Remove from list")}</Button>}
+              {action.private_key_ready && <Button size="xs" leftSection={<IconDownload size={15} />} onClick={() => download(action)}>{t("Download credentials once")}</Button>}
+              {action.key_downloaded_at && <Badge color="teal" variant="light">{t("Credentials downloaded")}</Badge>}
+            </Group>
+          </Group>
+          {action.error && <Text size="sm" c="red" mt="xs" style={{ whiteSpace: 'pre-wrap' }}>{t(action.error)}</Text>}
+        </Paper>)}</Stack>
       </Card>)}
-      {!data.actions.length && <Paper withBorder radius="lg"><Empty text={t("No requests yet")} /></Paper>}
-      {data.actions.length > 10 && <Group justify="space-between" mt="md"><Text size="sm" c="dimmed">{data.actions.length} {t("records")}</Text><Pagination value={Math.min(page, pages)} onChange={setPage} total={pages} size="sm" /></Group>}
+      {!lists.length && <Paper withBorder radius="lg"><Empty text={t("No requests yet")} /></Paper>}
+      {lists.length > 10 && <Pagination value={Math.min(page, pages)} onChange={setPage} total={pages} size="sm" />}
     </Stack>
   </>;
 }
@@ -252,24 +259,15 @@ export default function App() {
     return () => clearInterval(timer);
   }, [data?.actions, refresh]);
 
-  function actionConfirm(action: Action, kind: 'approve' | 'reject') {
-    setConfirm({ reject: kind === 'reject', title: kind === 'approve' ? t("Approve and run request?") : t("Reject request?"),
-      message: kind === 'approve' ? t("{0} for {1} on {2}.{3}", { 0: t(actionLabels[action.action_type]), 1: action.target_user, 2: action.target_server, 3: action.action_type === 'delete_user' ? t(" The account will be deleted; its home directory and files will be kept.") : t(" This connects to the target host.") }) : t("Reject request #{0} for {1}?", { 0: action.id, 1: action.target_user }),
-      run: async () => { const result = await api<{ warning?: string }>(`/api/actions/${action.id}/${kind}`, 'POST'); notify(result.warning || (kind === 'approve' ? t("Action completed") : t("Request rejected")), !!result.warning); await refresh(); },
-    });
-  }
-  function approveAll() {
-    const pending = data?.actions.filter(a => a.status === 'pending') || [];
-    if (!pending.length) return;
-    setConfirm({ title: t("Approve all {0} requests?", { 0: pending.length }), message: t("Each request will connect to its target host and run in order.{0}", { 0: pending.some(a => a.action_type === 'delete_user') ? t(" Includes account deletion. Home directories and files will be kept.") : '' }),
+  function approvalConfirm(list: ApprovalList, kind: 'approve' | 'reject') {
+    const count = list.items.filter(item => item.status === 'pending').length;
+    setConfirm({ reject: kind === 'reject', title: t(kind === 'approve' ? "Approve this list?" : "Reject this list?"),
+      message: t(kind === 'approve' ? "Approve and execute all {0} operations in this list?" : "Reject all {0} operations in this list?", { 0: count }),
       run: async () => {
-        let succeeded = 0; const failed: number[] = [];
-        for (const action of pending) {
-          try { const result = await api<{ warning?: string }>(`/api/actions/${action.id}/approve`, 'POST'); if (result.warning) notify(result.warning, true); succeeded++; }
-          catch { failed.push(action.id); }
-          await refresh();
-        }
-        notify(failed.length ? t("{0} completed; requests {1} failed", { 0: succeeded, 1: failed.join(', ') }) : t("Approved and ran {0} requests", { 0: succeeded }), failed.length > 0);
+        const path = list.legacy ? `/api/actions/${list.id}/${kind}` : `/api/approval-batches/${list.id}/${kind}`;
+        const result = await api<{ warning?: string }>(path, 'POST');
+        notify(result.warning || (kind === 'approve' ? t("Approval list completed") : t("Approval list rejected")), !!result.warning);
+        await refresh();
       },
     });
   }
@@ -286,7 +284,7 @@ export default function App() {
   }
   if (loading) return <Center h="100vh"><Loader /></Center>;
   if (!data) return <Center h="100vh"><Stack align="center"><Alert color="red">{fatal || t("Could not load the dashboard")}</Alert><Button onClick={() => void refresh()}>{t("Retry")}</Button></Stack></Center>;
-  const pending = data.actions.filter(a => a.status === 'pending').length;
+  const pending = approvalLists(data).filter(list => list.status === 'pending').length;
   const nav: { id: View; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: t("Dashboard"), icon: <IconLayoutDashboard size={19} /> },
     { id: 'overview', label: t("Servers"), icon: <IconServer size={19} /> },
@@ -346,7 +344,7 @@ export default function App() {
       {view === 'monitor' && <ResourceMonitor data={data} serverId={monitorServerId} selectServer={setMonitorServerId} />}
       {view === 'operations' && <Operations servers={data.servers} />}
       {view === 'users' && <Users data={data} openRequest={setRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}
-      {view === 'approvals' && <Approvals data={data} run={actionConfirm} busy={busy} approveAll={approveAll} download={action => void download(action)} />}
+      {view === 'approvals' && <Approvals data={data} run={approvalConfirm} busy={busy} saved={refresh} download={action => void download(action)} />}
       {view === 'audit' && <AuditLog data={data} />}
     </main></ScrollArea></AppShell.Main>
     <RequestModal draft={request} servers={data.servers} close={() => setRequest(null)} saved={refresh} />

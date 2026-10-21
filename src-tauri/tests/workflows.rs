@@ -836,3 +836,149 @@ fn malformed_scan_preserves_cache_and_marks_it_stale() {
     assert_eq!(f.dashboard()["servers"][0]["last_scan_status"], "error");
     assert_eq!(f.dashboard()["users"].as_array().unwrap().len(), 4);
 }
+
+#[test]
+fn approval_list_collects_multiple_operations_and_approves_once() {
+    let f = Fixture::new();
+    f.add("one");
+    let first = f.queued("alice", false);
+    let second = f.queued("bob", false);
+    assert_ne!(first, second);
+    assert_eq!(f.queued("alice", false), first); // repeat clicks cannot duplicate an item
+    let dashboard = f.dashboard();
+    assert_eq!(dashboard["approval_batches"].as_array().unwrap().len(), 1);
+    assert_eq!(dashboard["statistics"]["pending_approvals"], 1);
+    let batch = n(&dashboard["approval_batches"][0], "id");
+    assert_eq!(dashboard["actions"][0]["batch_id"], batch);
+    let result = f
+        .req(
+            &format!("/api/approval-batches/{batch}/approve"),
+            "POST",
+            json!({}),
+        )
+        .unwrap();
+    assert_eq!(result["completed"], 2);
+    assert_eq!(result["failed"], 0);
+    assert_eq!(f.dashboard()["approval_batches"][0]["status"], "executed");
+    assert!(f
+        .req(
+            &format!("/api/approval-batches/{batch}/approve"),
+            "POST",
+            json!({})
+        )
+        .is_err());
+    let calls = f.remote.calls.lock().unwrap();
+    assert_eq!(calls[0].1, "preflight");
+    assert_eq!(calls[1].1, "preflight");
+    assert_eq!(
+        calls.iter().filter(|call| call.1 == "disable_user").count(),
+        2
+    );
+    drop(calls);
+    f.queued("chen", false);
+    assert_ne!(f.dashboard()["actions"][0]["batch_id"], batch);
+}
+#[test]
+fn approval_list_preflight_failure_never_partially_executes() {
+    let f = Fixture::new();
+    f.add("one");
+    f.queued("alice", false);
+    f.queued("bob", false);
+    let batch = n(&f.dashboard()["approval_batches"][0], "id");
+    f.remote.fail.store(true, Ordering::SeqCst);
+    assert!(f
+        .req(
+            &format!("/api/approval-batches/{batch}/approve"),
+            "POST",
+            json!({})
+        )
+        .is_err());
+    assert!(f
+        .remote
+        .calls
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|call| call.1 == "preflight"));
+    let dashboard = f.dashboard();
+    assert_eq!(dashboard["approval_batches"][0]["status"], "failed");
+    assert!(dashboard["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|action| action["status"] == "failed"));
+}
+#[test]
+fn approval_list_retains_per_item_results_and_credentials_on_partial_failure() {
+    let f = Fixture::new();
+    f.add("one");
+    f.queued("alice", false);
+    f.queued("bob", true);
+    f.remote.fail_create.store(true, Ordering::SeqCst);
+    let batch = n(&f.dashboard()["approval_batches"][0], "id");
+    let result = f
+        .req(
+            &format!("/api/approval-batches/{batch}/approve"),
+            "POST",
+            json!({}),
+        )
+        .unwrap();
+    assert_eq!(result["completed"], 1);
+    assert_eq!(result["failed"], 1);
+    assert_eq!(f.dashboard()["approval_batches"][0]["status"], "failed");
+    assert_eq!(f.dashboard()["actions"][0]["private_key_ready"], false);
+    assert_eq!(f.dashboard()["actions"][1]["status"], "executed");
+}
+#[test]
+fn approval_list_can_remove_an_item_and_reject_remaining_items_without_remote_calls() {
+    let f = Fixture::new();
+    f.add("one");
+    let item = f.queued("alice", false);
+    f.queued("bob", false);
+    let batch = n(&f.dashboard()["approval_batches"][0], "id");
+    f.req(
+        &format!("/api/approval-batches/{batch}/items/{item}"),
+        "DELETE",
+        json!({}),
+    )
+    .unwrap();
+    assert_eq!(f.dashboard()["approval_batches"][0]["status"], "pending");
+    f.req(
+        &format!("/api/approval-batches/{batch}/reject"),
+        "POST",
+        json!({}),
+    )
+    .unwrap();
+    assert_eq!(f.dashboard()["approval_batches"][0]["status"], "rejected");
+    assert!(f.remote.calls.lock().unwrap().is_empty());
+}
+#[test]
+fn legacy_pending_items_migrate_to_one_list_and_interrupted_lists_do_not_resume() {
+    let f = Fixture::new();
+    f.add("one");
+    f.queued("alice", false);
+    f.queued("bob", false);
+    let c = f.service.connection().unwrap();
+    c.execute("UPDATE actions SET batch_id=NULL", []).unwrap();
+    c.execute("DELETE FROM approval_batches", []).unwrap();
+    drop(c);
+    let config = f.service.config.clone();
+    drop(f.service);
+    let svc = Service::open(config.clone(), f.remote.clone(), false).unwrap();
+    let dashboard = svc.request("/api/dashboard", "GET", Value::Null).unwrap();
+    assert_eq!(dashboard["approval_batches"].as_array().unwrap().len(), 1);
+    let c = svc.connection().unwrap();
+    c.execute("UPDATE approval_batches SET status='approved'", [])
+        .unwrap();
+    drop(c);
+    drop(svc);
+    let svc = Service::open(config, f.remote.clone(), false).unwrap();
+    let dashboard = svc.request("/api/dashboard", "GET", Value::Null).unwrap();
+    assert_eq!(dashboard["approval_batches"][0]["status"], "failed");
+    assert!(dashboard["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|item| item["status"] == "failed"));
+    assert!(f.remote.calls.lock().unwrap().is_empty());
+}

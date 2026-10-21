@@ -213,6 +213,18 @@ impl Service {
                 }
                 self.scan(&names)
             }
+            ("POST", ["api", "approval-batches", id, operation]) => {
+                let _g = self.acquire()?;
+                match *operation {
+                    "approve" => self.approve_batch(id_number(id)?),
+                    "reject" => self.reject_batch(id_number(id)?),
+                    _ => Err(Error::new(404, "Unknown operation")),
+                }
+            }
+            ("DELETE", ["api", "approval-batches", batch, "items", item]) => {
+                let _g = self.acquire()?;
+                self.remove_batch_item(id_number(batch)?, id_number(item)?)
+            }
             ("POST", ["api", "actions", "create-user"]) => {
                 let _g = self.acquire()?;
                 self.queue_action(&body, true)
@@ -297,7 +309,7 @@ impl Service {
             }
         }
         let users=db::rows(&c,"SELECT su.server_id,su.username,su.uid,su.gid,su.home,su.shell,su.is_sudo,su.is_disabled,su.scanned_at,s.name AS server,COALESCE(up.full_name,'') AS full_name FROM server_users su JOIN servers s ON s.id=su.server_id LEFT JOIN user_profiles up ON up.username=su.username ORDER BY su.username,s.name",[])?;
-        let mut actions=db::rows(&c,"SELECT ac.id,ac.action_type,ac.target_server,ac.target_user,ac.payload_json,ac.status,ac.requested_at,ac.approved_at,ac.executed_at,ac.error,ac.key_fingerprint,ac.private_key_path,ac.key_downloaded_at,req.username AS requested_by_name,app.username AS approved_by_name FROM actions ac JOIN admins req ON req.id=ac.requested_by LEFT JOIN admins app ON app.id=ac.approved_by ORDER BY ac.id DESC LIMIT 100",[])?;
+        let mut actions=db::rows(&c,"SELECT ac.id,ac.batch_id,ac.action_type,ac.target_server,ac.target_user,ac.payload_json,ac.status,ac.requested_at,ac.approved_at,ac.executed_at,ac.error,ac.key_fingerprint,ac.private_key_path,ac.key_downloaded_at,req.username AS requested_by_name,app.username AS approved_by_name FROM actions ac JOIN admins req ON req.id=ac.requested_by LEFT JOIN admins app ON app.id=ac.approved_by WHERE ac.batch_id IN (SELECT id FROM approval_batches ORDER BY id DESC LIMIT 100) OR ac.batch_id IS NULL AND ac.id IN (SELECT id FROM actions ORDER BY id DESC LIMIT 100) ORDER BY ac.id DESC",[])?;
         for a in &mut actions {
             a["payload"] = serde_json::from_str(s(a, "payload_json"))?;
             a["private_key_ready"] =
@@ -319,7 +331,7 @@ impl Service {
         )?
         .ok_or_else(|| Error::new(500, "No administrator account is available"))?;
         Ok(
-            json!({"admin":{"username":admin["username"],"csrf":"","desktop_mode":true},"servers":servers,"users":users,"actions":actions,"audit":logs,"statistics":history::statistics(&c)?}),
+            json!({"admin":{"username":admin["username"],"csrf":"","desktop_mode":true},"servers":servers,"users":users,"actions":actions,"approval_batches":db::rows(&c,"SELECT * FROM approval_batches ORDER BY id DESC LIMIT 100",[])?,"audit":logs,"statistics":history::statistics(&c)?}),
         )
     }
     fn no_pending(&self, server: &Value) -> Result<()> {

@@ -77,7 +77,7 @@ pub fn statistics(c: &Connection) -> Result<Value> {
     };
     let pending = db::row(
         c,
-        "SELECT COUNT(*) AS count FROM actions WHERE status='pending'",
+        "SELECT (SELECT COUNT(*) FROM approval_batches WHERE status='pending') + (SELECT COUNT(*) FROM actions WHERE batch_id IS NULL AND status='pending') AS count",
         [],
     )?
     .unwrap();
@@ -85,7 +85,7 @@ pub fn statistics(c: &Connection) -> Result<Value> {
         json!({"total_unique_users":users.len(),"dated_users":running,"undated_users":users.len() as i64-running,"new_users_30d":recent,
         "new_accounts_30d":recent_count("SELECT created_at AS date FROM server_users WHERE uid>=1000 OR is_disabled=0")?,
         "new_servers_30d":recent_count("SELECT created_at AS date FROM audit_log WHERE event='server_created'")?,
-        "pending_approvals":n(&pending,"count"),"new_pending_approvals_30d":recent_count("SELECT requested_at AS date FROM actions WHERE status='pending'")?,
+        "pending_approvals":n(&pending,"count"),"new_pending_approvals_30d":recent_count("SELECT created_at AS date FROM approval_batches WHERE status='pending'")?,
         "history":history,"through":end.date_naive().to_string()}),
     )
 }

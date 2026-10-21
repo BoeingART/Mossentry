@@ -58,7 +58,25 @@ impl Service {
         }
         let mut c = self.connection()?;
         let tx = c.transaction()?;
-        tx.execute("INSERT INTO actions(action_type,target_server,target_user,payload_json,status,requested_by,requested_at) VALUES(?,?,?,?,'pending',(SELECT id FROM admins WHERE active=1 ORDER BY id LIMIT 1),?)",params![action,names.join(","),username,payload.to_string(),db::now()])?;
+        let batch = crate::batches::pending(&tx)?;
+        if let Some(existing) = db::row(&tx, "SELECT id FROM actions WHERE batch_id=? AND status='pending' AND action_type=? AND target_user=? AND payload_json=?", params![batch, action, username, payload.to_string()])? {
+            return Ok(json!({"ok":true,"action_id":existing["id"],"batch_id":batch}));
+        }
+        if n(
+            &db::row(
+                &tx,
+                "SELECT COUNT(*) AS count FROM actions WHERE batch_id=?",
+                [batch],
+            )?
+            .unwrap(),
+            "count",
+        ) >= 200
+        {
+            return Err(Error::bad(
+                "Approve the current list before adding more operations",
+            ));
+        }
+        tx.execute("INSERT INTO actions(batch_id,action_type,target_server,target_user,payload_json,status,requested_by,requested_at) VALUES(?,?,?,?,?,'pending',(SELECT id FROM admins WHERE active=1 ORDER BY id LIMIT 1),?)",params![batch,action,names.join(","),username,payload.to_string(),db::now()])?;
         let id = tx.last_insert_rowid();
         db::audit(
             &tx,
@@ -68,7 +86,7 @@ impl Service {
         )?;
         tx.commit()?;
         Ok(
-            json!({"ok":true,"action_id":id,"message":if creating{"The creation request is pending approval"}else{"The request is pending approval"}}),
+            json!({"ok":true,"action_id":id,"batch_id":batch,"message":if creating{"The creation request is pending approval"}else{"The request is pending approval"}}),
         )
     }
     pub fn reject(&self, id: i64) -> Result<Value> {
@@ -80,6 +98,7 @@ impl Service {
             Some(&format!("action:{id}")),
             json!({}),
         )?;
+        crate::batches::finish(&c)?;
         Ok(json!({"ok":true}))
     }
     pub fn approve(&self, id: i64) -> Result<Value> {
@@ -146,6 +165,7 @@ impl Service {
                 Some(&format!("action:{id}")),
                 json!({"error":raw}),
             )?;
+            crate::batches::finish(&c)?;
             return Err(Error::remote(raw));
         }
         db::audit(
@@ -167,11 +187,12 @@ impl Service {
                 true
             }
         };
+        crate::batches::finish(&c)?;
         Ok(
             json!({"ok":true,"message":"Action completed","warning":if warning{Some("The action completed, but the account list could not refresh. Sync the affected servers again.")}else{None}}),
         )
     }
-    fn run_accounts(
+    pub(crate) fn run_accounts(
         &self,
         names: &[String],
         operation: &str,

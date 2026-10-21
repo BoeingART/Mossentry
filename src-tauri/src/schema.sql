@@ -61,8 +61,17 @@ CREATE TABLE IF NOT EXISTS user_history (
   first_seen_at TEXT NOT NULL,
   last_seen_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS approval_batches (
+  id INTEGER PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL,
+  approved_at TEXT,
+  executed_at TEXT,
+  error TEXT
+);
 CREATE TABLE IF NOT EXISTS actions (
   id INTEGER PRIMARY KEY,
+  batch_id INTEGER REFERENCES approval_batches(id),
   action_type TEXT NOT NULL,
   target_server TEXT NOT NULL,
   target_user TEXT NOT NULL,

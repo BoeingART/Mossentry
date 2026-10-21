@@ -19,6 +19,25 @@ export const en: Record<string, string> = {
 
 // English source messages map to Simplified Chinese. User and server data are never translated.
 export const zh: Record<string, string> = {
+  "Approval list #{0}": "审批清单#{0}",
+  "{0} operations": "{0}项操作",
+  "Reject list": "拒绝清单",
+  "Approve list and run": "统一审批并执行",
+  "Remove from list": "移出清单",
+  "Approve this list?": "审批此清单？",
+  "Reject this list?": "拒绝此清单？",
+  "Approve and execute all {0} operations in this list?": "审批并执行清单内的全部{0}项操作？",
+  "Reject all {0} operations in this list?": "拒绝清单内的全部{0}项操作？",
+  "Approval list completed": "审批清单已完成",
+  "Approval list rejected": "审批清单已拒绝",
+  "Approval list approved": "审批清单已通过",
+  "Approval list failed": "审批清单执行失败",
+  "Some operations in the approval list failed. Review their results.": "审批清单中的部分操作失败，请查看结果。",
+  "Approve the current list before adding more operations": "请先处理当前审批清单，再添加更多操作",
+  "This approval list has already been handled": "此审批清单已处理",
+  "The approval list is empty": "审批清单为空",
+  "Operation not found in this approval list": "此审批清单中没有该操作",
+
   "Commands will run with sudo.": "已选择使用sudo执行命令",
   "Commands will run as the SSH login account.": "已选择使用SSH登录账户执行命令",
   "Enabled / Total: {0}/{1}": "已启用/总数：{0}/{1}",

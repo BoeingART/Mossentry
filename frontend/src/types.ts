@@ -10,12 +10,16 @@ export type User = {
   scanned_at: string;
 };
 export type Action = {
-  id: number; action_type: 'create_user' | 'disable_user' | 'enable_user' | 'set_sudo' | 'delete_user';
+  id: number; batch_id: number | null; action_type: 'create_user' | 'disable_user' | 'enable_user' | 'set_sudo' | 'delete_user';
   target_server: string; target_user: string; payload: { sudo?: boolean; servers?: string[]; full_name?: string };
   status: 'pending' | 'approved' | 'executed' | 'failed' | 'rejected';
   requested_at: string; approved_at: string | null; executed_at: string | null;
   error: string | null; key_fingerprint: string | null; private_key_ready: boolean;
   key_downloaded_at: string | null; requested_by_name: string; approved_by_name: string | null;
+};
+export type ApprovalBatch = {
+  id: number; status: Action['status']; created_at: string;
+  approved_at: string | null; executed_at: string | null; error: string | null;
 };
 export type Audit = {
   id: number; event: string; target: string | null; details: Record<string, unknown>;
@@ -23,7 +27,7 @@ export type Audit = {
 };
 export type Dashboard = {
   admin: { username: string; csrf: string; desktop_mode: boolean };
-  servers: Server[]; users: User[]; actions: Action[]; audit: Audit[];
+  servers: Server[]; users: User[]; actions: Action[]; approval_batches: ApprovalBatch[]; audit: Audit[];
   statistics: {
     total_unique_users: number; dated_users: number; undated_users: number; new_users_30d: number;
     new_accounts_30d: number; new_servers_30d: number; pending_approvals: number; new_pending_approvals_30d: number;
