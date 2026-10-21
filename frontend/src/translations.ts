@@ -1,5 +1,6 @@
 // English source messages map to Simplified Chinese. User and server data are never translated.
 export const zh: Record<string, string> = {
+  "User number": "用户数量",
   "Check the server settings and try again.": "请检查服务器设置后重试。",
   "Check the operation settings and try again.": "请检查操作设置后重试。",
   "Check the server name and try again.": "请检查服务器名称后重试。",

@@ -10,7 +10,7 @@ const count = (value: number) => value.toLocaleString(locale());
 
 
 function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
-  const [range, setRange] = useState('all');
+  const [range, setRange] = useState('365');
   const [hover, setHover] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(750);
@@ -35,8 +35,8 @@ function UserNumber({ statistics }: { statistics: Dashboard['statistics'] }) {
   const added = hoverTime === null ? 0 : history.find(point => dateTime(point.date) === hoverTime)?.added ?? 0;
   const dateTicks = dateAxisTicks(start, end, right - left);
   return <section className="dashboard-panel user-number-panel" aria-labelledby="user-number-title">
-    <div className="dashboard-panel-heading"><div><Title order={3} id="user-number-title">{t("User growth")}</Title></div>
-      <Select aria-label={t("User number time range")} value={range} allowDeselect={false} onChange={value => { setRange(value || 'all'); setHover(null); }}
+    <div className="dashboard-panel-heading"><div><Title order={3} id="user-number-title">{t("User number")}</Title></div>
+      <Select aria-label={t("User number time range")} value={range} allowDeselect={false} onChange={value => { setRange(value || '365'); setHover(null); }}
         data={[{ value: 'all', label: t("All time") }, { value: '365', label: t("Last year") }, { value: '90', label: t("Last 90 days") }, { value: '30', label: t("Last 30 days") }]} className="dashboard-range" size="xs" />
     </div>
     <div className="growth-chart" ref={ref}>
