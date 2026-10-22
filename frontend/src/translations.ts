@@ -19,6 +19,24 @@ export const en: Record<string, string> = {
 
 // English source messages map to Simplified Chinese. User and server data are never translated.
 export const zh: Record<string, string> = {
+  "Import SSH config": "从 SSH config 导入",
+  "SSH config file": "SSH config 文件",
+  "Choose hosts from your SSH config. Imported servers start paused. Existing servers are kept.": "从 SSH config 选择需要导入的主机。新服务器默认暂停，已有服务器保持不变。",
+  "Default: ~/.ssh/config on macOS/Linux, %USERPROFILE%\\.ssh\\config on Windows.": "默认读取 macOS/Linux 的 ~/.ssh/config，Windows 的 %USERPROFILE%\\.ssh\\config。",
+  "Browse": "浏览",
+  "Import": "导入",
+  "Import {0}": "导入 {0}",
+  "{0} hosts selected": "已选择 {0} 台主机",
+  "Already exists": "已存在",
+  "Invalid SSH config import": "SSH config 导入信息无效",
+  "SSH config changed. Preview it again before importing.": "SSH config 已更改，请重新预览后再导入。",
+  "Some selected server names already exist": "部分所选服务器名称已存在",
+  "Select hosts to import": "请选择需要导入的主机",
+  "Could not choose SSH config file": "无法选择 SSH config 文件",
+  "Could not read SSH config file": "无法读取 SSH config 文件",
+  "SSH config must contain between 1 and 500 explicit Host aliases": "SSH config 必须包含 1 至 500 个明确的 Host 别名",
+  "Match blocks are not supported. Use a config with Host blocks.": "暂不支持 Match 条件块，请使用包含 Host 配置块的文件。",
+
   "Update": "更新",
   "Update · downloading": "更新 · 下载中",
   "Update · {0}%": "更新 · {0}%",

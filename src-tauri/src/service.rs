@@ -6,6 +6,7 @@ use crate::{
     model::{self, Operation, ServerInput},
     operations,
     ssh::{self, Transport},
+    ssh_config,
 };
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
@@ -242,8 +243,8 @@ impl Service {
                 self.reject(id_number(id)?)
             }
             ("PUT", ["api", "users", username, "profile"]) => self.profile(username, &body),
-            ("GET", ["api", "inventory", "export"]) => Ok(
-                json!({"version":1,"servers":db::rows(&self.connection()?,"SELECT name,hostname,port,ssh_user,key_path,enabled,group_name,notes FROM servers ORDER BY name",[])?}),
+            ("GET", ["api", "ssh-config"]) => Ok(
+                json!({"path":ssh_config::default_path(),"exists":ssh_config::default_path().is_file()}),
             ),
             ("POST", ["api", "inventory", "import"]) => {
                 let _g = self.acquire()?;
@@ -417,57 +418,60 @@ impl Service {
     fn import_inventory(&self, body: Value) -> Result<Value> {
         if body.as_object().is_none_or(|o| {
             o.keys()
-                .any(|k| !["version", "servers", "preview"].contains(&k.as_str()))
-        }) || body.get("version").is_some_and(|v| *v != 1)
-        {
-            return Err(Error::bad("Invalid inventory file"));
+                .any(|k| !["path", "preview", "revision", "names"].contains(&k.as_str()))
+        }) {
+            return Err(Error::bad("Invalid SSH config import"));
         }
-        let entries = body["servers"]
-            .as_array()
-            .filter(|a| !a.is_empty() && a.len() <= 500)
-            .ok_or_else(|| Error::bad("Invalid inventory file"))?;
-        let mut servers = Vec::new();
-        let mut names = Vec::new();
-        let mut conflicts = Vec::new();
+        let path = body
+            .get("path")
+            .and_then(Value::as_str)
+            .filter(|s| !s.trim().is_empty())
+            .map(config::expand_path)
+            .unwrap_or_else(ssh_config::default_path);
+        let imported = ssh_config::SshConfig::load(&path)?.import()?;
         let mut c = self.connection()?;
-        for entry in entries {
-            let b = ServerInput::parse(entry.clone())?;
-            if b.sudo_password.is_some() || b.clear_sudo_password {
-                return Err(Error::bad("Inventory files must not contain passwords"));
+        let mut conflicts = Vec::new();
+        for server in &imported.servers {
+            if db::row(&c, "SELECT 1 FROM servers WHERE name=?", [&server.name])?.is_some() {
+                conflicts.push(server.name.clone());
             }
-            if names.contains(&b.name) {
-                return Err(Error::bad("The inventory contains duplicate server names"));
-            }
-            if db::row(&c, "SELECT 1 FROM servers WHERE name=?", [&b.name])?.is_some() {
-                conflicts.push(b.name.clone());
-            }
-            names.push(b.name.clone());
-            servers.push(b);
         }
-        conflicts.sort();
         if body.get("preview").is_none_or(|v| *v == true) {
             return Ok(
-                json!({"count":names.len(),"names":names,"conflicts":conflicts,"paused":true}),
+                json!({"servers":imported.servers,"conflicts":conflicts,"warnings":imported.warnings,"revision":imported.revision}),
             );
         }
         if body["preview"] != false {
-            return Err(Error::bad("Invalid inventory file"));
+            return Err(Error::bad("Invalid SSH config import"));
         }
-        if !conflicts.is_empty() {
+        if body["revision"].as_str() != Some(imported.revision.as_str()) {
             return Err(Error::new(
                 409,
-                "Some server names already exist. Rename them in the inventory before importing",
+                "SSH config changed. Preview it again before importing.",
             ));
         }
+        let names: Vec<String> = serde_json::from_value(body["names"].clone())
+            .map_err(|_| Error::bad("Select hosts to import"))?;
+        if names.is_empty()
+            || names.iter().collect::<HashSet<_>>().len() != names.len()
+            || names
+                .iter()
+                .any(|name| !imported.servers.iter().any(|server| &server.name == name))
+        {
+            return Err(Error::bad("Select hosts to import"));
+        }
+        if conflicts.iter().any(|name| names.contains(name)) {
+            return Err(Error::new(409, "Some selected server names already exist"));
+        }
         let tx = c.transaction()?;
-        for b in servers {
-            Self::insert_server(&tx, &b, false)?;
+        for server in imported.servers.iter().filter(|s| names.contains(&s.name)) {
+            Self::insert_server(&tx, server, false)?;
         }
         db::audit(
             &tx,
             "inventory_imported",
             None,
-            json!({"count":names.len()}),
+            json!({"count":names.len(),"source":"ssh_config"}),
         )?;
         tx.commit()?;
         Ok(json!({"ok":true,"count":names.len()}))

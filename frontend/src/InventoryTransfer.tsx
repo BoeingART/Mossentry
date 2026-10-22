@@ -1,57 +1,62 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useState } from 'react';
-import { Alert, Button, Group, Modal, Stack, Text, Textarea } from '@mantine/core';
+import { Alert, Button, Checkbox, Group, Modal, ScrollArea, Stack, Table, Text, TextInput } from '@mantine/core';
 import { api } from './api';
 import { t } from './i18n';
+import type { Server } from './types';
 
 export async function saveJson(value: unknown, name: string) {
   try { return await invoke<boolean>('save_json', { filename: name, value }); }
   catch (cause) { throw new Error(t((cause as { detail?: string })?.detail || 'Could not save export')); }
 }
 
+type Preview = { servers: Server[]; conflicts: string[]; warnings: string[]; revision: string };
 export default function InventoryTransfer({ saved }: { saved: () => Promise<void> }) {
   const [opened, setOpened] = useState(false);
-  const [text, setText] = useState('');
+  const [path, setPath] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<{ count: number; names: string[]; conflicts: string[] } | null>(null);
-  async function exportFile() {
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const changePath = (value: string) => { setPath(value); setPreview(null); setSelected([]); setError(''); };
+  async function open() {
+    setOpened(true); setError(''); setPreview(null); setSelected([]); setBusy(true);
+    try { const config = await api<{ path: string }>('/api/ssh-config'); changePath(config.path); }
+    catch (cause) { setError(String(cause instanceof Error ? cause.message : cause)); }
+    finally { setBusy(false); }
+  }
+  async function browse() {
     setBusy(true); setError('');
-    try { await saveJson(await api('/api/inventory/export'), 'mossentry-inventory.json'); }
-    catch (cause) { setError(String(cause instanceof Error ? cause.message : cause)); setOpened(true); }
+    try { const value = await invoke<string | null>('choose_ssh_config'); if (value) changePath(value); }
+    catch (cause) { setError(t((cause as { detail?: string })?.detail || 'Could not choose SSH config file')); }
     finally { setBusy(false); }
   }
   async function importFile(apply: boolean) {
     setBusy(true); setError('');
     try {
-      if (text.length > 2_000_000) throw new Error(t('Inventory file is too large'));
-      const value = JSON.parse(text);
-      if (!apply) setPreview(await api('/api/inventory/import', 'POST', { ...value, preview: true }));
-      else { await api('/api/inventory/import', 'POST', { ...value, preview: false }); await saved(); setOpened(false); setText(''); setPreview(null); }
-    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Invalid inventory file')); }
+      if (!apply) {
+        const result = await api<Preview>('/api/inventory/import', 'POST', { path, preview: true });
+        setPreview(result); setSelected(result.servers.filter(s => !result.conflicts.includes(s.name)).map(s => s.name));
+      } else {
+        await api('/api/inventory/import', 'POST', { path, preview: false, revision: preview?.revision, names: selected });
+        await saved(); setOpened(false); setPreview(null); setSelected([]);
+      }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t('Invalid SSH config import')); }
     finally { setBusy(false); }
   }
   return <>
-    <Button variant="default" disabled={busy} onClick={() => void exportFile()}>{t('Export inventory')}</Button>
-    <Button variant="default" onClick={() => { setOpened(true); setError(''); }}>{t('Import inventory')}</Button>
-    <Modal opened={opened} onClose={() => !busy && setOpened(false)} title={t('Import inventory')} size="lg" centered>
+    <Button variant="default" onClick={() => void open()}>{t('Import SSH config')}</Button>
+    <Modal opened={opened} onClose={() => !busy && setOpened(false)} title={t('Import SSH config')} size="xl" centered closeOnClickOutside={!busy} closeOnEscape={!busy}>
       <Stack>
-        <Text size="sm">{t('Import adds new servers only. All imported servers start paused. Passwords and private keys are never included. Check key paths before enabling management.')}</Text>
-        <input aria-label={t('Choose inventory file')} type="file" accept=".json,application/json" disabled={busy} onChange={async e => {
-          const file = e.currentTarget.files?.[0];
-          if (!file) return;
-          setPreview(null); setError('');
-          if (file.size > 2_000_000) { setError(t('Inventory file is too large')); return; }
-          try { setText(await file.text()); } catch { setError(t('Invalid inventory file')); }
-        }} />
-        <Textarea label={t('Inventory JSON')} autosize minRows={7} maxRows={14} value={text} disabled={busy} onChange={e => { setText(e.currentTarget.value); setPreview(null); }} />
-        {error && <Alert color="red">{t(error)}</Alert>}
-        {preview && <Alert color={preview.conflicts.length ? 'orange' : 'blue'}>
-          <Text>{t('{0} servers will be added, paused', { 0: preview.count })}</Text>
-          <Text size="sm" style={{ overflowWrap: 'anywhere' }}>{preview.names.join(', ')}</Text>
-          {!!preview.conflicts.length && <Text>{t('Existing names must be renamed: {0}', { 0: preview.conflicts.join(', ') })}</Text>}
-        </Alert>}
-        <Group justify="end"><Button variant="default" disabled={busy || !text.trim()} onClick={() => void importFile(false)}>{t('Preview import')}</Button><Button loading={busy} disabled={!preview || !!preview.conflicts.length} onClick={() => void importFile(true)}>{t('Import paused servers')}</Button></Group>
+        <Text size="sm">{t('Choose hosts from your SSH config. Imported servers start paused. Existing servers are kept.')}</Text>
+        <Group align="end" wrap="nowrap"><TextInput style={{ flex: 1 }} label={t('SSH config file')} description={t('Default: ~/.ssh/config on macOS/Linux, %USERPROFILE%\\.ssh\\config on Windows.')} value={path} disabled={busy} onChange={e => changePath(e.currentTarget.value)} /><Button variant="default" disabled={busy} onClick={() => void browse()}>{t('Browse')}</Button></Group>
+        {preview && <>
+          <Text size="sm">{t('{0} hosts selected', { 0: selected.length })}</Text>
+          <ScrollArea.Autosize mah={300}><Table><Table.Thead><Table.Tr><Table.Th>{t('Import')}</Table.Th><Table.Th>{t('Server name')}</Table.Th><Table.Th>{t('Hostname or IP address')}</Table.Th><Table.Th>{t('SSH login account')}</Table.Th><Table.Th>{t('SSH port')}</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{preview.servers.map(server => <Table.Tr key={server.name}><Table.Td><Checkbox aria-label={t('Import {0}', { 0: server.name })} checked={selected.includes(server.name)} disabled={busy || preview.conflicts.includes(server.name)} onChange={e => { const checked = e.currentTarget.checked; setSelected(current => checked ? [...current, server.name] : current.filter(name => name !== server.name)); }} /></Table.Td><Table.Td>{server.name}{preview.conflicts.includes(server.name) && <Text size="xs" c="dimmed">{t('Already exists')}</Text>}</Table.Td><Table.Td>{server.hostname}</Table.Td><Table.Td>{server.ssh_user}</Table.Td><Table.Td>{server.port}</Table.Td></Table.Tr>)}</Table.Tbody></Table></ScrollArea.Autosize>
+          {preview.warnings.length > 0 && <Alert color="yellow">{preview.warnings.map(warning => <Text size="sm" key={warning}>{t(warning)}</Text>)}</Alert>}
+        </>}
+        {error && <Alert color="red" role="alert">{t(error)}</Alert>}
+        <Group justify="end"><Button variant="default" disabled={busy || !path.trim()} onClick={() => void importFile(false)}>{t('Preview import')}</Button><Button loading={busy} disabled={!preview || !selected.length} onClick={() => void importFile(true)}>{t('Import paused servers')}</Button></Group>
       </Stack>
     </Modal>
   </>;

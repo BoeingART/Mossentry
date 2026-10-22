@@ -54,6 +54,15 @@ async fn download_credentials(service: State<'_, AppService>, action_id: i64) ->
     Ok(true)
 }
 #[tauri::command]
+async fn choose_ssh_config() -> Option<String> {
+    rfd::AsyncFileDialog::new()
+        .set_directory(crate::config::expand_path("~/.ssh"))
+        .set_file_name("config")
+        .pick_file()
+        .await
+        .map(|file| file.path().to_string_lossy().into_owned())
+}
+#[tauri::command]
 async fn save_json(filename: String, value: Value) -> Result<bool> {
     if filename.len() > 120
         || !filename.starts_with("mossentry-")
@@ -100,6 +109,7 @@ pub fn run() {
             .plugin(tauri_plugin_updater::Builder::new().build())
             .manage(crate::updates::UpdateState::default())
             .invoke_handler(tauri::generate_handler![
+                choose_ssh_config,
                 request,
                 get_appearance,
                 set_appearance,

@@ -56,7 +56,6 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
   const [filter, setFilter] = useState<string | null>('all');
   const [editor, setEditor] = useState<{ server: Server | null } | null>(null);
   const [remove, setRemove] = useState<Server | null>(null);
-  const [removeName, setRemoveName] = useState('');
   const [busy, setBusy] = useState('');
   const [connections, setConnections] = useState<Record<number, { source: string; ok: boolean; detail: string }>>({});
   const [metrics, setMetrics] = useState<{ server: Server; result: ServerMetrics } | null>(null);
@@ -128,7 +127,7 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
                 <Menu.Item leftSection={<IconEdit size={14} />} onClick={() => setEditor({ server })}>{t("Edit server")}</Menu.Item>
                 <Menu.Item onClick={() => void toggle(server)}>{server.enabled ? t("Pause management") : t("Enable management")}</Menu.Item>
                 <Menu.Divider />
-                <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => { setRemove(server); setRemoveName(''); }}>{t("Remove server")}</Menu.Item>
+                <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => setRemove(server)}>{t("Remove server")}</Menu.Item>
               </Menu.Dropdown>
             </Menu>
           </Group>
@@ -147,7 +146,7 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
       </Card>;
     })}</div> : <Paper withBorder radius="lg" p="xl"><Stack align="center"><IconServer size={34} color="#8795a9" /><Title order={3}>{data.servers.length ? t("No matching servers") : t("Add your first server")}</Title>{!data.servers.length && <Button onClick={() => setEditor({ server: null })}>{t("Add server")}</Button>}</Stack></Paper>}
     {editor && <ServerForm server={editor.server} close={() => setEditor(null)} saved={saved} />}
-    <Modal opened={!!remove} onClose={() => !busy && setRemove(null)} title={t("Remove server?")} centered closeOnClickOutside={!busy} closeOnEscape={!busy}><Stack><Text size="sm">{t("Remove")} {remove?.name} {t("and its saved account list from Mossentry. The remote server, its users and files stay unchanged. Operation history is kept.")}</Text><TextInput label={t("Type {0} to confirm", { 0: remove?.name || t("the server name") })} value={removeName} onChange={e => setRemoveName(e.currentTarget.value)} /><Group justify="end"><Button variant="default" disabled={!!busy} onClick={() => setRemove(null)}>{t("Cancel")}</Button><Button color="red" disabled={removeName !== remove?.name} loading={!!busy} onClick={() => void removeServer()}>{t("Remove server")}</Button></Group></Stack></Modal>
+    <Modal opened={!!remove} onClose={() => !busy && setRemove(null)} title={t("Remove server?")} centered closeOnClickOutside={!busy} closeOnEscape={!busy}><Stack><Text size="sm">{t("Remove")} {remove?.name} {t("and its saved account list from Mossentry. The remote server, its users and files stay unchanged. Operation history is kept.")}</Text><Group justify="end"><Button variant="default" disabled={!!busy} onClick={() => setRemove(null)}>{t("Cancel")}</Button><Button color="red" disabled={!!busy} loading={!!busy} onClick={() => void removeServer()}>{t("Remove server")}</Button></Group></Stack></Modal>
     <Modal opened={!!metrics} onClose={() => setMetrics(null)} title={t("{0} · Server status", { 0: metrics?.server.name || '' })} centered size="lg"><Stack>{metrics && <>
       <Text size="xs" c="dimmed">{t("Checked")} {date(metrics.result.checked_at)}</Text><SimpleGrid cols={2}><Paper withBorder p="md"><Text size="sm" c="dimmed">{t("Uptime")}</Text><Text fw={700}>{Math.floor(metrics.result.uptime_seconds / 86400)} {t("days")} {Math.floor(metrics.result.uptime_seconds % 86400 / 3600)} {t("hours")}</Text></Paper><Paper withBorder p="md"><Text size="sm" c="dimmed">{t("System load · 1 / 5 / 15 min")}</Text><Text fw={700}>{metrics.result.load.join(' / ')}</Text></Paper></SimpleGrid>
       <div><Text size="sm" fw={700}>{t("Memory ·")} {metrics.result.memory_used_mb} / {metrics.result.memory_total_mb} MB</Text><Progress mt="xs" value={metrics.result.memory_total_mb ? metrics.result.memory_used_mb / metrics.result.memory_total_mb * 100 : 0} /></div><div><Text size="sm" fw={700}>{t("System disk (/) ·")} {metrics.result.disk_used_gb} / {metrics.result.disk_total_gb} GB</Text><Progress mt="xs" color={metrics.result.disk_percent > 90 ? 'red' : 'blue'} value={metrics.result.disk_percent} /></div><Group justify="end"><Button variant="default" onClick={() => setMetrics(null)}>{t("Close")}</Button><Button loading={!!busy} onClick={() => void operate(metrics.server, 'status')}>{t("Refresh status")}</Button></Group>

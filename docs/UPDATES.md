@@ -21,7 +21,7 @@ The workflow deliberately fails tagged builds if the secret is absent. Pull requ
 
 Tauri updater signatures and Apple code signatures serve separate purposes. The published v0.2.0 and v0.2.1 macOS packages are ad-hoc signed (`signingIdentity: "-"`) and have no Apple notarization ticket. A valid updater signature does not prevent Gatekeeper from blocking a downloaded application. See [INSTALL.md](INSTALL.md#apple-verification-warning--apple-无法验证) for the supported first-launch exception procedure.
 
-Future tagged builds require Apple Developer ID signing and notarization for both Mac architectures. With no Apple credentials, these builds fail before compiling instead of publishing another ad-hoc signed Mac release. Pull requests and untagged manual runs retain ad-hoc signing for development.
+macOS releases currently retain ad-hoc signing without Apple notarization. Signed updater packages remain required. Apple signing and notarization are optional: set the repository Actions variable `APPLE_NOTARIZATION=true` only after configuring all Apple credentials below. In that mode both Mac architectures must pass Apple trust verification before publication. Pull requests and untagged manual runs retain ad-hoc signing for development.
 
 To provision a release:
 
@@ -30,7 +30,7 @@ To provision a release:
 3. As the developer team's Account Holder, open [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/certificates/list), create a **Developer ID Application** certificate from that CSR, download the `.cer`, and install it in that Mac's login keychain. This is the certificate for distributing `.app` bundles outside the Mac App Store.
 4. In Keychain Access → My Certificates, export the certificate **with its private key** as a password-protected `.p12`. Encode it using `openssl base64 -A -in /path/to/certificate.p12 -out /path/to/certificate-base64.txt`. Keep these private files outside the repository.
 5. Create an [app-specific Apple Account password](https://support.apple.com/en-us/102654) for notarization. Use this password rather than your regular account password.
-6. In GitHub → this repository → Settings → Secrets and variables → Actions, configure the following repository secrets:
+6. In GitHub → this repository → Settings → Secrets and variables → Actions, configure the following repository secrets, then enable the `APPLE_NOTARIZATION=true` repository variable:
 
 | Secret | Value |
 | --- | --- |
@@ -58,7 +58,7 @@ See the [Tauri macOS signing guide](https://v2.tauri.app/distribute/sign/macos/)
 ## Publish an update
 
 1. Set the same new version in `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and `src-tauri/tauri.conf.json`.
-2. Provision the updater key and the Apple credentials above before pushing a matching `v<version>` tag. The workflow tests and builds macOS Apple Silicon, macOS Intel and Windows x64. Tagged builds enable `src-tauri/tauri.release.conf.json`, generating `.app.tar.gz` / `.exe` updater packages and their `.sig` files. The Mac builds must pass Developer ID, notarization-ticket and Gatekeeper checks before publication.
+2. Provision the updater key before pushing a matching `v<version>` tag. Apple credentials are required only when `APPLE_NOTARIZATION=true`. The workflow tests and builds macOS Apple Silicon, macOS Intel and Windows x64. Tagged builds enable `src-tauri/tauri.release.conf.json`, generating `.app.tar.gz` / `.exe` updater packages and their `.sig` files. When Apple notarization is enabled, the Mac builds must pass Developer ID, notarization-ticket and Gatekeeper checks before publication.
 3. The publish job combines all three platforms into one `latest.json`, checks all assets and signatures are present, and publishes the manifest, packages, installers and checksums together. Filenames include architecture so the two Mac packages cannot overwrite each other.
 
 Do not publish a higher-version release containing only DMGs/EXEs. Keep `latest.json` and its signed updater assets together. Tauri's [updater documentation](https://v2.tauri.app/plugin/updater/) describes the manifest and signing format.

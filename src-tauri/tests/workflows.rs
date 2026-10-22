@@ -391,45 +391,57 @@ fn duplicate_names_are_conflicts_not_internal_errors() {
     );
 }
 #[test]
-fn imports_preview_validate_atomically_and_start_paused() {
+fn ssh_config_import_previews_selected_hosts_and_rejects_stale_files() {
     let f = Fixture::new();
     f.add("one");
-    let data = json!({"version":1,"servers":[server("one"),server("two")],"preview":true});
-    assert_eq!(
-        f.req("/api/inventory/import", "POST", data.clone())
-            .unwrap()["conflicts"],
-        json!(["one"])
-    );
+    let path = f.dir.path().join("ssh-config");
+    std::fs::write(
+        &path,
+        "Host one two\n HostName example.test\n User operator\n",
+    )
+    .unwrap();
+    let preview = f
+        .req(
+            "/api/inventory/import",
+            "POST",
+            json!({"path":path,"preview":true}),
+        )
+        .unwrap();
+    assert_eq!(preview["conflicts"], json!(["one"]));
     assert_eq!(f.dashboard()["servers"].as_array().unwrap().len(), 1);
-    let mut apply = data;
-    apply["preview"] = json!(false);
+    let apply = json!({"path":path,"preview":false,"revision":preview["revision"],"names":["two"]});
+    let mut conflict = apply.clone();
+    conflict["names"] = json!(["one", "two"]);
+    assert_eq!(
+        f.req("/api/inventory/import", "POST", conflict)
+            .unwrap_err()
+            .status,
+        409
+    );
+    std::fs::write(&path, "Host two\n HostName changed.test\n User operator\n").unwrap();
     assert_eq!(
         f.req("/api/inventory/import", "POST", apply)
             .unwrap_err()
             .status,
         409
     );
+    let preview = f
+        .req("/api/inventory/import", "POST", json!({"path":path}))
+        .unwrap();
     f.req(
         "/api/inventory/import",
         "POST",
-        json!({"servers":[server("two")],"preview":false}),
+        json!({"path":path,"preview":false,"revision":preview["revision"],"names":["two"]}),
     )
     .unwrap();
     assert_eq!(f.dashboard()["servers"][1]["enabled"], 0);
-    let exported = f.req("/api/inventory/export", "GET", Value::Null).unwrap();
-    assert!(!exported.to_string().contains("sudo_password"));
-    let mut secret = server("three");
-    secret["sudo_password"] = json!("secret");
-    assert!(f
-        .req("/api/inventory/import", "POST", json!({"servers":[secret]}))
-        .is_err());
-    assert!(f
-        .req(
-            "/api/inventory/import",
-            "POST",
-            json!({"servers":[server("three"),server("three")]})
-        )
-        .is_err());
+    assert_eq!(f.dashboard()["servers"][1]["hostname"], "changed.test");
+    assert_eq!(
+        f.req("/api/inventory/export", "GET", Value::Null)
+            .unwrap_err()
+            .status,
+        404
+    );
 }
 #[test]
 fn scanning_keeps_all_accounts_but_filters_dashboard_and_preserves_history() {
