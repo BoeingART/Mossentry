@@ -1,6 +1,8 @@
-# Install the Rust edition
+# Installation and connection setup
 
-The `dev` branch now contains the Rust/Tauri application merged from `dev-rust`. Previously published Electron installers are historical builds and do not represent the current source.
+[English README](../README.md) · [简体中文 README](../README-cn.md)
+
+Download a desktop installer from [GitHub Releases](https://github.com/BoeingART/Mossentry/releases/latest). Managed Linux hosts use their existing SSH, Python 3 and Bash; no Mossentry agent or server-side service is installed.
 
 ## macOS
 
@@ -20,7 +22,7 @@ Automatic updates require a release containing `latest.json` and signed updater 
 
 The application reuses the existing Mossentry or legacy application data directory and `mossentry.db` / `server_manager.db` in place, including WAL sidecars, saved sudo passwords, pending requests, credential archives, profiles and operation history. Quit the Electron build before opening the Rust build. The Rust instance lock does not protect against the older Electron application.
 
-The default directory is `~/Library/Application Support/Mossentry` on macOS, `%APPDATA%\Mossentry` on Windows and `~/.config/Mossentry` on Linux. Set `MOSSENTRY_USER_DATA_DIR` to select an isolated directory, or `MOSSENTRY_DATA_DIR` / `MOSSENTRY_DB_PATH` for specific storage overrides. Previous `SRVMGR_*` aliases are accepted. Back up the whole data directory while the application is closed before migrating valuable installations.
+Back up the whole data directory while the application is closed before migrating valuable installations. See [application data](#application-data) for paths and overrides.
 
 ## SSH setup
 
@@ -28,8 +30,24 @@ New installations start with zero servers, no managed user information and empty
 
 Managed hosts require Linux, `/usr/bin/python3`, Bash and appropriate sudo permission. Python scripts execute on the remote host over SSH and are not installed as agents. Launching the application does not change remote accounts.
 
+Configure the login account and private-key path per server. Unix private keys must be owner-only (`0600`); passphrase-encrypted keys are not supported. Account discovery and changes require suitable sudo privileges and standard Linux account tools, including `getent`, `useradd` and `usermod`. NVIDIA GPU metrics additionally require a compatible installed driver and `nvidia-smi`.
+
+A saved sudo password is optional. Leaving its field blank during editing retains the saved value; changing the address, port or login account clears it unless a replacement is supplied. Saved sudo passwords are stored locally without encryption, excluded from responses and audit details, and sent over encrypted SSH stdin. The existing private `srvmgr.passwd` file or `MOSSENTRY_BECOME_PASSWORD_FILE` can supply a fallback; otherwise passwordless sudo is used.
+
+Connection changes invalidate cached accounts. Pending approval operations must be handled before editing or removing their servers.
+
+## Application data
+
+| Platform | Default directory |
+| --- | --- |
+| macOS | `~/Library/Application Support/Mossentry` |
+| Windows | `%APPDATA%\Mossentry` |
+| Linux | `~/.config/Mossentry` |
+
+The database lives under `data/mossentry.db`. Existing installation names, `server_manager.db`, cached users, history, saved credentials and preferences remain compatible. `MOSSENTRY_USER_DATA_DIR`, `MOSSENTRY_DATA_DIR` and `MOSSENTRY_DB_PATH` override storage locations; previous `SRVMGR_*` aliases are accepted. Unix application directories/files use `0700`/`0600`.
+
+A database lock prevents concurrent Rust instances. Interrupted operations are recorded for review and are not automatically retried. Native save dialogs export JSON and one-time credential ZIPs; cancellation or a failed write leaves credentials available.
+
 ## Build from source
 
-Install Node.js 24+, Rust stable and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). Run `npm ci`, then `npm start`. Build installers with `npm run dist:mac` or `npm run dist:win` on the target operating system. Output is under `src-tauri/target/release/bundle`.
-
-On Windows the OpenSSL source build also needs Perl; GitHub's Windows runner includes Strawberry Perl. On macOS the launcher automatically uses installed Command Line Tools if the active Xcode compiler is unavailable. It never accepts Xcode license terms or changes the global developer-directory selection.
+See the [development guide](DEVELOPMENT.md) for prerequisites, source setup, verification and installer builds.

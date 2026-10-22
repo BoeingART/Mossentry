@@ -1,101 +1,110 @@
-# Mossentry
+<div align="center">
 
-<img src="icon.svg" width="112" height="112" alt="Mossentry icon" />
+<h1><img src="icon-full.svg" alt="Mossentry" width="440" /></h1>
 
-Mossentry is a Rust desktop application for managing Linux servers over SSH. The `dev` branch uses Tauri 2, a React/Mantine interface in the system WebView, and a Rust core for SQLite storage, SSH, approvals, credentials and operation history.
+<p><strong>Your Linux servers. One desktop. Just SSH.</strong></p>
+<p>Manage user access, run commands across servers, and see where resources go.</p>
+
+<p>
+  <a href="https://github.com/BoeingART/Mossentry/releases"><img src="https://img.shields.io/github/v/release/BoeingART/Mossentry?style=flat-square&amp;color=008f82" alt="Latest release" /></a>
+  <a href="https://github.com/BoeingART/Mossentry/actions/workflows/release.yml"><img src="https://github.com/BoeingART/Mossentry/actions/workflows/release.yml/badge.svg" alt="Desktop release checks" /></a>
+  <img src="https://img.shields.io/badge/desktop-macOS%20%7C%20Windows-263d36?style=flat-square" alt="Desktop installers for macOS and Windows" />
+  <img src="https://img.shields.io/badge/SSH-agentless-7faa69?style=flat-square" alt="Agentless over SSH" />
+</p>
+
+<p><strong>English</strong> · <a href="README-cn.md">简体中文</a></p>
+
+<p>
+  <a href="#why-mossentry">Why Mossentry?</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="#documentation">Documentation</a>
+</p>
+
+</div>
+
+## Why Mossentry?
+
+**No server-side agent or service to install. Connect over SSH and use the Python already on your servers.**
+
+Mossentry is a desktop app for managing Linux servers from your own computer. It sends tasks and collects metrics over SSH, using short-lived remote programs. There is no Mossentry daemon to maintain, no web console to deploy, and no extra management port to open.
+
+### Less setup, fewer exposed services
+
+| | Mossentry | Cockpit | Webmin |
+| --- | --- | --- | --- |
+| Interface | Native desktop app | Web console | Web console |
+| Server setup | Existing SSH, Python 3 and Bash | Cockpit packages and socket | Webmin package and service |
+| Management endpoint | Your existing SSH port | HTTPS, usually port 9090 | HTTPS, usually port 10000 |
+| Management software to maintain | Desktop app | Server-side web console | Server-side web console |
+
+The comparison covers standard standalone web deployments described in the [Cockpit installation guide](https://cockpit-project.org/running.html) and [Webmin installation guide](https://webmin.com/download/). Ports and deployment arrangements can be customized.
+
+Mossentry reuses your SSH access and verifies server host keys before connecting. Your inventory and operation history stay on your computer. This avoids adding an HTTP administration endpoint and the associated web service setup, certificate configuration and access rules.
+
+### What your servers need
+
+| Requirement | Details |
+| --- | --- |
+| Operating system | Linux |
+| Connection | SSH access with a private key and a verified host fingerprint |
+| Runtime | Python 3 at `/usr/bin/python3`, Bash and standard Linux utilities |
+| Account administration | Sudo privileges for account discovery and changes |
+| NVIDIA GPU monitoring | An installed NVIDIA driver and `nvidia-smi`, only if GPU metrics are needed |
+
+**No additional Python packages or Mossentry services are required on the server.** See [connection setup](docs/INSTALL.md#ssh-setup) for SSH key requirements and permissions.
 
 ## Features
 
-- **Dashboard**: cumulative user numbers, a last-year default view, the current sudo-user ratio and server account totals.
-- **Servers**: connection settings, account synchronization, status, groups, notes, and JSON inventory import/export. Imported servers start paused.
-- **Users & access**: filter actual host accounts by status and server, create users, enable/disable sign-in, grant/revoke sudo, edit local profiles and queue account deletion.
-- **Approvals**: operations accumulate in one pending list. Review or remove individual items, then approve or reject the whole list. Every target is checked before execution; results and one-time credentials remain available per operation. Account deletion retains the home directory and files.
-- **Operations**: multiline Bash editing, optional syntax checks, risk review, sudo, per-server timeouts, output diagnostics and saved task history with JSON export.
-- **Monitoring**: CPU, NVIDIA GPU, memory, network and disk usage. Charts scroll over five minutes with fixed minute ticks and name-only legends. Disks sort by capacity and display media type and software RAID level when the host exposes them.
-- **Appearance**: English/Simplified Chinese and persistent light/dark preferences, using system fonts.
-- **Updates**: checks GitHub Releases at startup and every ten minutes. A newer version reveals the top-right Update button and downloads a signed package in the background; click when ready to install and restart. See [release setup](docs/UPDATES.md).
+### 🔐 User and permission management
 
-## Run from source
+Keep track of who can access each server and what they can do.
 
-Install Node.js 24+, Rust stable and the platform's [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). macOS needs Command Line Tools; Windows needs Microsoft C++ build tools, WebView2 and Perl for bundled OpenSSL. Linux needs WebKitGTK 4.1 and the other packages listed in the Tauri prerequisites.
+- Discover existing Linux accounts and review their sign-in status and sudo access across servers.
+- Create accounts on selected hosts, enable or disable sign-in, grant or revoke sudo, and remove accounts.
+- Collect account changes into a pending list and review them together before execution.
+- Generate SSH credentials for new accounts and export their login bundle.
 
-```bash
-npm ci
-npm start
-```
+### ⚡ Batch operations across servers
 
-`npm start` builds and opens the native application with the Vite development server. `npm run dev:ui` runs only Vite; functional application use requires the native window and its Rust commands. There is no local HTTP backend or sign-in screen.
+Run a maintenance task across selected hosts from one place.
 
-Node.js is a development/build dependency. The packaged app does not include Electron, Node.js, a local Python runtime or Ansible. The four embedded programs in `src-tauri/remote` run on the managed Linux host using its existing `/usr/bin/python3` and Bash.
+- Write a Bash script once and run it on multiple servers, with optional sudo and per-server timeouts.
+- Check shell syntax and review command risks before running a task.
+- Inspect each server's output, exit status and diagnostics, then revisit or export the saved task history.
 
-## Verify
+### 📈 Resource monitoring
 
-```bash
-npm run check          # frontend build, tooling, chart/UI data, Rust and remote-probe tests
-npm run check:rust     # full desktop Clippy checks
-npm run fmt:rust       # format Rust sources
-npm run test:ssh       # optional real SSH/account lifecycle test; requires Docker
-```
+See how your servers are being used while you work.
 
-Python 3 is needed locally for the remote-probe tests only. Regular tests use temporary data and mocked SSH. The optional SSH test creates a disposable Linux container bound to loopback; it does not contact configured servers.
+- Track CPU, memory, network, disk usage and supported NVIDIA GPUs.
+- Filter CPU and GPU activity by user to understand who is consuming resources.
+- Follow recent usage trends to investigate contention and check the effect of maintenance tasks.
 
-## Build installers
+## Get started
 
-```bash
-npm run dist:mac       # on macOS: app and DMG
-npm run dist:win       # on Windows: NSIS installer
-```
+1. **[Download Mossentry](https://github.com/BoeingART/Mossentry/releases/latest)** for your computer.
+2. Verify your servers' SSH fingerprints and add them to your local `known_hosts` file.
+3. Add a server with its address, SSH login account and private-key path, or import your inventory.
+4. Sync accounts, review permissions, and start running tasks or monitoring resources.
 
-`npm run build` builds only the frontend into `dist/`. Native installers are generated under `src-tauri/target/release/bundle/`.
-
-The release workflow builds macOS arm64/x64 and Windows x64 packages. Manual runs upload artifacts; explicit version tags publish after tests, platform builds and package-version checks succeed. Both npm and Cargo lockfiles are committed.
-
-See [installation and data migration](docs/INSTALL.md).
-
-## SSH and application data
-
-Managed hosts require Linux, `/usr/bin/python3`, Bash, key-based SSH and suitable sudo privileges for account changes. Configure the login account and key path per server. Unix private keys must be owner-only (`0600`); passphrase-encrypted keys are not supported. Verify each host fingerprint and add it to the local `~/.ssh/known_hosts` before connecting. Unknown and changed host keys are rejected.
-
-New installations start with zero servers, no managed user accounts or profiles, and empty user statistics. Add servers manually or import an inventory, then sync their accounts. Upgrades remove untouched, unused legacy example servers once, preserving configured or used servers and user data. Connection changes invalidate cached accounts. Pending approval operations must be handled before editing or removing their servers.
-
-A saved sudo password is optional. Leaving its field blank during editing retains the saved value; changing the address, port or login account clears it unless a replacement is supplied. Saved sudo passwords are stored locally without encryption, excluded from responses and audit details, and sent over encrypted SSH stdin. Unix application directories/files use `0700`/`0600`. The existing private `srvmgr.passwd` file or `MOSSENTRY_BECOME_PASSWORD_FILE` can supply a fallback; otherwise passwordless sudo is used.
-
-Default application data directories:
-
-| Platform | Directory |
+| Desktop platform | Installer |
 | --- | --- |
-| macOS | `~/Library/Application Support/Mossentry` |
-| Windows | `%APPDATA%\Mossentry` |
-| Linux | `~/.config/Mossentry` |
+| macOS 13+, Apple Silicon | Apple Silicon `.dmg` |
+| macOS 13+, Intel | Intel `.dmg` |
+| Windows 10/11, x64 | Windows `.exe` installer |
 
-The database lives under `data/mossentry.db`. Existing installation names, `server_manager.db`, cached users, history, saved credentials and preferences remain compatible. `MOSSENTRY_USER_DATA_DIR`, `MOSSENTRY_DATA_DIR` and `MOSSENTRY_DB_PATH` override storage locations; previous `SRVMGR_*` aliases are accepted.
+The packaged app needs no separate Python, Node.js or Ansible installation on your computer. Linux desktop users can [build from source](docs/DEVELOPMENT.md); the release workflow currently provides macOS and Windows installers.
 
-A database lock prevents concurrent Rust instances. Interrupted operations are recorded for review and are not automatically retried. Native save dialogs export JSON and one-time credential ZIPs; cancellation or a failed write leaves credentials available.
+## Documentation
 
-## Repository layout
-
-| Path | Contents |
+| Guide | What you will find |
 | --- | --- |
-| `frontend/src/` | React interface, charts, translations and native IPC calls |
-| `frontend/tests/` | Chart, filtering and approval-list regression tests |
-| `src-tauri/src/` | Rust desktop entry point and application services |
-| `src-tauri/remote/` | Embedded Linux programs sent over SSH |
-| `src-tauri/tests/` | Rust workflow, migration and live SSH tests |
-| `src-tauri/icons/` | Desktop icon resources generated from `icon.svg` |
-| `remote-tests/` | Remote-probe tests using Python's standard library |
-| `scripts/` | Rust launcher, cleanup utility and disposable integration fixtures |
-| `docs/` | Installation, operation workflows and migration notes |
+| [Installation and connection setup](docs/INSTALL.md) | Desktop installation, SSH requirements and local data |
+| [Operation workflows](docs/OPERATIONS.md) | Account approvals, batch commands and monitoring |
+| [Development guide](docs/DEVELOPMENT.md) | Run from source, checks, packaging and repository layout |
+| [Architecture and migration](docs/DEV-RUST.md) | Rust/Tauri implementation and data compatibility |
 
-## Keep the checkout clean
+## Contributing
 
-Generated dependencies, build output, installer packages and caches are ignored. The repository contains source, dependency lockfiles and required assets; old desktop runtimes and installer copies are not maintained in the checkout.
-
-```bash
-npm run clean -- --dry-run   # preview generated output/cache removal
-npm run clean               # remove dist, Rust output, generated schemas and caches
-npm run clean:all           # also remove node_modules; restore with npm ci
-```
-
-Cleanup preserves source, Git history, lockfiles and application data. Old Electron release notes and duplicated icon assets have been removed. Git history retains earlier versions.
-
-See [operation workflows](docs/OPERATIONS.md) and [Rust migration details](docs/DEV-RUST.md).
+Bug reports, feature ideas and pull requests are welcome. [Open an issue](https://github.com/BoeingART/Mossentry/issues) to share a problem or proposal, or follow the [development guide](docs/DEVELOPMENT.md) to work on the app.
