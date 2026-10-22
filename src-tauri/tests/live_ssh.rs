@@ -148,3 +148,139 @@ fn loopback_ssh_transport_and_complete_account_lifecycle() {
     assert_eq!(check, json!({"home":true,"injected":false}));
     assert_eq!(s(&dashboard()["actions"][0], "status"), "executed");
 }
+
+#[test]
+#[ignore = "requires the isolated Docker SSH fixture; run npm run test:ssh"]
+fn openssh_direct_and_imported_multiple_jump_hosts_preserve_framing_and_host_trust() {
+    use mossentry::ssh_config::SshConfig;
+    let port = std::env::var("MOSSENTRY_TEST_SSH_PORT")
+        .unwrap()
+        .parse::<u16>()
+        .unwrap();
+    let directory = PathBuf::from(std::env::var("MOSSENTRY_TEST_SSH_DIR").unwrap());
+    assert!(directory.join("disposable-fixture").is_file());
+    let ssh = NativeSsh::with_known_hosts(directory.join("known_hosts"));
+    let mut direct = json!({"hostname":"127.0.0.1","port":port,"ssh_user":"operator","key_path":directory.join("id_ed25519"),"ssh_backend":"openssh"});
+    let echo = "import sys,json\np=json.loads(sys.stdin.readline())\nsys.stderr.write('notice\\n' * 10000)\nprint(json.dumps(p))";
+    let payload =
+        json!({"value":"中文 ' ; $(touch /tmp/should-not-exist)","large":"x".repeat(200_000)});
+    assert_eq!(
+        ssh.execute(&direct, echo, &payload, true, Some("fixture-password"), 20)
+            .unwrap(),
+        payload
+    );
+    let bad = NativeSsh::with_known_hosts(directory.join("wrong_known_hosts"));
+    assert!(bad
+        .execute(&direct, echo, &payload, false, None, 10)
+        .unwrap_err()
+        .to_lowercase()
+        .contains("host key"));
+    assert!(ssh
+        .execute(
+            &direct,
+            "import time;time.sleep(5)",
+            &json!({}),
+            false,
+            None,
+            1
+        )
+        .unwrap_err()
+        .contains("timed out"));
+    direct["ssh_user"] = json!("nopass");
+    assert_eq!(
+        ssh.execute(&direct, echo, &payload, true, Some("unused-password"), 20)
+            .unwrap(),
+        payload
+    );
+
+    #[cfg(unix)]
+    {
+        struct Agent(std::process::Child);
+        impl Drop for Agent {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let socket = directory.join("agent.sock");
+        let _agent = Agent(
+            std::process::Command::new("/usr/bin/ssh-agent")
+                .args(["-D", "-a"])
+                .arg(&socket)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        for _ in 0..200 {
+            if socket.exists() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let add = std::process::Command::new("/usr/bin/ssh-add")
+            .arg(directory.join("id_ed25519"))
+            .env("SSH_AUTH_SOCK", &socket)
+            .output()
+            .unwrap();
+        assert!(
+            add.status.success(),
+            "{}",
+            String::from_utf8_lossy(&add.stderr)
+        );
+        let mut agent_server = direct.clone();
+        agent_server["ssh_user"] = json!("operator");
+        agent_server["key_path"] = json!("");
+        agent_server["ssh_options"] = json!(format!(
+            "IdentityAgent {}\nIdentityFile none\n",
+            mossentry::ssh_config::quote(&socket.to_string_lossy())
+        ));
+        assert_eq!(
+            ssh.execute(&agent_server, echo, &payload, false, None, 20)
+                .unwrap(),
+            payload
+        );
+    }
+
+    let path = directory.join("jump-config");
+    let key = mossentry::ssh_config::quote(&directory.join("id_ed25519").to_string_lossy());
+    std::fs::write(&path, format!("Host target\n HostName 127.0.0.1\n Port 22\n User operator\n IdentityFile {key}\n ProxyJump relay,inner\nHost relay\n HostName 127.0.0.1\n Port {port}\n User operator\n IdentityFile {key}\nHost inner\n HostName 127.0.0.1\n Port 22\n User operator\n IdentityFile {key}\n")).unwrap();
+    let imported = SshConfig::load(&path).unwrap().import().unwrap();
+    let target = serde_json::to_value(&imported.servers[0]).unwrap();
+    assert_eq!(
+        ssh.execute(&target, echo, &payload, true, Some("fixture-password"), 20)
+            .unwrap(),
+        payload
+    );
+    assert!(ssh
+        .execute(
+            &target,
+            "import time;time.sleep(5)",
+            &json!({}),
+            false,
+            None,
+            1
+        )
+        .unwrap_err()
+        .contains("timed out"));
+    assert!(ssh
+        .execute(
+            &target,
+            "print('x' * 17_000_000)",
+            &json!({}),
+            false,
+            None,
+            20
+        )
+        .unwrap_err()
+        .contains("size limit"));
+
+    let mut command = target.clone();
+    let proxy = format!("ProxyCommand {} -F {} -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile={} -W %h:%p relay\n", shell_words::quote(&mossentry::openssh::executable().to_string_lossy()), shell_words::quote(&path.to_string_lossy()), shell_words::quote(&directory.join("known_hosts").to_string_lossy()));
+    command["ssh_options"] = json!(proxy);
+    assert_eq!(
+        ssh.execute(&command, echo, &payload, false, None, 20)
+            .unwrap(),
+        payload
+    );
+}

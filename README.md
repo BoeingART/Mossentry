@@ -83,7 +83,7 @@ See how your servers are being used while you work.
 
 1. **[Download Mossentry](https://github.com/BoeingART/Mossentry/releases/latest)** for your computer.
 2. Verify your servers' SSH fingerprints and add them to your local `known_hosts` file.
-3. Add a server with its address, SSH login account and private-key path, or import your inventory.
+3. Add a server with its address, SSH login account and private-key path, or import hosts from `~/.ssh/config` (`%USERPROFILE%\.ssh\config` on Windows).
 4. Sync accounts, review permissions, and start running tasks or monitoring resources.
 
 | Desktop platform | Installer |
@@ -94,7 +94,7 @@ See how your servers are being used while you work.
 
 The packaged app needs no additional software installed on your computer. Linux desktop users can [build from source](docs/DEVELOPMENT.md); the release workflow currently provides macOS and Windows installers.
 
-**macOS first-launch Apple verification warning:** v0.2.0 and v0.2.1 have not been notarized by Apple. If you trust the download from this project, use **System Settings → Privacy & Security → Open Anyway**. See the [installation guide](docs/INSTALL.md#apple-verification-warning--apple-无法验证) for the full procedure.
+**macOS first-launch Apple verification warning:** v0.2.0 through v0.2.2 have not been notarized by Apple. If you trust the download from this project, use **System Settings → Privacy & Security → Open Anyway**. See the [installation guide](docs/INSTALL.md#apple-verification-warning--apple-无法验证) for the full procedure.
 
 ## Documentation
 

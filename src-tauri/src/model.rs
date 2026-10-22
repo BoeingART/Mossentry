@@ -44,6 +44,17 @@ pub struct ServerInput {
     pub group_name: String,
     #[serde(default)]
     pub notes: String,
+    #[serde(default = "native_backend")]
+    pub ssh_backend: String,
+    #[serde(default)]
+    pub ssh_alias: String,
+    #[serde(default)]
+    pub ssh_options: String,
+    #[serde(default)]
+    pub ssh_jump_config: String,
+}
+fn native_backend() -> String {
+    "native".into()
 }
 fn bool_or_int<'de, D: serde::Deserializer<'de>>(d: D) -> std::result::Result<bool, D::Error> {
     match Value::deserialize(d)? {
@@ -64,7 +75,25 @@ impl ServerInput {
         if ["all", "ungrouped", "managed"].contains(&s.name.as_str()) {
             return Err(Error::bad("This server name is reserved"));
         }
-        username(&s.ssh_user)?;
+        if !matches(r"^[A-Za-z0-9_][A-Za-z0-9_.@\\$-]{0,127}$", &s.ssh_user) {
+            return Err(Error::bad("Invalid SSH login account"));
+        }
+        if !["native", "openssh"].contains(&s.ssh_backend.as_str()) {
+            return Err(Error::bad("Invalid SSH transport"));
+        }
+        if !s.ssh_alias.is_empty() && !matches(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$", &s.ssh_alias)
+        {
+            return Err(Error::bad("Invalid SSH Host alias"));
+        }
+        crate::ssh_config::validate_options(&s.ssh_options, false)?;
+        crate::ssh_config::validate_options(&s.ssh_jump_config, true)?;
+        if s.ssh_backend == "native"
+            && (!s.ssh_options.trim().is_empty() || !s.ssh_jump_config.trim().is_empty())
+        {
+            return Err(Error::bad(
+                "Select OpenSSH to use advanced SSH login settings",
+            ));
+        }
         let host_valid = s.hostname.parse::<std::net::IpAddr>().is_ok()
             || s.hostname
                 .trim_end_matches('.')
@@ -82,12 +111,16 @@ impl ServerInput {
             return Err(Error::bad("Invalid SSH key path"));
         }
         let p = expand_path(s.key_path.trim());
-        if !p.is_absolute() {
+        if !p.is_absolute() && !(s.key_path.trim().is_empty() && s.ssh_backend == "openssh") {
             return Err(Error::bad(
                 "Use an absolute SSH key path or a path starting with ~/",
             ));
         }
-        s.key_path = p.to_string_lossy().into_owned();
+        s.key_path = if s.key_path.trim().is_empty() {
+            String::new()
+        } else {
+            p.to_string_lossy().into_owned()
+        };
         if s.sudo_password
             .as_ref()
             .is_some_and(|s| s.chars().count() > 4096 || s.contains(['\r', '\n', '\0']))

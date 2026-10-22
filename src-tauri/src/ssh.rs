@@ -64,16 +64,28 @@ impl Transport for NativeSsh {
         password: Option<&str>,
         timeout: u64,
     ) -> std::result::Result<Value, String> {
-        execute(
-            &self.known_hosts,
-            server,
-            source,
-            payload,
-            sudo,
-            password,
-            timeout,
-        )
-        .map_err(|e| redact(&e, password))
+        let result = if s(server, "ssh_backend") == "openssh" {
+            crate::openssh::execute(
+                &self.known_hosts,
+                server,
+                source,
+                payload,
+                sudo,
+                password,
+                timeout,
+            )
+        } else {
+            execute(
+                &self.known_hosts,
+                server,
+                source,
+                payload,
+                sudo,
+                password,
+                timeout,
+            )
+        };
+        result.map_err(|e| redact(&e, password))
     }
 }
 fn execute(

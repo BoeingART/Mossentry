@@ -1,6 +1,6 @@
 [package]
 name = "mossentry"
-version = "0.2.1"
+version = "0.2.2"
 description = "Rust desktop manager for SSH hosts and access requests"
 edition = "2021"
 default-run = "mossentry"
@@ -30,6 +30,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 shell-words = "1"
 glob = "0.3"
 sha2 = "0.10"
+tempfile = "3"
 tauri = { version = "2", optional = true, features = [] }
 tauri-plugin-single-instance = { version = "2", optional = true }
 rfd = { version = "0.15", optional = true }
@@ -38,5 +39,5 @@ tauri-plugin-updater = { version = "2", optional = true }
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
-[dev-dependencies]
-tempfile = "3"
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

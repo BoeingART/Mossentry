@@ -1196,3 +1196,32 @@ fn legacy_pending_items_migrate_to_one_list_and_interrupted_lists_do_not_resume(
         .all(|item| item["status"] == "failed"));
     assert!(f.remote.calls.lock().unwrap().is_empty());
 }
+
+#[test]
+fn advanced_login_settings_round_trip_and_route_changes_clear_cached_identity() {
+    let f = Fixture::new();
+    let mut body = server("one");
+    body["sudo_password"] = json!("saved-password");
+    let id = n(&f.req("/api/servers", "POST", body.clone()).unwrap(), "id");
+    f.scan();
+    body["sudo_password"] = json!("");
+    body["ssh_backend"] = json!("openssh");
+    body["ssh_alias"] = json!("lab-node");
+    body["ssh_options"] = json!("ProxyJump relay\nIdentityAgent SSH_AUTH_SOCK\n");
+    body["ssh_jump_config"] = json!("Host relay\n HostName relay.test\n User jump\n Port 2222\n");
+    f.req(&format!("/api/servers/{id}"), "PUT", body.clone())
+        .unwrap();
+    let dashboard = f.dashboard();
+    assert!(dashboard["users"].as_array().unwrap().is_empty());
+    assert_eq!(dashboard["servers"][0]["last_scan_status"], "never");
+    assert_eq!(dashboard["servers"][0]["has_sudo_password"], 0);
+    for key in ["ssh_backend", "ssh_alias", "ssh_options", "ssh_jump_config"] {
+        assert_eq!(dashboard["servers"][0][key], body[key]);
+    }
+    body["ssh_options"] = json!("LocalCommand touch /tmp/sentinel");
+    assert!(f.req(&format!("/api/servers/{id}"), "PUT", body).is_err());
+    assert_eq!(
+        f.dashboard()["servers"][0]["ssh_options"],
+        dashboard["servers"][0]["ssh_options"]
+    );
+}

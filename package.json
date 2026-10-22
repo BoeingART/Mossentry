@@ -1,7 +1,7 @@
 {
   "name": "mossentry",
   "productName": "Mossentry",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "Desktop manager for SSH hosts and access requests",
   "scripts": {

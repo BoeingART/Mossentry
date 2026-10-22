@@ -19,7 +19,7 @@ The workflow deliberately fails tagged builds if the secret is absent. Pull requ
 
 ## macOS Developer ID signing and notarization
 
-Tauri updater signatures and Apple code signatures serve separate purposes. The published v0.2.0 and v0.2.1 macOS packages are ad-hoc signed (`signingIdentity: "-"`) and have no Apple notarization ticket. A valid updater signature does not prevent Gatekeeper from blocking a downloaded application. See [INSTALL.md](INSTALL.md#apple-verification-warning--apple-无法验证) for the supported first-launch exception procedure.
+Tauri updater signatures and Apple code signatures serve separate purposes. The published v0.2.0 through v0.2.2 macOS packages are ad-hoc signed (`signingIdentity: "-"`) and have no Apple notarization ticket. A valid updater signature does not prevent Gatekeeper from blocking a downloaded application. See [INSTALL.md](INSTALL.md#apple-verification-warning--apple-无法验证) for the supported first-launch exception procedure.
 
 macOS releases currently retain ad-hoc signing without Apple notarization. Signed updater packages remain required. Apple signing and notarization are optional: set the repository Actions variable `APPLE_NOTARIZATION=true` only after configuring all Apple credentials below. In that mode both Mac architectures must pass Apple trust verification before publication. Pull requests and untagged manual runs retain ad-hoc signing for development.
 

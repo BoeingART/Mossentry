@@ -2491,12 +2491,13 @@ dependencies = [
 
 [[package]]
 name = "mossentry"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "chrono",
  "dirs 6.0.0",
  "fs2",
  "glob",
+ "libc",
  "rand 0.8.8",
  "regex",
  "rfd",

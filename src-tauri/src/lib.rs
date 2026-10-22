@@ -7,6 +7,7 @@ pub mod desktop;
 pub mod error;
 pub mod history;
 pub mod model;
+pub mod openssh;
 pub mod operations;
 pub mod service;
 pub mod ssh;

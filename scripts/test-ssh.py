@@ -56,6 +56,9 @@ CMD ["/usr/sbin/sshd", "-D", "-e", "-o", "PasswordAuthentication=no"]
             public = run('docker', 'exec', container, 'cat', f'/etc/ssh/ssh_host_{algorithm}_key.pub', capture_output=True).stdout.split()
             (directory / f'known_hosts_{algorithm}').write_text(f'[127.0.0.1]:{port} {public[0]} {public[1]}\n')
         shutil.copyfile(directory / 'known_hosts_ed25519', directory / 'known_hosts')
+        public = run('docker', 'exec', container, 'cat', '/etc/ssh/ssh_host_ed25519_key.pub', capture_output=True).stdout.split()
+        with (directory / 'known_hosts').open('a') as hosts:
+            hosts.write(f'127.0.0.1 {public[0]} {public[1]}\n')
         shutil.copyfile(directory / 'known_hosts', directory / 'known_hosts_hashed')
         run('ssh-keygen', '-q', '-H', '-f', str(directory / 'known_hosts_hashed'), capture_output=True)
         env = {**os.environ, 'MOSSENTRY_TEST_SSH_DIR': str(directory), 'MOSSENTRY_TEST_SSH_PORT': port}

@@ -2,25 +2,26 @@ import { numericDate } from './dateFormat';
 import { t } from './i18n';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Modal, NumberInput, Paper, PasswordInput, Progress, Select, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip, Textarea, Badge } from '@mantine/core';
+import { Accordion, ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Modal, NumberInput, Paper, PasswordInput, Progress, Select, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip, Textarea, Badge } from '@mantine/core';
 import { IconCheck, IconDots, IconEdit, IconPlus, IconSearch, IconServer, IconTrash, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { api } from './api';
 import InventoryTransfer from './InventoryTransfer';
+import { sshOption, setSshOption } from './sshOptions';
 import type { Dashboard, Server, ServerMetrics } from './types';
 
 const date = (value: string | null) => value ? numericDate(value, { includeTime: true }) : t("Not yet synced");
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : t("Please retry the operation");
 const notify = (message: string, error = false) => notifications.show({ title: error ? t("Could not complete") : t("Done"), message: t(message), color: error ? 'red' : 'teal' });
-type Draft = { name: string; hostname: string; port: number | string; ssh_user: string; key_path: string; enabled: boolean; group_name: string; notes: string };
+type Draft = { name: string; hostname: string; port: number | string; ssh_user: string; key_path: string; enabled: boolean; group_name: string; notes: string; ssh_backend: 'native' | 'openssh'; ssh_alias: string; ssh_options: string; ssh_jump_config: string };
 
 function ServerForm({ server, close, saved }: { server: Server | null; close: () => void; saved: () => Promise<void> }) {
-  const [draft, setDraft] = useState<Draft>({ name: server?.name || '', hostname: server?.hostname || '', port: server?.port || 22, ssh_user: server?.ssh_user || '', key_path: server?.key_path || '~/.ssh/id_rsa', enabled: server ? !!server.enabled : true, group_name: server?.group_name || '', notes: server?.notes || '' });
+  const [draft, setDraft] = useState<Draft>({ name: server?.name || '', hostname: server?.hostname || '', port: server?.port || 22, ssh_user: server?.ssh_user || '', key_path: server?.key_path ?? '~/.ssh/id_rsa', enabled: server ? !!server.enabled : true, group_name: server?.group_name || '', notes: server?.notes || '', ssh_backend: server?.ssh_backend || 'native', ssh_alias: server?.ssh_alias || '', ssh_options: server?.ssh_options || '', ssh_jump_config: server?.ssh_jump_config || '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sudoPassword, setSudoPassword] = useState('');
   const [clearSudoPassword, setClearSudoPassword] = useState(false);
-  const identityChanged = !!server && (draft.hostname !== server.hostname || Number(draft.port) !== server.port || draft.ssh_user !== server.ssh_user);
+  const identityChanged = !!server && (draft.hostname !== server.hostname || Number(draft.port) !== server.port || draft.ssh_user !== server.ssh_user || draft.ssh_backend !== server.ssh_backend || draft.ssh_alias !== server.ssh_alias || draft.ssh_options !== server.ssh_options || draft.ssh_jump_config !== server.ssh_jump_config);
   const field = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft(current => ({ ...current, [key]: value }));
   async function submit(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
@@ -32,12 +33,38 @@ function ServerForm({ server, close, saved }: { server: Server | null; close: ()
       await saved(); close();
     } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   }
-  return <Modal opened onClose={() => !busy && close()} closeOnClickOutside={!busy} closeOnEscape={!busy} title={server ? t("Edit server") : t("Add server")} centered radius="lg">
+  return <Modal opened onClose={() => !busy && close()} closeOnClickOutside={!busy} closeOnEscape={!busy} title={server ? t("Edit server") : t("Add server")} centered radius="lg" size="lg">
     <form onSubmit={submit}><Stack gap="md">
       <TextInput label={t("Server name")} placeholder={t("e.g. gpu5")} value={draft.name} onChange={e => field('name', e.currentTarget.value)} pattern="[a-z][a-z0-9_-]{0,31}" required autoFocus />
       <Group grow align="start"><TextInput label={t("Hostname or IP address")} placeholder={t("e.g. 192.168.1.10")} value={draft.hostname} onChange={e => field('hostname', e.currentTarget.value)} required /><NumberInput label={t("SSH port")} min={1} max={65535} allowDecimal={false} value={draft.port} onChange={value => field('port', value)} required /></Group>
-      <TextInput label={t("SSH login account")} value={draft.ssh_user} onChange={e => field('ssh_user', e.currentTarget.value)} pattern="[a-z_][a-z0-9_-]{0,31}" required />
-      <TextInput label={t("SSH private key path")} placeholder="~/.ssh/id_rsa" value={draft.key_path} onChange={e => field('key_path', e.currentTarget.value)} required />
+      <TextInput label={t("SSH login account")} value={draft.ssh_user} onChange={e => field('ssh_user', e.currentTarget.value)} maxLength={128} required />
+      <TextInput label={t("SSH private key path")} placeholder="~/.ssh/id_rsa" value={draft.key_path} onChange={e => field('key_path', e.currentTarget.value)} required={draft.ssh_backend === 'native'} description={draft.ssh_backend === 'openssh' ? t("Leave blank to use SSH agent or default identity files.") : undefined} />
+      <Select label={t('SSH transport')} value={draft.ssh_backend} allowDeselect={false} onChange={value => {
+        if (value === 'native' && (draft.ssh_options.trim() || draft.ssh_jump_config.trim())) return;
+        field('ssh_backend', value === 'openssh' ? 'openssh' : 'native');
+      }} data={[{ value: 'native', label: t('Built-in SSH'), disabled: !!(draft.ssh_options.trim() || draft.ssh_jump_config.trim()) }, { value: 'openssh', label: t('System OpenSSH (jump hosts and SSH agent)') }]} />
+      {draft.ssh_backend === 'openssh' && <>
+        <TextInput label={t('SSH Host alias')} description={t('Original SSH config alias, used for tokens such as %n.')} value={draft.ssh_alias} onChange={e => field('ssh_alias', e.currentTarget.value)} />
+        <TextInput label={t('Jump hosts (ProxyJump)')} placeholder="user@bastion:22,second-hop" description={t('Use user@hostname:port or imported jump host aliases. Separate multiple hops with commas.')} value={sshOption(draft.ssh_options, 'ProxyJump')} onChange={e => field('ssh_options', setSshOption(draft.ssh_options, 'ProxyJump', e.currentTarget.value))} />
+        <Accordion variant="separated"><Accordion.Item value="ssh-login"><Accordion.Control>{t('More SSH login settings')}</Accordion.Control><Accordion.Panel><Stack gap="sm">
+          <Text size="xs" c="dimmed">{t('OpenSSH uses noninteractive keys or SSH agent. Quote paths containing spaces. Password prompts and interactive MFA are unavailable.')}</Text>
+          {[
+            ['ProxyCommand', 'Proxy command (ProxyCommand)', 'Runs a local connection command. Use this or ProxyJump.'],
+            ['IdentityAgent', 'SSH agent (IdentityAgent)', 'Agent socket path, SSH_AUTH_SOCK or none.'],
+            ['IdentitiesOnly', 'Use configured identities only (IdentitiesOnly)', 'yes or no'],
+            ['CertificateFile', 'SSH certificate (CertificateFile)', '~/.ssh/id_ed25519-cert.pub'],
+            ['UserKnownHostsFile', 'Known hosts files (UserKnownHostsFile)', '~/.ssh/known_hosts'],
+            ['HostKeyAlias', 'Host key alias (HostKeyAlias)', ''],
+            ['ConnectTimeout', 'Connection timeout (ConnectTimeout)', '10'],
+            ['ServerAliveInterval', 'Keepalive interval (ServerAliveInterval)', '5'],
+            ['ServerAliveCountMax', 'Keepalive attempts (ServerAliveCountMax)', '3'],
+            ['ForwardAgent', 'Forward SSH agent (ForwardAgent)', 'yes or no'],
+            ['Compression', 'Compression (Compression)', 'yes or no'],
+          ].map(([keyword, label, hint]) => <TextInput key={keyword} label={t(label)} placeholder={t(hint)} value={sshOption(draft.ssh_options, keyword)} onChange={e => field('ssh_options', setSshOption(draft.ssh_options, keyword, e.currentTarget.value))} />)}
+          <Textarea label={t('SSH login options')} description={t('OpenSSH syntax. Also supports multiple IdentityFile/CertificateFile entries, authentication preferences, algorithms, address family and bind address.')} autosize minRows={4} maxRows={12} value={draft.ssh_options} onChange={e => field('ssh_options', e.currentTarget.value)} />
+          <Textarea label={t('Jump host definitions')} description={t('Imported jump host Host blocks are saved here, including their login accounts and identity files.')} autosize minRows={3} maxRows={12} value={draft.ssh_jump_config} onChange={e => field('ssh_jump_config', e.currentTarget.value)} />
+        </Stack></Accordion.Panel></Accordion.Item></Accordion>
+      </>}
       <PasswordInput label={t("Sudo password (optional)")} autoComplete="new-password" value={sudoPassword} onChange={e => setSudoPassword(e.currentTarget.value)} disabled={clearSudoPassword} maxLength={4096}
         description={t(identityChanged && server?.has_sudo_password ? "The saved password will be cleared because the server address or login account changed." : server?.has_sudo_password ? "A password is saved. Leave blank to keep it, or enter a replacement." : "Enter the SSH login account's sudo password if required. Otherwise, leave blank.")} />
       {!!server?.has_sudo_password && <Checkbox label={t("Clear saved sudo password")} checked={clearSudoPassword} onChange={e => setClearSudoPassword(e.currentTarget.checked)} />}
@@ -63,6 +90,7 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
   // A saved scan is the initial result; newer checks apply only to the same connection settings.
   const connectionSource = (server: Server) => JSON.stringify([
     server.name, server.hostname, server.port, server.ssh_user, server.key_path,
+    server.ssh_backend, server.ssh_alias, server.ssh_options, server.ssh_jump_config,
     server.enabled, server.last_scan_at, server.last_scan_status, server.last_scan_error,
   ]);
   function recordConnection(server: Server, ok: boolean, detail: string) {
@@ -89,7 +117,7 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
   }
   async function toggle(server: Server) {
     setBusy(`${server.id}:edit`);
-    try { await api(`/api/servers/${server.id}`, 'PUT', { ...server, enabled: !server.enabled }); notify(server.enabled ? t("Server paused") : t("Server enabled")); await saved(); }
+    try { await api(`/api/servers/${server.id}`, 'PUT', { name: server.name, hostname: server.hostname, port: server.port, ssh_user: server.ssh_user, key_path: server.key_path, group_name: server.group_name, notes: server.notes, ssh_backend: server.ssh_backend, ssh_alias: server.ssh_alias, ssh_options: server.ssh_options, ssh_jump_config: server.ssh_jump_config, enabled: !server.enabled }); notify(server.enabled ? t("Server paused") : t("Server enabled")); await saved(); }
     catch (cause) { notify(errorMessage(cause), true); } finally { setBusy(''); }
   }
   async function removeServer() {

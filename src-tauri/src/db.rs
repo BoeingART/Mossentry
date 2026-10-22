@@ -126,6 +126,10 @@ pub fn init(config: &Config) -> Result<File> {
         ),
         ("servers", "group_name", "TEXT NOT NULL DEFAULT ''"),
         ("servers", "notes", "TEXT NOT NULL DEFAULT ''"),
+        ("servers", "ssh_backend", "TEXT NOT NULL DEFAULT 'native'"),
+        ("servers", "ssh_alias", "TEXT NOT NULL DEFAULT ''"),
+        ("servers", "ssh_options", "TEXT NOT NULL DEFAULT ''"),
+        ("servers", "ssh_jump_config", "TEXT NOT NULL DEFAULT ''"),
         ("server_users", "created_at", "TEXT"),
         ("server_users", "created_at_source", "TEXT"),
         (

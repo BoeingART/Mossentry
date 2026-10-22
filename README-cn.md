@@ -83,7 +83,7 @@ Mossentry复用已有的SSH访问方式，连接前校验服务器主机密钥�
 
 1. **[下载Mossentry](https://github.com/BoeingART/Mossentry/releases/latest)**，选择适合自己电脑的安装包。
 2. 核验服务器的SSH指纹，并加入本地`known_hosts`文件。
-3. 填写服务器地址、SSH登录账户和私钥路径，或导入已有的服务器清单。
+3. 填写服务器地址、SSH登录账户和私钥路径，或从 `~/.ssh/config`（Windows 为 `%USERPROFILE%\.ssh\config`）导入主机。
 4. 同步账户，核对权限，开始执行任务或查看资源使用情况。
 
 | 桌面平台 | 安装包 |
@@ -94,7 +94,7 @@ Mossentry复用已有的SSH访问方式，连接前校验服务器主机密钥�
 
 使用安装包时，本地电脑无需另行安装其他软件。Linux桌面用户可[从源码构建](docs/DEVELOPMENT.md)，目前发布流程提供macOS和Windows安装包。
 
-**macOS 首次打开提示“Apple 无法验证”**：v0.2.0、v0.2.1 尚未经过 Apple 公证。确认安装包来自本项目后，在“系统设置 → 隐私与安全性”中点击“仍要打开”，具体步骤见[安装指南](docs/INSTALL.md#apple-verification-warning--apple-无法验证)。
+**macOS 首次打开提示“Apple 无法验证”**：v0.2.0 至 v0.2.2 尚未经过 Apple 公证。确认安装包来自本项目后，在“系统设置 → 隐私与安全性”中点击“仍要打开”，具体步骤见[安装指南](docs/INSTALL.md#apple-verification-warning--apple-无法验证)。
 
 ## 文档
 

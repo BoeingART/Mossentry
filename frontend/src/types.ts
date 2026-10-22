@@ -3,6 +3,7 @@ export type Server = {
   ssh_user: string; key_path: string; enabled: number; last_scan_at: string | null;
   last_scan_status: string | null; last_scan_error: string | null;
   has_sudo_password: boolean | number; group_name: string; notes: string;
+  ssh_backend: 'native' | 'openssh'; ssh_alias: string; ssh_options: string; ssh_jump_config: string;
 };
 export type User = {
   id: number; username: string; server: string; full_name: string; uid: number;

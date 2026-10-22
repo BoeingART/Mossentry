@@ -371,7 +371,7 @@ impl Service {
         Ok(())
     }
     fn insert_server(c: &Connection, b: &ServerInput, enabled: bool) -> Result<i64> {
-        c.execute("INSERT INTO servers(name,hostname,port,ssh_user,key_path,enabled,group_name,notes) VALUES(?,?,?,?,?,?,?,?)",params![b.name,b.hostname,b.port,b.ssh_user,b.key_path,enabled,b.group_name,b.notes])?;
+        c.execute("INSERT INTO servers(name,hostname,port,ssh_user,key_path,enabled,group_name,notes,ssh_backend,ssh_alias,ssh_options,ssh_jump_config) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",params![b.name,b.hostname,b.port,b.ssh_user,b.key_path,enabled,b.group_name,b.notes,b.ssh_backend,b.ssh_alias,b.ssh_options,b.ssh_jump_config])?;
         Ok(c.last_insert_rowid())
     }
     fn create_server(&self, b: ServerInput) -> Result<Value> {
@@ -389,11 +389,15 @@ impl Service {
         let identity = s(&old, "hostname") != b.hostname
             || n(&old, "port") != b.port as i64
             || s(&old, "ssh_user") != b.ssh_user;
-        let changed = identity || s(&old, "key_path") != b.key_path;
+        let routing_changed = s(&old, "ssh_backend") != b.ssh_backend
+            || s(&old, "ssh_alias") != b.ssh_alias
+            || s(&old, "ssh_options") != b.ssh_options
+            || s(&old, "ssh_jump_config") != b.ssh_jump_config;
+        let changed = identity || routing_changed || s(&old, "key_path") != b.key_path;
         let mut c = self.connection()?;
         let tx = c.transaction()?;
-        tx.execute("UPDATE servers SET name=?,hostname=?,port=?,ssh_user=?,key_path=?,enabled=?,group_name=?,notes=? WHERE id=?",params![b.name,b.hostname,b.port,b.ssh_user,b.key_path,b.enabled,b.group_name,b.notes,id])?;
-        Self::save_password(&tx, id, &b, identity)?;
+        tx.execute("UPDATE servers SET name=?,hostname=?,port=?,ssh_user=?,key_path=?,enabled=?,group_name=?,notes=?,ssh_backend=?,ssh_alias=?,ssh_options=?,ssh_jump_config=? WHERE id=?",params![b.name,b.hostname,b.port,b.ssh_user,b.key_path,b.enabled,b.group_name,b.notes,b.ssh_backend,b.ssh_alias,b.ssh_options,b.ssh_jump_config,id])?;
+        Self::save_password(&tx, id, &b, identity || routing_changed)?;
         if changed {
             tx.execute("DELETE FROM server_users WHERE server_id=?", [id])?;
             tx.execute("UPDATE servers SET last_scan_at=NULL,last_scan_status='never',last_scan_error=NULL WHERE id=?",[id])?;
@@ -598,7 +602,11 @@ impl Service {
             server["hostname"],
             server["port"],
             server["ssh_user"],
-            server["key_path"]
+            server["key_path"],
+            server["ssh_backend"],
+            server["ssh_alias"],
+            server["ssh_options"],
+            server["ssh_jump_config"]
         ])
         .to_string();
         {

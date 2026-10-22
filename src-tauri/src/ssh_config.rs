@@ -15,6 +15,7 @@ use std::{
 pub struct Directive {
     pub key: String,
     pub value: String,
+    include_boundary: Option<bool>,
 }
 pub struct SshConfig {
     pub directives: Vec<Directive>,
@@ -28,6 +29,129 @@ pub struct Import {
 }
 pub fn default_path() -> PathBuf {
     config::expand_path("~/.ssh/config")
+}
+
+pub fn login_option(key: &str) -> bool {
+    matches!(
+        key,
+        "identityfile"
+            | "certificatefile"
+            | "proxyjump"
+            | "proxycommand"
+            | "identityagent"
+            | "identitiesonly"
+            | "pubkeyauthentication"
+            | "preferredauthentications"
+            | "passwordauthentication"
+            | "kbdinteractiveauthentication"
+            | "hostkeyalias"
+            | "userknownhostsfile"
+            | "globalknownhostsfile"
+            | "stricthostkeychecking"
+            | "checkhostip"
+            | "hashknownhosts"
+            | "hostkeyalgorithms"
+            | "pubkeyacceptedalgorithms"
+            | "pubkeyacceptedkeytypes"
+            | "casignaturealgorithms"
+            | "kexalgorithms"
+            | "ciphers"
+            | "macs"
+            | "connecttimeout"
+            | "connectionattempts"
+            | "serveraliveinterval"
+            | "serveralivecountmax"
+            | "tcpkeepalive"
+            | "compression"
+            | "forwardagent"
+            | "addressfamily"
+            | "bindaddress"
+            | "bindinterface"
+            | "addkeystoagent"
+            | "usekeychain"
+            | "pkcs11provider"
+            | "securitykeyprovider"
+            | "gssapiauthentication"
+            | "gssapidelegatecredentials"
+    )
+}
+
+pub fn validate_options(text: &str, host_blocks: bool) -> Result<()> {
+    if text.len() > 65536
+        || text
+            .chars()
+            .any(|c| c.is_control() && !matches!(c, '\n' | '\r' | '\t'))
+    {
+        return Err(Error::bad("Invalid or oversized SSH login settings"));
+    }
+    let mut jump = false;
+    let mut proxy = false;
+    for line in text.lines() {
+        let Some(d) = directive(line)? else {
+            continue;
+        };
+        if host_blocks && d.key == "host" {
+            if jump && proxy {
+                return Err(Error::bad("Use either ProxyJump or ProxyCommand, not both"));
+            }
+            jump = false;
+            proxy = false;
+            for alias in words(&d.value)? {
+                if !crate::model::matches(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$", &alias) {
+                    return Err(Error::bad("Invalid SSH Host alias"));
+                }
+            }
+            continue;
+        }
+        if host_blocks && matches!(d.key.as_str(), "hostname" | "user" | "port") {
+            let value = scalar(&d.value)?;
+            if d.key == "hostname" && !crate::model::matches(r"^[A-Za-z0-9_.:%\[\]-]+$", &value)
+                || d.key == "user"
+                    && !crate::model::matches(r"^[A-Za-z0-9_][A-Za-z0-9_.@\\$%-]{0,127}$", &value)
+                || d.key == "port" && value.parse::<u16>().map_or(true, |p| p == 0)
+            {
+                return Err(Error::bad("Invalid jump host connection settings"));
+            }
+            continue;
+        }
+        if !login_option(&d.key) {
+            return Err(Error::bad(format!(
+                "Unsupported SSH login option: {}",
+                d.key
+            )));
+        }
+        if d.key == "proxyjump" {
+            let value = scalar(&d.value)?;
+            if !crate::model::matches(r"^[A-Za-z0-9_.@%:\[\],+-]+$", &value) {
+                return Err(Error::bad("Invalid ProxyJump value"));
+            }
+            jump |= value != "none";
+        }
+        proxy |= d.key == "proxycommand" && d.value.trim() != "none";
+        if [
+            "connecttimeout",
+            "connectionattempts",
+            "serveraliveinterval",
+            "serveralivecountmax",
+        ]
+        .contains(&d.key.as_str())
+        {
+            let value = scalar(&d.value)?;
+            if value.parse::<u32>().is_err() {
+                return Err(Error::bad(
+                    "SSH timeouts and keepalive values must be non-negative integers",
+                ));
+            }
+        }
+    }
+    if jump && proxy {
+        return Err(Error::bad("Use either ProxyJump or ProxyCommand, not both"));
+    }
+    Ok(())
+}
+
+pub fn quote(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 // OpenSSH quoting, without shell expansion or execution. Backslashes in Windows
@@ -92,6 +216,7 @@ pub fn directive(line: &str) -> Result<Option<Directive>> {
     Ok(Some(Directive {
         key,
         value: value.to_owned(),
+        include_boundary: None,
     }))
 }
 pub fn scalar(value: &str) -> Result<String> {
@@ -150,7 +275,17 @@ fn read(
                 .map_err(|_| Error::bad("Could not read SSH config Include"))?;
             paths.sort();
             for path in paths {
+                directives.push(Directive {
+                    key: String::new(),
+                    value: String::new(),
+                    include_boundary: Some(true),
+                });
                 read(&path, directives, stack, bytes)?;
+                directives.push(Directive {
+                    key: String::new(),
+                    value: String::new(),
+                    include_boundary: Some(false),
+                });
             }
         }
     }
@@ -178,7 +313,7 @@ impl SshConfig {
         let mut aliases = Vec::new();
         let mut digest = Sha256::new();
         for d in &directives {
-            digest.update(format!("{} {}\n", d.key, d.value));
+            digest.update(format!("{:?} {} {}\n", d.include_boundary, d.key, d.value));
             if d.key == "host" {
                 for alias in words(&d.value)? {
                     if !alias.contains(['*', '?', '[', '!', '%']) && !aliases.contains(&alias) {
@@ -195,18 +330,47 @@ impl SshConfig {
                 "SSH config must contain between 1 and 500 explicit Host aliases",
             ));
         }
-        Ok(Self {
+        let mut parsed = Self {
             directives,
             aliases,
             revision: format!("{:x}", digest.finalize()),
-        })
+        };
+        let mut active_aliases = Vec::new();
+        for alias in &parsed.aliases {
+            if parsed.resolve_internal(alias)?.1 {
+                active_aliases.push(alias.clone());
+            }
+        }
+        parsed.aliases = active_aliases;
+        if parsed.aliases.is_empty() {
+            return Err(Error::bad(
+                "SSH config contains no active explicit Host aliases",
+            ));
+        }
+        Ok(parsed)
     }
     pub fn resolve(&self, alias: &str) -> Result<BTreeMap<String, Vec<String>>> {
+        Ok(self.resolve_internal(alias)?.0)
+    }
+    fn resolve_internal(&self, alias: &str) -> Result<(BTreeMap<String, Vec<String>>, bool)> {
         let mut result = BTreeMap::<String, Vec<String>>::new();
         let mut active = true;
+        let mut scopes = Vec::new();
+        let mut explicit = false;
         for d in &self.directives {
+            if let Some(start) = d.include_boundary {
+                if start {
+                    scopes.push(active);
+                } else {
+                    active = scopes.pop().unwrap_or(true);
+                }
+                continue;
+            }
             if d.key == "host" {
-                active = pattern_matches(&words(&d.value)?, alias);
+                let patterns = words(&d.value)?;
+                active =
+                    scopes.last().copied().unwrap_or(true) && pattern_matches(&patterns, alias);
+                explicit |= active && patterns.iter().any(|p| p.eq_ignore_ascii_case(alias));
                 continue;
             }
             if !active {
@@ -223,7 +387,66 @@ impl SshConfig {
                     .or_insert_with(|| vec![d.value.clone()]);
             }
         }
-        Ok(result)
+        Ok((result, explicit))
+    }
+    fn jump_context(&self, alias: &str) -> Result<String> {
+        fn collect(
+            config: &SshConfig,
+            alias: &str,
+            active: &mut HashSet<String>,
+            done: &mut HashSet<String>,
+            output: &mut String,
+        ) -> Result<()> {
+            if !active.insert(alias.to_ascii_lowercase()) {
+                return Err(Error::bad("SSH config contains a ProxyJump cycle"));
+            }
+            if active.len() > 8 {
+                return Err(Error::bad("SSH ProxyJump chain is too deep"));
+            }
+            let options = config.resolve(alias)?;
+            if let Some(values) = options.get("proxyjump") {
+                let jump = scalar(&values[0])?;
+                if jump != "none" {
+                    for destination in jump.split(',') {
+                        let host = destination.rsplit('@').next().unwrap_or(destination);
+                        let host = if let Some(ipv6) = host.strip_prefix('[') {
+                            ipv6.split(']').next().unwrap_or(ipv6)
+                        } else {
+                            host.split(':').next().unwrap_or(host)
+                        };
+                        if host.contains(':') || host.contains('%') {
+                            continue;
+                        }
+                        if !done.contains(&host.to_ascii_lowercase()) {
+                            collect(config, host, active, done, output)?;
+                            output.push_str(&format!("Host {host}\n"));
+                            for (key, values) in config.resolve(host)? {
+                                if login_option(&key)
+                                    || ["hostname", "user", "port"].contains(&key.as_str())
+                                {
+                                    for value in values {
+                                        output.push_str(&format!("  {key} {value}\n"));
+                                    }
+                                }
+                            }
+                            done.insert(host.to_ascii_lowercase());
+                        }
+                    }
+                }
+            }
+            active.remove(&alias.to_ascii_lowercase());
+            Ok(())
+        }
+        let mut output = String::new();
+        collect(
+            self,
+            alias,
+            &mut HashSet::new(),
+            &mut HashSet::new(),
+            &mut output,
+        )?;
+        validate_options(&output, true)?;
+        Ok(output)
     }
     pub fn import(&self) -> Result<Import> {
         let mut servers = Vec::new();
@@ -245,16 +468,29 @@ impl SshConfig {
                 .unwrap_or_else(|| "22".into())
                 .parse::<u16>()
                 .map_err(|_| Error::bad("Invalid SSH config Port"))?;
-            let key = get("identityfile")?
-                .unwrap_or_else(|| "~/.ssh/id_rsa".into())
-                .replace(
-                    "%d",
-                    &dirs::home_dir().unwrap_or_default().to_string_lossy(),
-                )
-                .replace("%h", &hostname)
-                .replace("%n", alias)
-                .replace("%r", &user)
-                .replace("%p", &port.to_string());
+            let key = get("identityfile")?.unwrap_or_default();
+            let key = if key == "none" || key.contains("${") || key.contains('%') {
+                String::new()
+            } else {
+                let path = config::expand_path(&key);
+                if path.is_absolute() {
+                    path.to_string_lossy().into_owned()
+                } else {
+                    String::new()
+                }
+            };
+            let mut login_settings = String::new();
+            for (keyword, values) in &options {
+                if login_option(keyword) {
+                    for (index, value) in values.iter().enumerate() {
+                        if keyword == "identityfile" && index == 0 && !key.is_empty() {
+                            continue;
+                        }
+                        login_settings.push_str(&format!("{keyword} {value}\n"));
+                    }
+                }
+            }
+            let jump_config = self.jump_context(alias)?;
             let mut name = alias.to_ascii_lowercase().replace('.', "_");
             if !name.starts_with(|c: char| c.is_ascii_lowercase()) {
                 name = format!("host_{name}");
@@ -271,7 +507,7 @@ impl SshConfig {
             }
             for keyword in options
                 .keys()
-                .filter(|k| !["hostname", "user", "port", "identityfile"].contains(&k.as_str()))
+                .filter(|k| !login_option(k) && !["hostname", "user", "port"].contains(&k.as_str()))
             {
                 let warning = format!("Unsupported SSH option: {keyword}");
                 if !warnings.contains(&warning) {
@@ -279,7 +515,7 @@ impl SshConfig {
                 }
             }
             let server = ServerInput::parse(
-                json!({"name":name,"hostname":hostname,"port":port,"ssh_user":user,"key_path":key,"enabled":false}),
+                json!({"name":name,"hostname":hostname,"port":port,"ssh_user":user,"key_path":key,"enabled":false,"ssh_backend":"openssh","ssh_alias":alias,"ssh_options":login_settings,"ssh_jump_config":jump_config}),
             )?;
             servers.push(server);
         }
