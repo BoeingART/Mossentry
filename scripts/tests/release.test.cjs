@@ -3,7 +3,40 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { stageRelease, createManifest } = require('../release.cjs');
+const { stageRelease, createManifest, checkMacOSCredentials } = require('../release.cjs');
+
+const appleCredentials = {
+  APPLE_CERTIFICATE: 'test-certificate',
+  APPLE_CERTIFICATE_PASSWORD: 'test-certificate-password',
+  APPLE_SIGNING_IDENTITY: 'Developer ID Application: Example (ABCD123456)',
+  APPLE_ID: 'developer@example.com',
+  APPLE_PASSWORD: 'test-app-specific-password',
+  APPLE_TEAM_ID: 'ABCD123456',
+};
+
+test('macOS release preflight requires every Apple signing and notarization secret', () => {
+  for (const name of Object.keys(appleCredentials)) {
+    for (const value of [undefined, '', '  ']) {
+      assert.throws(() => checkMacOSCredentials({ ...appleCredentials, [name]: value }), error => {
+        assert.match(error.message, new RegExp(name));
+        assert.equal(error.message.includes(appleCredentials.APPLE_PASSWORD), false);
+        assert.equal(error.message.includes(appleCredentials.APPLE_CERTIFICATE_PASSWORD), false);
+        return true;
+      });
+    }
+  }
+});
+
+test('macOS release preflight rejects ad-hoc and development signing identities', () => {
+  for (const identity of ['-', 'Apple Development: Example (ABCD123456)', 'Apple Distribution: Example (ABCD123456)']) {
+    assert.throws(() => checkMacOSCredentials({ ...appleCredentials, APPLE_SIGNING_IDENTITY: identity }), /Developer ID Application/);
+  }
+});
+
+test('macOS release preflight requires a matching notarization team', () => {
+  assert.throws(() => checkMacOSCredentials({ ...appleCredentials, APPLE_TEAM_ID: 'OTHER12345' }), /same Apple Developer team/);
+  assert.doesNotThrow(() => checkMacOSCredentials(appleCredentials));
+});
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mossentry-release-'));

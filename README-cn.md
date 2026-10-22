@@ -94,6 +94,8 @@ Mossentry复用已有的SSH访问方式，连接前校验服务器主机密钥�
 
 使用安装包时，本地电脑无需另行安装其他软件。Linux桌面用户可[从源码构建](docs/DEVELOPMENT.md)，目前发布流程提供macOS和Windows安装包。
 
+**macOS 首次打开提示“Apple 无法验证”**：v0.2.0、v0.2.1 尚未经过 Apple 公证。确认安装包来自本项目后，在“系统设置 → 隐私与安全性”中点击“仍要打开”，具体步骤见[安装指南](docs/INSTALL.md#apple-verification-warning--apple-无法验证)。
+
 ## 文档
 
 | 指南 | 内容 |

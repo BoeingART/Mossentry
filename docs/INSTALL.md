@@ -6,7 +6,25 @@ Download a desktop installer from [GitHub Releases](https://github.com/BoeingART
 
 ## macOS
 
-Use the Apple Silicon or Intel DMG matching your Mac, then drag Mossentry to Applications. The application uses the system WebKit and contains the Rust executable, interface assets and embedded remote probes. No separate Python, Node.js, Ansible or SSH client is needed. Unsigned development builds may need approval in System Settings → Privacy & Security.
+Use the Apple Silicon or Intel DMG matching your Mac, then drag Mossentry to Applications. The application uses the system WebKit and contains the Rust executable, interface assets and embedded remote probes. No separate Python, Node.js, Ansible or SSH client is needed.
+
+### Apple verification warning / Apple 无法验证
+
+The published v0.2.0 and v0.2.1 macOS builds use ad-hoc signing and have not been notarized by Apple. macOS can display “Apple could not verify Mossentry.app is free of malware” and block the first launch. The updater's `.sig` files authenticate updates to Mossentry; they do not supply an Apple Developer ID signature or notarization.
+
+If you downloaded the app from this project's GitHub Releases and choose to trust it, use Apple's [Open Anyway procedure](https://support.apple.com/en-us/102445):
+
+1. Drag Mossentry to Applications, open it once, and dismiss the warning with **Done**.
+2. Open **System Settings → Privacy & Security**, scroll to Security, and click **Open Anyway** next to the Mossentry warning.
+3. Authenticate if requested and confirm **Open**. macOS saves an exception for this app.
+
+当前发布的 v0.2.0、v0.2.1 macOS 安装包尚未经过 Apple 公证，首次打开可能出现“Apple 无法验证 Mossentry.app”的提示。确认安装包来自本项目的 GitHub Releases 并决定信任后，可以按以下步骤打开：
+
+1. 将 Mossentry 拖到“应用程序”，打开一次，弹出警告后点击“完成”。
+2. 打开“系统设置 → 隐私与安全性”，向下找到“安全性”区域，在 Mossentry 被阻止的提示旁点击“仍要打开”。
+3. 按系统要求验证身份，再确认“打开”。此后 macOS 会保留对此应用的例外设置。
+
+Managed Macs may restrict this option; contact the administrator if it is unavailable. A release that passes Apple's normal verification requires Developer ID Application signing and Apple notarization. Maintainers can provision these through [UPDATES.md](UPDATES.md#macos-developer-id-signing-and-notarization).
 
 ## Windows
 

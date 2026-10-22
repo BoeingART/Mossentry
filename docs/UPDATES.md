@@ -17,10 +17,48 @@ gh secret set TAURI_SIGNING_PRIVATE_KEY --repo BoeingART/Mossentry \
 
 The workflow deliberately fails tagged builds if the secret is absent. Pull requests and untagged manual runs build ordinary installers without requiring the secret. Replacing this key after distribution requires a key migration through a release signed by the existing key, or a manual reinstall.
 
+## macOS Developer ID signing and notarization
+
+Tauri updater signatures and Apple code signatures serve separate purposes. The published v0.2.0 and v0.2.1 macOS packages are ad-hoc signed (`signingIdentity: "-"`) and have no Apple notarization ticket. A valid updater signature does not prevent Gatekeeper from blocking a downloaded application. See [INSTALL.md](INSTALL.md#apple-verification-warning--apple-无法验证) for the supported first-launch exception procedure.
+
+Future tagged builds require Apple Developer ID signing and notarization for both Mac architectures. With no Apple credentials, these builds fail before compiling instead of publishing another ad-hoc signed Mac release. Pull requests and untagged manual runs retain ad-hoc signing for development.
+
+To provision a release:
+
+1. Enroll in the regular [Apple Developer Program](https://developer.apple.com/cn/help/account/membership/enrolling-in-the-app/). As checked on 2026-10-22, the mainland China annual membership is ¥688; Apple lists a US$99 annual price in the US. A personal membership is sufficient. Eligible accredited educational institutions, nonprofits and government entities may request a [membership fee waiver](https://developer.apple.com/cn/help/account/membership/fee-waivers/); individual teachers/students and an educational email address alone do not qualify for that waiver. A free personal developer account does not include notarization.
+2. On the Mac that will hold the private key, use **Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority** to save a certificate signing request (CSR).
+3. As the developer team's Account Holder, open [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/certificates/list), create a **Developer ID Application** certificate from that CSR, download the `.cer`, and install it in that Mac's login keychain. This is the certificate for distributing `.app` bundles outside the Mac App Store.
+4. In Keychain Access → My Certificates, export the certificate **with its private key** as a password-protected `.p12`. Encode it using `openssl base64 -A -in /path/to/certificate.p12 -out /path/to/certificate-base64.txt`. Keep these private files outside the repository.
+5. Create an [app-specific Apple Account password](https://support.apple.com/en-us/102654) for notarization. Use this password rather than your regular account password.
+6. In GitHub → this repository → Settings → Secrets and variables → Actions, configure the following repository secrets:
+
+| Secret | Value |
+| --- | --- |
+| `APPLE_CERTIFICATE` | Base64-encoded `.p12` certificate and private key |
+| `APPLE_CERTIFICATE_PASSWORD` | Non-empty password chosen when exporting the `.p12` |
+| `APPLE_SIGNING_IDENTITY` | Full identity, e.g. `Developer ID Application: Your Name (TEAMID1234)` |
+| `APPLE_ID` | Apple Account email for the developer membership |
+| `APPLE_PASSWORD` | App-specific password used by Apple's notarization service |
+| `APPLE_TEAM_ID` | Team ID matching the signing identity |
+
+`security find-identity -v -p codesigning` lists installed identities. The workflow passes these secrets to Tauri, which imports the certificate into a temporary keychain, signs with Developer ID and the hardened runtime, submits the app for notarization, and staples the ticket before generating updater packages. `APPLE_SIGNING_IDENTITY` overrides the development ad-hoc identity. Keep the existing `TAURI_SIGNING_PRIVATE_KEY` for updater authentication as well.
+
+Before staging release assets, `scripts/verify-macos-release.sh` checks the built app, the app extracted from the signed updater archive, and the app inside the mounted read-only DMG. Each must have a valid Apple-issued Developer ID Application signature, a valid stapled ticket and an accepted Gatekeeper assessment. The checks do not re-sign packages or remove quarantine attributes. Actual notarization and positive Gatekeeper acceptance must be verified with real credentials; credential preflight tests alone cannot establish either.
+
+For a local release build, export the same Apple variables and the updater key, then run:
+
+```bash
+node scripts/release.cjs check-macos-signing
+npm run tauri -- build --bundles app,dmg --config src-tauri/tauri.release.conf.json -- --locked
+bash scripts/verify-macos-release.sh
+```
+
+See the [Tauri macOS signing guide](https://v2.tauri.app/distribute/sign/macos/) and [Apple Developer ID certificate instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/) for the underlying setup.
+
 ## Publish an update
 
 1. Set the same new version in `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and `src-tauri/tauri.conf.json`.
-2. Push a matching `v<version>` tag. The workflow tests and builds macOS Apple Silicon, macOS Intel and Windows x64. Tagged builds enable `src-tauri/tauri.release.conf.json`, generating `.app.tar.gz` / `.exe` updater packages and their `.sig` files.
+2. Provision the updater key and the Apple credentials above before pushing a matching `v<version>` tag. The workflow tests and builds macOS Apple Silicon, macOS Intel and Windows x64. Tagged builds enable `src-tauri/tauri.release.conf.json`, generating `.app.tar.gz` / `.exe` updater packages and their `.sig` files. The Mac builds must pass Developer ID, notarization-ticket and Gatekeeper checks before publication.
 3. The publish job combines all three platforms into one `latest.json`, checks all assets and signatures are present, and publishes the manifest, packages, installers and checksums together. Filenames include architecture so the two Mac packages cannot overwrite each other.
 
 Do not publish a higher-version release containing only DMGs/EXEs. Keep `latest.json` and its signed updater assets together. Tauri's [updater documentation](https://v2.tauri.app/plugin/updater/) describes the manifest and signing format.

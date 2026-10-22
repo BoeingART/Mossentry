@@ -2,6 +2,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const platforms = ['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64'];
+function checkMacOSCredentials(env = process.env) {
+  const required = ['APPLE_CERTIFICATE', 'APPLE_CERTIFICATE_PASSWORD', 'APPLE_SIGNING_IDENTITY',
+    'APPLE_ID', 'APPLE_PASSWORD', 'APPLE_TEAM_ID'];
+  const missing = required.filter(name => !env[name]?.trim());
+  if (missing.length) {
+    throw new Error(`macOS releases require Developer ID signing and Apple notarization. Configure GitHub secrets: ${missing.join(', ')}. See docs/UPDATES.md.`);
+  }
+  if (!env.APPLE_SIGNING_IDENTITY.startsWith('Developer ID Application: ')) {
+    throw new Error('APPLE_SIGNING_IDENTITY must be a Developer ID Application identity; ad-hoc and development certificates cannot be used for a macOS release.');
+  }
+  if (!env.APPLE_SIGNING_IDENTITY.endsWith(`(${env.APPLE_TEAM_ID})`)) {
+    throw new Error('APPLE_SIGNING_IDENTITY and APPLE_TEAM_ID must belong to the same Apple Developer team.');
+  }
+}
+
 function versionAt(root) { return JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version; }
 function onlyFile(directory, suffix) {
   const files = fs.readdirSync(directory).filter(name => name.endsWith(suffix));
@@ -55,10 +70,11 @@ function createManifest(root, directory, repository, tag, now = new Date()) {
   return manifest;
 }
 
-module.exports = { stageRelease, createManifest };
+module.exports = { stageRelease, createManifest, checkMacOSCredentials };
 if (require.main === module) {
   const root = path.resolve(__dirname, '..');
-  if (process.argv[2] === 'stage') stageRelease(root, process.argv[3], process.argv.includes('--signed'));
+  if (process.argv[2] === 'check-macos-signing') checkMacOSCredentials();
+  else if (process.argv[2] === 'stage') stageRelease(root, process.argv[3], process.argv.includes('--signed'));
   else if (process.argv[2] === 'manifest') createManifest(root, path.join(root, 'release'), process.env.GITHUB_REPOSITORY, process.env.GITHUB_REF_NAME);
-  else throw new Error('Usage: release.cjs stage <platform> [--signed] | manifest');
+  else throw new Error('Usage: release.cjs check-macos-signing | stage <platform> [--signed] | manifest');
 }
