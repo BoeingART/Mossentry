@@ -2,14 +2,14 @@
 
 <h1><img src="icon-full.svg" alt="Mossentry" width="440" /></h1>
 
-<p><strong>Your Linux servers. One desktop. Just SSH.</strong></p>
+<p><strong>One app to manage your servers.</strong></p>
 <p>Manage user access, run commands across servers, and see where resources go.</p>
 
 <p>
   <a href="https://github.com/BoeingART/Mossentry/releases"><img src="https://img.shields.io/github/v/release/BoeingART/Mossentry?style=flat-square&amp;color=008f82" alt="Latest release" /></a>
   <a href="https://github.com/BoeingART/Mossentry/actions/workflows/release.yml"><img src="https://github.com/BoeingART/Mossentry/actions/workflows/release.yml/badge.svg" alt="Desktop release checks" /></a>
   <img src="https://img.shields.io/badge/desktop-macOS%20%7C%20Windows-263d36?style=flat-square" alt="Desktop installers for macOS and Windows" />
-  <img src="https://img.shields.io/badge/SSH-agentless-7faa69?style=flat-square" alt="Agentless over SSH" />
+  <img src="https://img.shields.io/badge/SSH-agentless-7faa69?style=flat-square" alt="Connect over SSH from your computer" />
 </p>
 
 <p><strong>English</strong> · <a href="README-cn.md">简体中文</a></p>
@@ -25,7 +25,7 @@
 
 ## Why Mossentry?
 
-**No server-side agent or service to install. Connect over SSH and use the Python already on your servers.**
+**No additional server-side service to install. Connect using the SSH and Python already on your servers.**
 
 Mossentry is a desktop app for managing Linux servers from your own computer. It sends tasks and collects metrics over SSH, using short-lived remote programs. There is no Mossentry daemon to maintain, no web console to deploy, and no extra management port to open.
 
@@ -34,15 +34,15 @@ Mossentry is a desktop app for managing Linux servers from your own computer. It
 | | Mossentry | Cockpit | Webmin |
 | --- | --- | --- | --- |
 | Interface | Native desktop app | Web console | Web console |
-| Server setup | Existing SSH, Python 3 and Bash | Cockpit packages and socket | Webmin package and service |
-| Management endpoint | Your existing SSH port | HTTPS, usually port 9090 | HTTPS, usually port 10000 |
+| Server setup | SSH, Python 3 and Bash | Cockpit packages and socket | Webmin package and service |
+| Management endpoint | Your existing SSH port | HTTPS | HTTPS |
 | Management software to maintain | Desktop app | Server-side web console | Server-side web console |
 
-The comparison covers standard standalone web deployments described in the [Cockpit installation guide](https://cockpit-project.org/running.html) and [Webmin installation guide](https://webmin.com/download/). Ports and deployment arrangements can be customized.
-
-Mossentry reuses your SSH access and verifies server host keys before connecting. Your inventory and operation history stay on your computer. This avoids adding an HTTP administration endpoint and the associated web service setup, certificate configuration and access rules.
+Mossentry reuses your SSH access and verifies server host keys before connecting. Your inventory and operation history stay on your computer. This avoids adding an HTTP administration endpoint and the associated web service setup, certificate configuration and access rules. It also avoids exposing server information through a misconfigured web console.
 
 ### What your servers need
+
+**No additional Python packages or Mossentry services are required on the server.** See [connection setup](docs/INSTALL.md#ssh-setup) for SSH key requirements and permissions.
 
 | Requirement | Details |
 | --- | --- |
@@ -51,8 +51,6 @@ Mossentry reuses your SSH access and verifies server host keys before connecting
 | Runtime | Python 3 at `/usr/bin/python3`, Bash and standard Linux utilities |
 | Account administration | Sudo privileges for account discovery and changes |
 | NVIDIA GPU monitoring | An installed NVIDIA driver and `nvidia-smi`, only if GPU metrics are needed |
-
-**No additional Python packages or Mossentry services are required on the server.** See [connection setup](docs/INSTALL.md#ssh-setup) for SSH key requirements and permissions.
 
 ## Features
 
@@ -94,7 +92,7 @@ See how your servers are being used while you work.
 | macOS 13+, Intel | Intel `.dmg` |
 | Windows 10/11, x64 | Windows `.exe` installer |
 
-The packaged app needs no separate Python, Node.js or Ansible installation on your computer. Linux desktop users can [build from source](docs/DEVELOPMENT.md); the release workflow currently provides macOS and Windows installers.
+The packaged app needs no additional software installed on your computer. Linux desktop users can [build from source](docs/DEVELOPMENT.md); the release workflow currently provides macOS and Windows installers.
 
 ## Documentation
 
