@@ -515,7 +515,7 @@ impl SshConfig {
                 }
             }
             let server = ServerInput::parse(
-                json!({"name":name,"hostname":hostname,"port":port,"ssh_user":user,"key_path":key,"enabled":false,"ssh_backend":"openssh","ssh_alias":alias,"ssh_options":login_settings,"ssh_jump_config":jump_config}),
+                json!({"name":name,"hostname":hostname,"port":port,"ssh_user":user,"key_path":key,"enabled":true,"ssh_backend":"openssh","ssh_alias":alias,"ssh_options":login_settings,"ssh_jump_config":jump_config}),
             )?;
             servers.push(server);
         }

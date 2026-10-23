@@ -15,7 +15,7 @@ fn aliases_inherit_first_values_and_accumulate_identity_files() {
     assert_eq!(import.servers[0].name, "gpu_one");
     assert_eq!(import.servers[0].hostname, "example.test");
     assert_eq!(import.servers[0].port, 2202);
-    assert!(!import.servers[0].enabled);
+    assert!(import.servers.iter().all(|server| server.enabled));
     assert!(import.servers[0].key_path.ends_with("key with spaces"));
 }
 

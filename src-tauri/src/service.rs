@@ -453,7 +453,7 @@ impl Service {
         if body["revision"].as_str() != Some(imported.revision.as_str()) {
             return Err(Error::new(
                 409,
-                "SSH config changed. Preview it again before importing.",
+                "SSH config changed. Select hosts again before importing.",
             ));
         }
         let names: Vec<String> = serde_json::from_value(body["names"].clone())
@@ -471,7 +471,7 @@ impl Service {
         }
         let tx = c.transaction()?;
         for server in imported.servers.iter().filter(|s| names.contains(&s.name)) {
-            Self::insert_server(&tx, server, false)?;
+            Self::insert_server(&tx, server, server.enabled)?;
         }
         db::audit(
             &tx,

@@ -394,9 +394,11 @@ fn duplicate_names_are_conflicts_not_internal_errors() {
     );
 }
 #[test]
-fn ssh_config_import_previews_selected_hosts_and_rejects_stale_files() {
+fn ssh_config_import_enables_only_selected_hosts_and_rejects_stale_files() {
     let f = Fixture::new();
-    f.add("one");
+    let mut existing = server("one");
+    existing["enabled"] = json!(false);
+    f.req("/api/servers", "POST", existing).unwrap();
     let path = f.dir.path().join("ssh-config");
     std::fs::write(
         &path,
@@ -411,8 +413,21 @@ fn ssh_config_import_previews_selected_hosts_and_rejects_stale_files() {
         )
         .unwrap();
     assert_eq!(preview["conflicts"], json!(["one"]));
+    assert!(preview["servers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|server| server["enabled"] == true));
     assert_eq!(f.dashboard()["servers"].as_array().unwrap().len(), 1);
     let apply = json!({"path":path,"preview":false,"revision":preview["revision"],"names":["two"]});
+    let mut empty = apply.clone();
+    empty["names"] = json!([]);
+    assert_eq!(
+        f.req("/api/inventory/import", "POST", empty)
+            .unwrap_err()
+            .status,
+        400
+    );
     let mut conflict = apply.clone();
     conflict["names"] = json!(["one", "two"]);
     assert_eq!(
@@ -421,7 +436,11 @@ fn ssh_config_import_previews_selected_hosts_and_rejects_stale_files() {
             .status,
         409
     );
-    std::fs::write(&path, "Host two\n HostName changed.test\n User operator\n").unwrap();
+    std::fs::write(
+        &path,
+        "Host one two three\n HostName changed.test\n User operator\n",
+    )
+    .unwrap();
     assert_eq!(
         f.req("/api/inventory/import", "POST", apply)
             .unwrap_err()
@@ -437,8 +456,20 @@ fn ssh_config_import_previews_selected_hosts_and_rejects_stale_files() {
         json!({"path":path,"preview":false,"revision":preview["revision"],"names":["two"]}),
     )
     .unwrap();
-    assert_eq!(f.dashboard()["servers"][1]["enabled"], 0);
+    assert_eq!(f.dashboard()["servers"].as_array().unwrap().len(), 2);
+    assert_eq!(f.dashboard()["servers"][0]["enabled"], 0);
+    assert_eq!(f.dashboard()["servers"][0]["hostname"], "example.test");
+    assert_eq!(f.dashboard()["servers"][1]["enabled"], 1);
     assert_eq!(f.dashboard()["servers"][1]["hostname"], "changed.test");
+    assert!(f.remote.calls.lock().unwrap().is_empty());
+    f.scan();
+    assert!(f
+        .remote
+        .calls
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|(name, operation, _, _)| name == "two" && operation == "scan_users"));
     assert_eq!(
         f.req("/api/inventory/export", "GET", Value::Null)
             .unwrap_err()
