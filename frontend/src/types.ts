@@ -76,3 +76,11 @@ export type ResourceMetrics = {
   };
   warnings: string[];
 };
+
+export type FirewallStatus = { available: false } | {
+  available: true; enabled: boolean; ssh_allowed: boolean; ssh_port: number | null; management_ip: string | null;
+  revision: string; rules: { id: number; description: string }[];
+};
+export type PingResult = {
+  ok: boolean; hostname: string; checked_at: string; exit_code: number | null; timed_out: boolean; output: string;
+};

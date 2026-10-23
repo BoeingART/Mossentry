@@ -74,6 +74,28 @@ fn loopback_ssh_transport_and_complete_account_lifecycle() {
             .unwrap(),
         payload
     );
+    // Both transports must carry the actual SSH tuple through sudo's environment reset.
+    for backend in ["native", "openssh"] {
+        let mut target = server.clone();
+        target["ssh_backend"] = json!(backend);
+        let result = ssh
+            .execute(
+                &target,
+                "import sys,json;print(json.dumps({'connection':sys.argv[1]}))",
+                &json!({}),
+                true,
+                Some("fixture-password"),
+                10,
+            )
+            .unwrap();
+        let fields: Vec<_> = result["connection"]
+            .as_str()
+            .unwrap()
+            .split_whitespace()
+            .collect();
+        assert_eq!(fields.len(), 4);
+        assert_eq!(fields[3], "22"); // Remote port, even when Docker maps a different local port.
+    }
     let queue = |action: &str, username: &str| {
         let body = json!({"username":username,"servers":["fixture"],"action":action,"sudo":action=="set_sudo","full_name":"SSH fixture"});
         let route = if action == "create_user" {

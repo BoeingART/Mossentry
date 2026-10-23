@@ -6,6 +6,8 @@ import { Accordion, ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Moda
 import { IconCheck, IconDots, IconEdit, IconPlus, IconSearch, IconServer, IconTrash, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { api } from './api';
+import Firewall from './Firewall';
+import PingTest from './PingTest';
 import InventoryTransfer from './InventoryTransfer';
 import { sshOption, setSshOption } from './sshOptions';
 import type { Dashboard, Server, ServerMetrics } from './types';
@@ -82,6 +84,8 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
   const [group, setGroup] = useState<string | null>(null);
   const [filter, setFilter] = useState<string | null>('all');
   const [editor, setEditor] = useState<{ server: Server | null } | null>(null);
+  const [firewall, setFirewall] = useState<Server | null>(null);
+  const [ping, setPing] = useState<Server | null>(null);
   const [remove, setRemove] = useState<Server | null>(null);
   const [busy, setBusy] = useState('');
   const [connections, setConnections] = useState<Record<number, { source: string; ok: boolean; detail: string }>>({});
@@ -170,9 +174,13 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
           <Button size="xs" variant="default" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:scan`} onClick={() => void operate(server, 'scan')}>{t("Sync")}</Button>
           <Button size="xs" variant="default" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:status`} onClick={() => void operate(server, 'status')}>{t("Status")}</Button>
           <Button size="xs" variant="default" disabled={!server.enabled} onClick={() => monitor(server)}>{t("Monitor")}</Button>
+          <Button size="xs" variant="default" disabled={!server.enabled || !!busy} onClick={() => setFirewall(server)}>{t("Firewall")}</Button>
+          <Button size="xs" variant="default" disabled={!server.enabled || !!busy} onClick={() => setPing(server)}>{t("Ping test")}</Button>
         </Group>
       </Card>;
     })}</div> : <Paper withBorder radius="lg" p="xl"><Stack align="center"><IconServer size={34} color="#8795a9" /><Title order={3}>{data.servers.length ? t("No matching servers") : t("Add your first server")}</Title>{!data.servers.length && <Button onClick={() => setEditor({ server: null })}>{t("Add server")}</Button>}</Stack></Paper>}
+    {firewall && <Firewall key={firewall.id} server={firewall} close={() => setFirewall(null)} saved={saved} />}
+    {ping && <PingTest key={ping.id} server={ping} close={() => setPing(null)} />}
     {editor && <ServerForm server={editor.server} close={() => setEditor(null)} saved={saved} />}
     <Modal opened={!!remove} onClose={() => !busy && setRemove(null)} title={t("Remove server?")} centered closeOnClickOutside={!busy} closeOnEscape={!busy}><Stack><Text size="sm">{t("Remove")} {remove?.name} {t("and its saved account list from Mossentry. The remote server, its users and files stay unchanged. Operation history is kept.")}</Text><Group justify="end"><Button variant="default" disabled={!!busy} onClick={() => setRemove(null)}>{t("Cancel")}</Button><Button color="red" disabled={!!busy} loading={!!busy} onClick={() => void removeServer()}>{t("Remove server")}</Button></Group></Stack></Modal>
     <Modal opened={!!metrics} onClose={() => setMetrics(null)} title={t("{0} · Server status", { 0: metrics?.server.name || '' })} centered size="lg"><Stack>{metrics && <>

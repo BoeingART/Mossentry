@@ -27,7 +27,7 @@ npm start
 
 `npm start` builds and opens the native application with the Vite development server. `npm run dev:ui` runs only Vite; functional application use requires the native window and its Rust commands. There is no local HTTP backend or sign-in screen.
 
-Node.js is a development/build dependency. The packaged app does not include Electron, Node.js, a local Python runtime or Ansible. The four embedded programs in `src-tauri/remote/` run on the managed Linux host using its existing `/usr/bin/python3` and Bash, without installing an agent or service.
+Node.js is a development/build dependency. The packaged app does not include Electron, Node.js, a local Python runtime or Ansible. The five embedded programs in `src-tauri/remote/` run on the managed Linux host using its existing `/usr/bin/python3` and Bash, without installing an agent or service.
 
 Use an isolated application data directory when developing against disposable hosts. Storage paths and overrides are documented in [installation and connection setup](INSTALL.md#application-data).
 

@@ -13,6 +13,7 @@ use std::{
 pub const ACCOUNTS: &str = include_str!("../remote/remote_actions.py");
 pub const RESOURCES: &str = include_str!("../remote/resource_probe.py");
 pub const OPERATIONS: &str = include_str!("../remote/operations_probe.py");
+pub const FIREWALL: &str = include_str!("../remote/firewall.py");
 pub const CREATION: &str = include_str!("../remote/user_creation_times.py");
 // Injectable transport keeps regression tests completely disconnected from real hosts.
 pub trait Transport: Send + Sync {
@@ -178,8 +179,9 @@ fn execute(
         session.set_keepalive(true, 5);
         let marker = format!("mossentry-request-{:032x}", rand::random::<u128>());
         let program = framed_program(source, &marker);
+        // The login shell expands the SSH tuple before sudo clears its environment.
         let command = format!(
-            "{}/usr/bin/python3 -c {}",
+            "{}/usr/bin/python3 -c {} \"$SSH_CONNECTION\"",
             if sudo {
                 if password.is_some() {
                     "sudo -S -p '' -- "
