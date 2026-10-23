@@ -52,6 +52,9 @@ impl Transport for Fake {
         {
             return Err("SSH authentication failed".into());
         }
+        if source == ssh::FIREWALL {
+            return Ok(self.output.lock().unwrap().clone().unwrap_or_else(|| json!({"available":true,"enabled":false,"rules":[],"revision":"fixture","ssh_allowed":false,"ssh_port":22,"management_ip":"192.0.2.10"})));
+        }
         if source == ssh::RESOURCES {
             return Ok(
                 json!({"checked_at":db::now(),"cpu":{"percent":12,"cores":8,"users":[]},"memory":{"total_mb":8000,"used_mb":4000,"percent":50},"disks":[],"gpu":{"status":"unavailable","devices":[],"message":""},"network":{"status":"unavailable","interfaces":[]},"warnings":[]}),
@@ -1224,4 +1227,93 @@ fn advanced_login_settings_round_trip_and_route_changes_clear_cached_identity() 
         f.dashboard()["servers"][0]["ssh_options"],
         dashboard["servers"][0]["ssh_options"]
     );
+}
+
+#[test]
+fn firewall_requires_enabled_host_operation_lock_and_privileged_transport() {
+    let f = Fixture::new();
+    let id = f.add("one");
+    let path = format!("/api/servers/{id}/firewall");
+    let state = f.req(&path, "POST", json!({"operation":"status"})).unwrap();
+    assert_eq!(state["enabled"], false);
+    assert!(f.remote.calls.lock().unwrap().last().unwrap().2);
+    let guard = f.service.acquire().unwrap();
+    assert_eq!(
+        f.req(&path, "POST", json!({"operation":"enable"}))
+            .unwrap_err()
+            .status,
+        409
+    );
+    drop(guard);
+    let count = f.remote.calls.lock().unwrap().len();
+    assert_eq!(
+        f.req(&path, "POST", json!({"operation":"reset"}))
+            .unwrap_err()
+            .status,
+        400
+    );
+    let mut paused = server("one");
+    paused["enabled"] = json!(false);
+    f.req(&format!("/api/servers/{id}"), "PUT", paused).unwrap();
+    assert_eq!(
+        f.req(&path, "POST", json!({"operation":"status"}))
+            .unwrap_err()
+            .status,
+        400
+    );
+    assert_eq!(f.remote.calls.lock().unwrap().len(), count);
+}
+
+#[test]
+fn firewall_preserves_actionable_errors_and_records_failed_operations() {
+    let f = Fixture::new();
+    let id = f.add("one");
+    let path = format!("/api/servers/{id}/firewall");
+    *f.remote.output.lock().unwrap() = Some(
+        json!({"error":"SSH access is not explicitly allowed. Add an inbound TCP allow rule for the SSH port and management IP before enabling the firewall."}),
+    );
+    let error = f
+        .req(
+            &path,
+            "POST",
+            json!({"operation":"enable","ssh_allowed":true}),
+        )
+        .unwrap_err();
+    assert_eq!(error.status, 409);
+    assert!(error
+        .detail
+        .starts_with("SSH access is not explicitly allowed."));
+    assert_eq!(f.dashboard()["audit"][0]["event"], "firewall_failed");
+    *f.remote.output.lock().unwrap() = Some(json!({"available":false}));
+    assert_eq!(
+        f.req(&path, "POST", json!({"operation":"status"})).unwrap()["available"],
+        false
+    );
+    assert_eq!(
+        f.req(&path, "POST", json!({"operation":"enable"}))
+            .unwrap_err()
+            .status,
+        400
+    );
+    *f.remote.output.lock().unwrap() = Some(json!({"ok":true}));
+    assert_eq!(
+        f.req(&path, "POST", json!({"operation":"status"}))
+            .unwrap_err()
+            .status,
+        502
+    );
+}
+
+#[test]
+fn firewall_mutations_record_activity() {
+    let f = Fixture::new();
+    let id = f.add("one");
+    f.req(
+        &format!("/api/servers/{id}/firewall"),
+        "POST",
+        json!({"operation":"add","port":443,"protocol":"tcp","source":"any","action":"allow"}),
+    )
+    .unwrap();
+    assert_eq!(f.remote.calls.lock().unwrap().last().unwrap().1, "add");
+    assert_eq!(f.dashboard()["audit"][0]["event"], "firewall_changed");
 }

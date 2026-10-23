@@ -42,6 +42,7 @@ const actionLabels: Record<Action['action_type'], string> = {
 };
 const eventLabels: Record<string, string> = {
   server_created: 'Server added', server_updated: 'Server updated', server_removed: 'Server removed',
+  firewall_checked: 'Firewall checked', firewall_changed: 'Firewall changed', firewall_failed: 'Firewall operation failed', ping_tested: 'Ping tested',
   connection_tested: 'Connection successful', connection_failed: 'Connection failed', status_checked: 'Server status checked', status_failed: 'Server status unavailable',
   login_success: 'Administrator sign-in', login_failed: 'Sign-in failed', logout: 'Sign-out',
   scan_started: 'Scan started', scan_completed: 'Scan completed', scan_failed: 'Scan failed',

@@ -5,8 +5,10 @@ pub mod db;
 #[cfg(feature = "desktop")]
 pub mod desktop;
 pub mod error;
+pub mod firewall;
 pub mod history;
 pub mod model;
+pub mod network;
 pub mod openssh;
 pub mod operations;
 pub mod service;

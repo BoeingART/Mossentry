@@ -196,6 +196,8 @@ impl Service {
                     "test" => self.test_connection(&server),
                     "status" => self.status(&server),
                     "scan" => self.scan(&[s(&server, "name").into()]),
+                    "firewall" => self.firewall(&server, body),
+                    "ping" => self.ping(&server),
                     _ => Err(Error::new(404, "Unknown operation")),
                 }
             }

@@ -128,8 +128,9 @@ pub fn execute(
         }
         let marker = format!("mossentry-request-{:032x}", rand::random::<u128>());
         let program = ssh::framed_program(source, &marker);
+        // The login shell expands the SSH tuple before sudo clears its environment.
         let command = format!(
-            "{}/usr/bin/python3 -c {}",
+            "{}/usr/bin/python3 -c {} \"$SSH_CONNECTION\"",
             if sudo {
                 if password.is_some() {
                     "sudo -S -p '' -- "

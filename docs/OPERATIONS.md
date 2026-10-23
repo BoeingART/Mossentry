@@ -20,6 +20,16 @@ Tasks persist their per-host results, exit codes, stdout, stderr and detected di
 
 Configuration changes, account management and command jobs share a local operation lock. Monitoring uses separate bounded requests. Failed or interrupted commands are not automatically retried.
 
+## Firewall and ping
+
+Open **Firewall** on an enabled server's card to manage UFW. The server must already have UFW installed and the management account needs sudo access. Add inbound allow/deny rules for a port using TCP, UDP or both, choosing all IPs or a source IPv4/IPv6 address or CIDR network. Saved rules remain visible and editable while UFW is disabled. Changes to an active firewall apply immediately. Deleting a saved rule removes its IPv4 and IPv6 counterparts; a changed rule list must be refreshed before deletion. Disable retains the saved rules. Changes and failures are recorded in the activity log and share the server operation lock.
+
+Enabling requires an explicit saved inbound TCP allow rule matching the management connection. The privileged remote operation checks persisted rules again immediately before invoking `ufw --force enable`; missing, unreadable or unrecognized rules block enabling. The check uses the actual server-side SSH port and source IP (including a jump host's IP), which can differ from the configured destination when forwarding/NAT is involved. It honors source/destination networks, port ranges, IPv4/IPv6 and the order of user rules, including earlier deny/reject rules. UFW application profiles are checked through their expanded numeric rules. Interface-specific or other complex rules that cannot be proven safe block enabling. Add a suitable rule while disabled and refresh before enabling. Custom rules outside UFW's user input chain, external firewalls and later changes made outside Mossentry require separate review.
+
+Open **Ping test** to send four ICMP requests from this computer to the configured server address, independently of SSH. The result includes the system ping output and is bounded by a 12-second deadline. Jump hosts and SSH proxy settings are not used. ICMP failure can indicate filtering and does not establish whether SSH/TCP access works.
+
+See the [Ubuntu UFW guide](https://ubuntu.com/server/docs/how-to/security/firewalls/) for rule behavior and server setup.
+
 ## Monitoring
 
 Open a server's **Monitor** button from its Servers card. Collection runs every five seconds while the page is visible and unpaused; overlapping samples are skipped. Charts keep a rolling five-minute window with whole-minute ticks that move left as time advances. Legends contain names; hover tooltips provide readings.
