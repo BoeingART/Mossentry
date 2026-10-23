@@ -166,7 +166,7 @@ export default function Operations({ servers }: { servers: Server[] }) {
     finally { setBusy(false); }
   }
   return <Stack gap="lg">
-    <div><Title order={2}>{t('Operations')}</Title><Text size="sm" c="dimmed">{t('Check and run Linux commands on selected servers over SSH.')}</Text></div>
+    <div><Title order={2}>{t('Execute commands')}</Title><Text size="sm" c="dimmed">{t('Check and run Linux commands on selected servers over SSH.')}</Text></div>
     {error && <Alert color="red" withCloseButton onClose={() => setError('')}>{t(error)}</Alert>}
     <Card withBorder radius="lg" p="lg"><Stack gap="md">
       <Group align="end" wrap="nowrap" className="operation-targets">

@@ -15,15 +15,17 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useMediaQuery, useReducedMotion } from '@mantine/hooks';
 import {
-  IconActivity, IconBell, IconArrowUpRight, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
-  IconEdit, IconHistory, IconKey, IconPlus, IconSearch, IconServer,
-  IconShieldCheck, IconUser, IconUsers, IconLayoutSidebarLeftCollapse,
+  IconActivity, IconBell, IconArrowUpRight, IconCheck, IconChevronRight, IconDownload,
+  IconEdit, IconKey, IconPlus, IconSearch,
+  IconShieldCheck, IconUser, IconLayoutSidebarLeftCollapse,
 } from '@tabler/icons-react';
 import { api, downloadCredentials, fetchDashboard, setCsrf } from './api';
 import { filteredAccounts, type UserFilter } from './userData';
 import type { Action, Dashboard, Server, User } from './types';
 import Servers from './Servers';
 import Operations from './Operations';
+import FirewallPage from './FirewallPage';
+import SidebarNavigation, { type View } from './SidebarNavigation';
 import { approvalLists, type ApprovalList } from './approvalData';
 import { flyToApprovals } from './approvalMotion';
 import ResourceMonitor from './ResourceMonitor';
@@ -31,7 +33,6 @@ import DashboardPage from './DashboardPage';
 import AppearanceControls from './AppearanceControls';
 import UpdateButton from './UpdateButton';
 
-type View = 'operations' | 'dashboard' | 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
 type UserAction = 'disable_user' | 'enable_user' | 'set_sudo' | 'delete_user';
 type RequestDraft = { mode: 'create_user' | UserAction; username: string; server?: string; sudo: boolean };
 type ConfirmDraft = { reject?: boolean; title: string; message: string; run: () => Promise<void> };
@@ -304,14 +305,6 @@ export default function App() {
   if (loading) return <Center h="100vh"><Loader /></Center>;
   if (!data) return <Center h="100vh"><Stack align="center"><Alert color="red">{fatal || t("Could not load the dashboard")}</Alert><Button onClick={() => void refresh()}>{t("Retry")}</Button></Stack></Center>;
   const pending = approvalLists(data).filter(list => list.status === 'pending').length;
-  const nav: { id: View; label: string; icon: React.ReactNode }[] = [
-    { id: 'dashboard', label: t("Dashboard"), icon: <IconLayoutDashboard size={19} /> },
-    { id: 'overview', label: t("Servers"), icon: <IconServer size={19} /> },
-    { id: 'operations', label: t('Operations'), icon: <IconServer size={19} /> },
-    { id: 'users', label: t("Users & access"), icon: <IconUsers size={19} /> },
-    { id: 'approvals', label: t("Approvals"), icon: <IconShieldCheck size={19} /> },
-    { id: 'audit', label: t("Activity log"), icon: <IconHistory size={19} /> },
-  ];
   function navigate(next: View) {
     setView(next);
     if (next === 'monitor') setMonitorServerId(null);
@@ -342,13 +335,7 @@ export default function App() {
     </AppShell.Header>
     <AppShell.Navbar id="main-sidebar" className="sidebar">
       <ScrollArea className="sidebar-scroll" type="never" viewportProps={{ tabIndex: 0, 'aria-label': t("Navigation") }}>
-        <span className="nav-section-label" aria-hidden={compactSidebar}>{t("Workspace")}</span>
-        <Stack component="nav" aria-label={t("Main navigation")} gap={7}>{nav.map(item => <div key={item.id}>
-          {item.id === 'users' && <span className="nav-section-label nav-section-divider" aria-hidden={compactSidebar}>{t("Administration")}</span>}
-          <Tooltip label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} position="right" disabled={!compactSidebar} events={{ hover: true, focus: true, touch: false }}>
-            <button type="button" data-approval-target={item.id === 'approvals' || undefined} aria-label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} aria-current={view === item.id || (view === 'monitor' && item.id === 'overview') ? 'page' : undefined} className={`nav-button ${view === item.id || (view === 'monitor' && item.id === 'overview') ? 'active' : ''}`} onClick={() => navigate(item.id)}><span className="nav-icon">{item.icon}</span><span className="nav-label" aria-hidden={compactSidebar}>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge className="nav-badge" aria-hidden size="sm" color={view === 'approvals' ? 'gray' : 'teal'} variant="light" circle ml="auto">{pending}</Badge>}</button>
-          </Tooltip>
-        </div>)}</Stack>
+        <SidebarNavigation view={view} compact={compactSidebar} pending={pending} navigate={navigate} />
       </ScrollArea>
       <div className="sidebar-footer">
         <div className="workspace-card-reveal" inert={compactSidebar} aria-hidden={compactSidebar}><div><div className="workspace-card"><span className="workspace-card-icon"><IconActivity size={22} stroke={1.5} /></span><strong>{t("Your infrastructure,")}<br />{t("at a glance.")}</strong><Button fullWidth variant="light" rightSection={<IconArrowUpRight size={15} />} onClick={() => navigate('monitor')}>{t("Open monitor")}</Button></div></div></div>
@@ -363,6 +350,7 @@ export default function App() {
       {view === 'overview' && <Servers data={data} saved={refresh} monitor={server => { setMonitorServerId(server.id); setView('monitor'); }} />}
       {view === 'monitor' && <ResourceMonitor data={data} serverId={monitorServerId} selectServer={setMonitorServerId} />}
       {view === 'operations' && <Operations servers={data.servers} />}
+      {view === 'firewall' && <FirewallPage servers={data.servers} saved={refresh} openServers={() => navigate('overview')} />}
       {view === 'users' && <Users data={data} openRequest={userRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}
       {view === 'approvals' && <Approvals data={data} run={approvalConfirm} busy={busy} saved={refresh} download={action => void download(action)} />}
       {view === 'audit' && <AuditLog data={data} />}

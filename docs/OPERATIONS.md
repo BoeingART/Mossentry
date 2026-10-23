@@ -1,5 +1,7 @@
 # Operation workflows
 
+The sidebar lists Dashboard, Servers, Users & access, Operations, Approvals and Activity log. Expand **Operations** to open **Firewall** or **Execute commands**. **Scheduled tasks** and **Background processes** are marked **Unfinished** and cannot be opened. When the sidebar is collapsed to icons, the Operations icon opens the same submenu.
+
 ## Account approvals
 
 User access buttons immediately add an operation to the current pending approval list. Multiple users, hosts and permission changes can share one list. Repeated identical items are deduplicated. New-user forms collect the username, target hosts and desired sudo access before adding the item.
@@ -10,7 +12,7 @@ System and management accounts are protected locally and remotely. The existing 
 
 ## Commands
 
-Choose one or more enabled servers, enter multiline Bash commands, and optionally select sudo and a timeout from 10 to 3600 seconds per server. Commands execute non-interactively.
+Open **Operations → Execute commands**, choose one or more enabled servers, enter multiline Bash commands, and optionally select sudo and a timeout from 10 to 3600 seconds per server. Commands execute non-interactively.
 
 **Check syntax and risks** uses `bash -n` on each target without executing the entered commands. This optional check validates shell grammar, not command options, installed software or successful outcomes.
 
@@ -22,7 +24,7 @@ Configuration changes, account management and command jobs share a local operati
 
 ## Firewall and ping
 
-Open **Firewall** on an enabled server's card to manage UFW. The server must already have UFW installed and the management account needs sudo access. Add inbound allow/deny rules for a port using TCP, UDP or both, choosing all IPs or a source IPv4/IPv6 address or CIDR network. Saved rules remain visible and editable while UFW is disabled. Changes to an active firewall apply immediately. Deleting a saved rule removes its IPv4 and IPv6 counterparts; a changed rule list must be refreshed before deletion. Disable retains the saved rules. Changes and failures are recorded in the activity log and share the server operation lock.
+Open **Operations → Firewall** and choose **Manage firewall** on an enabled server, or open **Firewall** from its Servers card, to manage UFW. The server must already have UFW installed and the management account needs sudo access. Add inbound allow/deny rules for a port using TCP, UDP or both, choosing all IPs or a source IPv4/IPv6 address or CIDR network. Saved rules remain visible and editable while UFW is disabled. Changes to an active firewall apply immediately. Deleting a saved rule removes its IPv4 and IPv6 counterparts; a changed rule list must be refreshed before deletion. Disable retains the saved rules. Changes and failures are recorded in the activity log and share the server operation lock.
 
 Enabling requires an explicit saved inbound TCP allow rule matching the management connection. The privileged remote operation checks persisted rules again immediately before invoking `ufw --force enable`; missing, unreadable or unrecognized rules block enabling. The check uses the actual server-side SSH port and source IP (including a jump host's IP), which can differ from the configured destination when forwarding/NAT is involved. It honors source/destination networks, port ranges, IPv4/IPv6 and the order of user rules, including earlier deny/reject rules. UFW application profiles are checked through their expanded numeric rules. Interface-specific or other complex rules that cannot be proven safe block enabling. Add a suitable rule while disabled and refresh before enabling. Custom rules outside UFW's user input chain, external firewalls and later changes made outside Mossentry require separate review.
 
