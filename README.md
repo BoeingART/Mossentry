@@ -23,6 +23,8 @@
 
 </div>
 
+![Mossentry dashboard](imgs/dashborad.png)
+
 ## Why Mossentry?
 
 **No additional server-side service to install. Connect using the SSH and Python already on your servers.**

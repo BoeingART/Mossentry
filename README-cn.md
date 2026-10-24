@@ -23,6 +23,8 @@
 
 </div>
 
+![Mossentry 中文概览](imgs/dashborad-cn.png)
+
 ## Why Mossentry?
 
 **服务器端无需安装额外的service，使用已有的SSH和Python即可连接。**
