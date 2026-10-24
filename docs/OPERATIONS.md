@@ -40,6 +40,6 @@ Disk bars are sorted by physical capacity. Linux sysfs rotational information, w
 
 ## Inventory and storage
 
-Import servers from an SSH config file, preview the resolved hosts, and select which new entries to add. Imported servers start paused and existing names are skipped in the selection. Inventory export has been removed; task-result and credential downloads remain available. Removing a server requires one confirmation and removes its local inventory and account cache while preserving operation history and remote data. See [SSH config import](INSTALL.md#ssh-config-import-and-login-options) for supported login settings.
+Import servers from an SSH config file, preview the resolved hosts, and select which new entries to add. **Select all / none** toggles all new hosts; existing names are skipped in the selection. Imported servers have management enabled by default. Inventory export has been removed; task-result and credential downloads remain available. Removing a server requires one confirmation and removes its local inventory and account cache while preserving operation history and remote data. See [SSH config import](INSTALL.md#ssh-config-import-and-login-options) for supported login settings.
 
 All application persistence lives in the configured user-data directory, outside the source checkout by default. See [installation](INSTALL.md) for paths and storage overrides.

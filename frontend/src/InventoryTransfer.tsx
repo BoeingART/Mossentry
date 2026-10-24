@@ -18,6 +18,8 @@ export default function InventoryTransfer({ saved }: { saved: () => Promise<void
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const selectable = preview?.servers.filter(server => !preview.conflicts.includes(server.name)).map(server => server.name) ?? [];
+  const allSelected = selectable.length > 0 && selectable.every(name => selected.includes(name));
   const changePath = (value: string) => { setPath(value); setPreview(null); setSelected([]); setError(''); };
   async function open() {
     setOpened(true); setError(''); setPreview(null); setSelected([]); setBusy(true);
@@ -48,15 +50,19 @@ export default function InventoryTransfer({ saved }: { saved: () => Promise<void
     <Button variant="default" onClick={() => void open()}>{t('Import SSH config')}</Button>
     <Modal opened={opened} onClose={() => !busy && setOpened(false)} title={t('Import SSH config')} size="xl" centered closeOnClickOutside={!busy} closeOnEscape={!busy}>
       <Stack>
-        <Text size="sm">{t('Choose hosts from your SSH config. Imported servers start paused. Existing servers are kept.')}</Text>
+        <Text size="sm">{t('Choose hosts from your SSH config. Imported servers have management enabled. Existing servers are kept.')}</Text>
         <Group align="end" wrap="nowrap"><TextInput style={{ flex: 1 }} label={t('SSH config file')} description={t('Default: ~/.ssh/config on macOS/Linux, %USERPROFILE%\\.ssh\\config on Windows.')} value={path} disabled={busy} onChange={e => changePath(e.currentTarget.value)} /><Button variant="default" disabled={busy} onClick={() => void browse()}>{t('Browse')}</Button></Group>
         {preview && <>
-          <Text size="sm">{t('{0} hosts selected', { 0: selected.length })}</Text>
-          <ScrollArea.Autosize mah={300}><Table><Table.Thead><Table.Tr><Table.Th>{t('Import')}</Table.Th><Table.Th>{t('Server name')}</Table.Th><Table.Th>{t('SSH Host alias')}</Table.Th><Table.Th>{t('Hostname or IP address')}</Table.Th><Table.Th>{t('SSH login account')}</Table.Th><Table.Th>{t('SSH port')}</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{preview.servers.map(server => <Table.Tr key={server.name}><Table.Td><Checkbox aria-label={t('Import {0}', { 0: server.name })} checked={selected.includes(server.name)} disabled={busy || preview.conflicts.includes(server.name)} onChange={e => { const checked = e.currentTarget.checked; setSelected(current => checked ? [...current, server.name] : current.filter(name => name !== server.name)); }} /></Table.Td><Table.Td>{server.name}{preview.conflicts.includes(server.name) && <Text size="xs" c="dimmed">{t('Already exists')}</Text>}</Table.Td><Table.Td>{server.ssh_alias || server.name}</Table.Td><Table.Td>{server.hostname}</Table.Td><Table.Td>{server.ssh_user}</Table.Td><Table.Td>{server.port}</Table.Td></Table.Tr>)}</Table.Tbody></Table></ScrollArea.Autosize>
+          <Group justify="space-between">
+            <Text size="sm">{t('{0} hosts selected', { 0: selected.length })}</Text>
+            <Checkbox label={t('Select all / none')} checked={allSelected} indeterminate={selected.length > 0 && !allSelected}
+              disabled={busy || !selectable.length} onChange={event => setSelected(event.currentTarget.checked ? selectable : [])} />
+          </Group>
+          <ScrollArea.Autosize mah={300}><Table><Table.Thead><Table.Tr><Table.Th>{t('Import')}</Table.Th><Table.Th>{t('Server name')}</Table.Th><Table.Th>{t('Hostname or IP address')}</Table.Th><Table.Th>{t('SSH login account')}</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{preview.servers.map(server => <Table.Tr key={server.name}><Table.Td><Checkbox aria-label={t('Import {0}', { 0: server.name })} checked={selected.includes(server.name)} disabled={busy || preview.conflicts.includes(server.name)} onChange={e => { const checked = e.currentTarget.checked; setSelected(current => checked ? [...current, server.name] : current.filter(name => name !== server.name)); }} /></Table.Td><Table.Td>{server.name}{preview.conflicts.includes(server.name) && <Text size="xs" c="dimmed">{t('Already exists')}</Text>}</Table.Td><Table.Td>{server.hostname}</Table.Td><Table.Td>{server.ssh_user}</Table.Td></Table.Tr>)}</Table.Tbody></Table></ScrollArea.Autosize>
           {preview.warnings.length > 0 && <Alert color="yellow">{preview.warnings.map(warning => <Text size="sm" key={warning}>{warning.startsWith('Unsupported SSH option: ') ? t('Skipped SSH option: {0}', { 0: warning.slice('Unsupported SSH option: '.length) }) : t(warning)}</Text>)}</Alert>}
         </>}
         {error && <Alert color="red" role="alert">{t(error)}</Alert>}
-        <Group justify="end"><Button variant="default" disabled={busy || !path.trim()} onClick={() => void importFile(false)}>{t('Preview import')}</Button><Button loading={busy} disabled={!preview || !selected.length} onClick={() => void importFile(true)}>{t('Import paused servers')}</Button></Group>
+        <Group justify="end"><Button variant="default" disabled={busy || !path.trim()} onClick={() => void importFile(false)}>{t('Preview import')}</Button><Button loading={busy} disabled={!preview || !selected.length} onClick={() => void importFile(true)}>{t('Import servers')}</Button></Group>
       </Stack>
     </Modal>
   </>;

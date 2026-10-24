@@ -471,7 +471,7 @@ impl Service {
         }
         let tx = c.transaction()?;
         for server in imported.servers.iter().filter(|s| names.contains(&s.name)) {
-            Self::insert_server(&tx, server, false)?;
+            Self::insert_server(&tx, server, server.enabled)?;
         }
         db::audit(
             &tx,
