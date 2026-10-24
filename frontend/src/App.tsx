@@ -318,25 +318,27 @@ export default function App() {
     setMobileOpened(false);
   }
   const nativeDesktop = isTauri();
-  return <AppShell className="app-shell" data-language={language} data-sidebar-collapsed={compactSidebar || undefined} transitionDuration={reducedMotion ? 0 : 280} transitionTimingFunction="cubic-bezier(0.22, 1, 0.36, 1)" navbar={{ width: compactSidebar ? 76 : 232, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: nativeDesktop ? 100 : 76 }} padding={0}>
+  return <AppShell className="app-shell" data-language={language} data-sidebar-collapsed={compactSidebar || undefined} transitionDuration={reducedMotion ? 0 : 280} transitionTimingFunction="cubic-bezier(0.22, 1, 0.36, 1)" navbar={{ width: compactSidebar ? 76 : 232, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: nativeDesktop ? 'calc(76px + var(--app-titlebar-height))' : 76 }} padding={0}>
     <AppShell.Header className="topbar" onMouseDown={event => {
       if (!nativeDesktop || event.button !== 0 || (event.target as HTMLElement).closest('button,input,a,select,textarea,[role="button"]')) return;
       if (event.detail === 2) void getCurrentWindow().toggleMaximize();
       else void getCurrentWindow().startDragging();
     }}>
       <WindowControls />
-      <div className="topbar-brand" aria-label="Mossentry"><img className="brand-mark" src={brandIcon} width={42} height={42} alt="" /><span className="brand-name" aria-hidden={compactSidebar}><span className="brand-accent">Moss</span>entry</span></div>
-      <div className="topbar-content">
-        <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label={t("Toggle navigation")} />
-        <Tooltip label={compactSidebar ? t("Expand sidebar") : t("Collapse sidebar")}>
-          <ActionIcon className="sidebar-toggle" variant="subtle" color="gray" size="lg" visibleFrom="sm" aria-label={compactSidebar ? t("Expand sidebar") : t("Collapse sidebar")} aria-expanded={!compactSidebar} aria-controls="main-sidebar" onClick={() => setSidebarCollapsed(value => !value)}>
-            <IconLayoutSidebarLeftCollapse size={21} stroke={1.5} />
-          </ActionIcon>
-        </Tooltip>
-        <div className="topbar-actions">
-          <UpdateButton />
-          <Tooltip label={pending ? t("{0} requests awaiting approval", { 0: pending }) : t("View approvals")}><ActionIcon data-approval-bell className="approval-bell" variant="subtle" color="gray" size="lg" aria-label={t("View pending approvals")} onClick={() => navigate('approvals')}><IconBell size={20} stroke={1.5} />{pending > 0 && <span className="notification-dot" />}</ActionIcon></Tooltip>
-          <AppearanceControls />
+      <div className="topbar-toolbar">
+        <div className="topbar-brand" aria-label="Mossentry"><img className="brand-mark" src={brandIcon} width={42} height={42} alt="" /><span className="brand-name" aria-hidden={compactSidebar}><span className="brand-accent">Moss</span>entry</span></div>
+        <div className="topbar-content">
+          <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label={t("Toggle navigation")} />
+          <Tooltip label={compactSidebar ? t("Expand sidebar") : t("Collapse sidebar")}>
+            <ActionIcon className="sidebar-toggle" variant="subtle" color="gray" size="lg" visibleFrom="sm" aria-label={compactSidebar ? t("Expand sidebar") : t("Collapse sidebar")} aria-expanded={!compactSidebar} aria-controls="main-sidebar" onClick={() => setSidebarCollapsed(value => !value)}>
+              <IconLayoutSidebarLeftCollapse size={21} stroke={1.5} />
+            </ActionIcon>
+          </Tooltip>
+          <div className="topbar-actions">
+            <UpdateButton />
+            <Tooltip label={pending ? t("{0} requests awaiting approval", { 0: pending }) : t("View approvals")}><ActionIcon data-approval-bell className="approval-bell" variant="subtle" color="gray" size="lg" aria-label={t("View pending approvals")} onClick={() => navigate('approvals')}><IconBell size={20} stroke={1.5} />{pending > 0 && <span className="notification-dot" />}</ActionIcon></Tooltip>
+            <AppearanceControls />
+          </div>
         </div>
       </div>
     </AppShell.Header>
