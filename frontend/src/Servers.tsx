@@ -1,13 +1,14 @@
 import { numericDate } from './dateFormat';
 import { t } from './i18n';
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Accordion, ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Modal, NumberInput, Paper, PasswordInput, Progress, Select, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip, Textarea, Badge } from '@mantine/core';
+import { Accordion, ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Modal, NumberInput, Paper, PasswordInput, Progress, ScrollArea, Select, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip, Textarea, Badge } from '@mantine/core';
 import { IconCheck, IconDots, IconEdit, IconPlus, IconRefresh, IconSearch, IconServer, IconTrash, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { api } from './api';
 import InventoryTransfer from './InventoryTransfer';
 import { sshOption, setSshOption } from './sshOptions';
+import { serverNameError } from './serverName';
 import type { Dashboard, Server, ServerMetrics } from './types';
 
 const date = (value: string | null) => value ? numericDate(value, { includeTime: true }) : t("Not yet synced");
@@ -17,15 +18,23 @@ type Draft = { name: string; hostname: string; port: number | string; ssh_user: 
 type ScanResult = { ok: boolean; users: number; errors: Record<string, string> };
 
 function ServerForm({ server, close, saved }: { server: Server | null; close: () => void; saved: () => Promise<void> }) {
+  const formId = useId();
+  const nameInput = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<Draft>({ name: server?.name || '', hostname: server?.hostname || '', port: server?.port || 22, ssh_user: server?.ssh_user || '', key_path: server?.key_path ?? '~/.ssh/id_rsa', enabled: server ? !!server.enabled : true, group_name: server?.group_name || '', notes: server?.notes || '', ssh_backend: server?.ssh_backend || 'native', ssh_alias: server?.ssh_alias || '', ssh_options: server?.ssh_options || '', ssh_jump_config: server?.ssh_jump_config || '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [sudoPassword, setSudoPassword] = useState('');
   const [clearSudoPassword, setClearSudoPassword] = useState(false);
   const identityChanged = !!server && (draft.hostname !== server.hostname || Number(draft.port) !== server.port || draft.ssh_user !== server.ssh_user || draft.ssh_backend !== server.ssh_backend || draft.ssh_alias !== server.ssh_alias || draft.ssh_options !== server.ssh_options || draft.ssh_jump_config !== server.ssh_jump_config);
   const field = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft(current => ({ ...current, [key]: value }));
   async function submit(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError('');
+    event.preventDefault();
+    if (busy) return;
+    const invalidName = serverNameError(draft.name);
+    setNameError(invalidName);
+    if (invalidName) { nameInput.current?.focus(); return; }
+    setBusy(true); setError('');
     try {
       await api(server ? `/api/servers/${server.id}` : '/api/servers', server ? 'PUT' : 'POST', {
         ...draft, port: Number(draft.port), sudo_password: sudoPassword, clear_sudo_password: clearSudoPassword,
@@ -34,9 +43,19 @@ function ServerForm({ server, close, saved }: { server: Server | null; close: ()
       await saved(); close();
     } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   }
-  return <Modal opened onClose={() => !busy && close()} closeOnClickOutside={!busy} closeOnEscape={!busy} title={server ? t("Edit server") : t("Add server")} centered radius="lg" size="lg">
-    <form onSubmit={submit}><Stack gap="md">
-      <TextInput label={t("Server name")} placeholder={t("e.g. gpu5")} value={draft.name} onChange={e => field('name', e.currentTarget.value)} pattern="[a-z][a-z0-9_-]{0,31}" required autoFocus />
+  return <Modal.Root opened onClose={() => !busy && close()} closeOnClickOutside={!busy} closeOnEscape={!busy} centered radius="lg" size="lg" scrollAreaComponent={ScrollArea.Autosize}>
+    <Modal.Overlay backgroundOpacity={0.2} blur={3} />
+    <Modal.Content>
+      <Modal.Header className="server-editor-header">
+        <Modal.Title>{server ? t("Edit server") : t("Add server")}</Modal.Title>
+        <Group gap="xs" wrap="nowrap">
+          <Button type="submit" form={formId} loading={busy}>{t("Save server")}</Button>
+          <Modal.CloseButton disabled={busy} aria-label={t("Close")} />
+        </Group>
+      </Modal.Header>
+      <Modal.Body><form id={formId} onSubmit={submit}><Stack gap="md">
+      {error && <Alert color="red" role="alert">{t(error)}</Alert>}
+      <TextInput ref={nameInput} label={t("Server name")} placeholder={t("e.g. gpu5")} description={t("Up to 80 characters. Chinese, letters, numbers, spaces and symbols are supported.")} value={draft.name} onChange={e => { field('name', e.currentTarget.value); setNameError(null); }} error={nameError ? t(nameError) : undefined} required autoFocus />
       <Group grow align="start"><TextInput label={t("Hostname or IP address")} placeholder={t("e.g. 192.168.1.10")} value={draft.hostname} onChange={e => field('hostname', e.currentTarget.value)} required /><NumberInput label={t("SSH port")} min={1} max={65535} allowDecimal={false} value={draft.port} onChange={value => field('port', value)} required /></Group>
       <TextInput label={t("SSH login account")} value={draft.ssh_user} onChange={e => field('ssh_user', e.currentTarget.value)} maxLength={128} required />
       <TextInput label={t("SSH private key path")} placeholder="~/.ssh/id_rsa" value={draft.key_path} onChange={e => field('key_path', e.currentTarget.value)} required={draft.ssh_backend === 'native'} description={draft.ssh_backend === 'openssh' ? t("Leave blank to use SSH agent or default identity files.") : undefined} />
@@ -72,10 +91,9 @@ function ServerForm({ server, close, saved }: { server: Server | null; close: ()
       <TextInput label={t('Server group')} maxLength={80} value={draft.group_name} onChange={e => field('group_name', e.currentTarget.value)} />
       <Textarea label={t('Notes')} maxLength={2000} autosize minRows={2} value={draft.notes} onChange={e => field('notes', e.currentTarget.value)} />
       <Checkbox label={t("Enable management")} checked={draft.enabled} onChange={e => field('enabled', e.currentTarget.checked)} />
-      {error && <Alert color="red" role="alert">{t(error)}</Alert>}
-      <Group justify="end"><Button variant="default" disabled={busy} onClick={close}>{t("Cancel")}</Button><Button type="submit" loading={busy}>{t("Save server")}</Button></Group>
-    </Stack></form>
-  </Modal>;
+    </Stack></form></Modal.Body>
+    </Modal.Content>
+  </Modal.Root>;
 }
 
 export default function Servers({ data, saved, monitor }: { data: Dashboard; saved: () => Promise<void>; monitor: (server: Server) => void }) {

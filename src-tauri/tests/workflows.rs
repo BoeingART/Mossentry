@@ -360,13 +360,93 @@ fn inventory_crud_and_password_identity_rules() {
     assert!(f.dashboard()["servers"].as_array().unwrap().is_empty());
 }
 #[test]
+fn renaming_server_preserves_display_name_and_connection_data() {
+    let f = Fixture::new();
+    let mut body = server("gpu3");
+    body["ssh_backend"] = json!("openssh");
+    body["key_path"] = json!("");
+    body["ssh_alias"] = json!("Luoserver-gpu3");
+    body["sudo_password"] = json!("saved-password");
+    let id = n(&f.req("/api/servers", "POST", body.clone()).unwrap(), "id");
+    f.scan();
+    let before = f.dashboard()["servers"][0].clone();
+    let calls = f.remote.calls.lock().unwrap().len();
+
+    let mut expected = before;
+    for name in ["MyServer", "My Server · 研发 / GPU (3), #1 🚀"] {
+        body["name"] = json!(name);
+        body["sudo_password"] = json!("");
+        f.req(&format!("/api/servers/{id}"), "PUT", body.clone())
+            .unwrap();
+        let dashboard = f.dashboard();
+        expected["name"] = json!(name);
+        assert_eq!(dashboard["servers"][0], expected);
+        let users = dashboard["users"].as_array().unwrap();
+        assert!(!users.is_empty());
+        assert!(users.iter().all(|user| user["server"] == name));
+        assert_eq!(f.remote.calls.lock().unwrap().len(), calls);
+    }
+    let name = body["name"].as_str().unwrap();
+    f.req(&format!("/api/servers/{id}/scan"), "POST", json!({}))
+        .unwrap();
+    assert_eq!(f.remote.calls.lock().unwrap().last().unwrap().0, name);
+
+    let config = f.service.config.clone();
+    drop(f.service);
+    let reopened = Service::open(config, f.remote.clone()).unwrap();
+    let dashboard = reopened
+        .request("/api/dashboard", "GET", Value::Null)
+        .unwrap();
+    assert_eq!(dashboard["servers"][0]["name"], name);
+    assert_eq!(dashboard["servers"][0]["has_sudo_password"], 1);
+}
+
+#[test]
+fn server_names_accept_display_characters_and_keep_name_limits() {
+    let f = Fixture::new();
+    for name in [
+        "MyServer",
+        "1 Server",
+        "服务器 · GPU (3), #1 🚀",
+        "my.server/a\\b",
+        "Quoted \"server\" & <tag>; $value",
+        &"服".repeat(80),
+        &"🚀".repeat(80),
+    ] {
+        let id = f.add(name);
+        assert_eq!(f.service.server(id).unwrap()["name"], name);
+    }
+    for name in [
+        "",
+        "   ",
+        "\nserver",
+        "server\r",
+        "server\tname",
+        "server\0",
+        "server\u{7f}",
+        "server\u{85}",
+        "server\u{2028}name",
+        "server\u{2029}name",
+        "all",
+        "ALL",
+        "Ungrouped",
+        "MANAGED",
+        &"服".repeat(81),
+        &"🚀".repeat(81),
+    ] {
+        let error = f.req("/api/servers", "POST", server(name)).unwrap_err();
+        assert_eq!(error.status, 400, "{name}");
+    }
+}
+
+#[test]
 fn validation_rejects_host_injection_reserved_names_and_bad_paths() {
     let f = Fixture::new();
     for (key, value) in [
         ("hostname", json!("x; echo unsafe")),
         ("hostname", json!("http://example.com")),
         ("name", json!("all")),
-        ("name", json!("../escape")),
+        ("name", json!("line\nbreak")),
         ("ssh_user", json!("root;ls")),
         ("port", json!(0)),
         ("key_path", json!("relative")),
