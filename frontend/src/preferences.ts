@@ -29,6 +29,6 @@ export const colorSchemeManager = {
   },
   clear() {
     browserManager.clear();
-    persistPreference('colorScheme', 'light');
+    persistPreference('colorScheme', 'auto');
   },
 };

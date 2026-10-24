@@ -2,7 +2,7 @@
 export function flyToApprovals(source: HTMLElement) {
   const visible = (selector: string) => [...document.querySelectorAll<HTMLElement>(selector)]
     .find(element => { const box = element.getBoundingClientRect(); return box.width > 0 && box.height > 0; });
-  const target = visible('[data-approval-target]') ?? visible('[data-approval-bell]');
+  const target = visible('[data-approval-target]');
   if (!target || !source.isConnected) return;
   const from = source.getBoundingClientRect(), to = target.getBoundingClientRect();
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
