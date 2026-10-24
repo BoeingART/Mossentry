@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Code, Group, NumberInput, Paper, Select, Stack, Text, TextInput, Title } from '@mantine/core';
-import { api } from './api';
+import { firewallSource, type FirewallController } from './firewallData';
 import { t } from './i18n';
 import type { FirewallStatus, Server } from './types';
 
@@ -8,8 +8,8 @@ const message = (error: unknown) => error instanceof Error ? error.message : t('
 const sshBlocked = 'SSH access is not explicitly allowed. Add an inbound TCP allow rule for the SSH port and management IP before enabling the firewall.';
 type Pending = { operation: 'enable' | 'disable' } | { operation: 'delete'; rule_id: number; revision: string; description: string };
 
-export default function Firewall({ server, saved, busy, setBusy }: {
-  server: Server; saved: () => Promise<void>; busy: boolean; setBusy: (busy: boolean) => void;
+export default function Firewall({ server, saved, busy, setBusy, controller }: {
+  server: Server; saved: () => Promise<void>; busy: boolean; setBusy: (busy: boolean) => void; controller: FirewallController;
 }) {
   const [status, setStatus] = useState<FirewallStatus | null>(null);
   const [error, setError] = useState('');
@@ -20,23 +20,21 @@ export default function Firewall({ server, saved, busy, setBusy }: {
   const [action, setAction] = useState<string | null>('allow');
   const [scope, setScope] = useState<string | null>('any');
   const [source, setSource] = useState('');
-  const endpoint = `/api/servers/${server.id}/firewall`;
-  const initialRequest = useRef<{ endpoint: string; promise: Promise<FirewallStatus> } | null>(null);
+  const sourceKey = firewallSource(server);
   useEffect(() => {
     let active = true;
-    // Reuse the request during StrictMode effect replay; the server operation holds a lock.
-    if (initialRequest.current?.endpoint !== endpoint) initialRequest.current = { endpoint, promise: api<FirewallStatus>(endpoint, 'POST', { operation: 'status' }) };
-    initialRequest.current.promise.then(value => {
+    setBusy(true);
+    controller.check(server).then(value => {
       if (active) { setStatus(value); if (value.available && value.ssh_port) setPort(value.ssh_port); }
     }).catch(cause => { if (active) setError(message(cause)); }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [endpoint, setBusy]);
+  }, [sourceKey, controller, setBusy]);
   async function operate(body: Record<string, unknown>) {
     setBusy(true); setError(''); setNotice(''); setPending(null);
     // Stale data must never leave the enable button available after a failed operation.
     setStatus(null);
     try {
-      setStatus(await api<FirewallStatus>(endpoint, 'POST', body));
+      setStatus(await controller.request(server, body));
       if (body.operation !== 'status') setNotice(t('Firewall settings updated.'));
     } catch (cause) { setError(message(cause)); }
     finally { setBusy(false); void saved().catch(() => {}); }
