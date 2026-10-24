@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
-import { ActionIcon, Button, Menu, Tooltip, useMantineColorScheme } from '@mantine/core';
-import { IconCheck, IconDeviceDesktop, IconLanguage, IconMoon, IconSun } from '@tabler/icons-react';
+import { ActionIcon, Menu, useMantineColorScheme } from '@mantine/core';
+import { IconCheck, IconLanguage, IconMoon, IconSun, IconSunMoon } from '@tabler/icons-react';
 import { setLanguage, t, useLanguage } from './i18n';
 
 const modes = {
-  auto: { label: 'Follow computer settings', next: 'light', icon: IconDeviceDesktop },
+  auto: { label: 'Follow computer settings', next: 'light', icon: IconSunMoon },
   light: { label: 'Day mode', next: 'dark', icon: IconSun },
   dark: { label: 'Night mode', next: 'auto', icon: IconMoon },
 } as const;
@@ -24,13 +24,10 @@ export default function AppearanceControls() {
   }, []);
 
   return <>
-    <Tooltip label={themeLabel}>
-      <Button className="theme-toggle" variant="subtle" color="gray" size="compact-sm" aria-label={themeLabel}
-        leftSection={<span className="theme-mode-icon" key={colorScheme}><ThemeIcon size={20} stroke={1.6} /></span>}
-        onClick={() => setColorScheme(mode.next)}>
-        <span className="theme-label">{t(mode.label)}</span>
-      </Button>
-    </Tooltip>
+    <ActionIcon className="theme-toggle" variant="subtle" color="gray" size="lg" aria-label={themeLabel}
+      onClick={() => setColorScheme(mode.next)}>
+      <span className="theme-mode-icon" key={colorScheme}><ThemeIcon size={21} stroke={1.6} /></span>
+    </ActionIcon>
     <Menu position="bottom-end" withinPortal>
       <Menu.Target>
         <ActionIcon className="language-toggle" variant="subtle" color="gray" size="lg" aria-label={t('Switch language')} title={t('Switch language')}>
