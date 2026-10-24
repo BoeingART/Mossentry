@@ -55,7 +55,7 @@ export default function InventoryTransfer({ saved }: { saved: () => Promise<void
         {preview && <>
           <Group justify="space-between">
             <Text size="sm">{t('{0} hosts selected', { 0: selected.length })}</Text>
-            <Checkbox label={t('Select all / none')} checked={allSelected} indeterminate={selected.length > 0 && !allSelected}
+            <Checkbox label={t(allSelected ? 'Deselect all' : 'Select all')} checked={allSelected} indeterminate={selected.length > 0 && !allSelected}
               disabled={busy || !selectable.length} onChange={event => setSelected(event.currentTarget.checked ? selectable : [])} />
           </Group>
           <ScrollArea.Autosize mah={300}><Table><Table.Thead><Table.Tr><Table.Th>{t('Import')}</Table.Th><Table.Th>{t('Server name')}</Table.Th><Table.Th>{t('Hostname or IP address')}</Table.Th><Table.Th>{t('SSH login account')}</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{preview.servers.map(server => <Table.Tr key={server.name}><Table.Td><Checkbox aria-label={t('Import {0}', { 0: server.name })} checked={selected.includes(server.name)} disabled={busy || preview.conflicts.includes(server.name)} onChange={e => { const checked = e.currentTarget.checked; setSelected(current => checked ? [...current, server.name] : current.filter(name => name !== server.name)); }} /></Table.Td><Table.Td>{server.name}{preview.conflicts.includes(server.name) && <Text size="xs" c="dimmed">{t('Already exists')}</Text>}</Table.Td><Table.Td>{server.hostname}</Table.Td><Table.Td>{server.ssh_user}</Table.Td></Table.Tr>)}</Table.Tbody></Table></ScrollArea.Autosize>
