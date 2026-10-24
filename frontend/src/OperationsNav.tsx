@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Collapse, Stack, Tooltip } from '@mantine/core';
-import { IconChevronRight, IconServer, IconShieldCheck, IconTerminal2 } from '@tabler/icons-react';
+import { IconChevronRight, IconServer } from '@tabler/icons-react';
 import { t } from './i18n';
 
 type OperationsView = 'firewall' | 'operations';
@@ -25,11 +25,11 @@ export default function OperationsNav({ compact, view, navigate, expandSidebar }
     <Collapse expanded={!compact && opened}>
       <Stack id="operations-navigation" className="nav-submenu" gap={5}>
         {([
-          { id: 'firewall', label: t('Firewall'), icon: <IconShieldCheck size={17} /> },
-          { id: 'operations', label: t('Execute commands'), icon: <IconTerminal2 size={17} /> },
+          { id: 'firewall', label: t('Firewall') },
+          { id: 'operations', label: t('Execute commands') },
         ] as const).map(item => <button key={item.id} type="button" className={`nav-button ${view === item.id ? 'active' : ''}`}
           aria-current={view === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}>
-          <span className="nav-icon">{item.icon}</span><span className="nav-label">{item.label}</span>
+          <span className="nav-label">{item.label}</span>
         </button>)}
       </Stack>
     </Collapse>
