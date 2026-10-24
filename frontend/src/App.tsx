@@ -15,7 +15,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useMediaQuery, useReducedMotion } from '@mantine/hooks';
 import {
-  IconBell, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
+  IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
   IconEdit, IconHistory, IconKey, IconPlus, IconSearch, IconServer,
   IconShieldCheck, IconUser, IconUsers, IconLayoutSidebarLeftCollapse,
 } from '@tabler/icons-react';
@@ -337,7 +337,6 @@ export default function App() {
         </Tooltip>
         <div className="topbar-actions">
           <UpdateButton />
-          <Tooltip label={pending ? t("{0} requests awaiting approval", { 0: pending }) : t("View approvals")}><ActionIcon data-approval-bell className="approval-bell" variant="subtle" color="gray" size="lg" aria-label={t("View pending approvals")} onClick={() => navigate('approvals')}><IconBell size={20} stroke={1.5} />{pending > 0 && <span className="notification-dot" />}</ActionIcon></Tooltip>
           <AppearanceControls />
         </div>
       </div>

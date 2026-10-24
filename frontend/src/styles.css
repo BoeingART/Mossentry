@@ -56,8 +56,17 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .topbar-actions .mantine-ActionIcon-root { color: var(--secondary); }
 .update-control { display: inline-flex; align-items: center; }
 .update-button { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.approval-bell { position: relative; }
-.notification-dot { width: 6px; height: 6px; border-radius: 50%; background: #009688; position: absolute; top: 5px; right: 6px; border: 1px solid #fff; }
+.theme-toggle { min-width: 118px; min-height: 36px; padding-inline: 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-soft); color: var(--secondary); }
+.theme-mode-icon { display: inline-flex; }
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme-ready] :is(body, .topbar, .main-area, .mantine-Card-root, .mantine-Paper-root,
+    .mantine-Title-root, .mantine-Text-root, .mantine-Input-input, .mantine-Modal-content, .mantine-Modal-header,
+    .mantine-Alert-root, .mantine-Button-root, .mantine-ActionIcon-root, .mantine-Menu-dropdown, .mantine-Combobox-dropdown) {
+    transition: background-color 400ms ease, color 400ms ease, border-color 400ms ease, box-shadow 400ms ease;
+  }
+  .theme-mode-icon { animation: theme-icon-enter 250ms ease both; }
+}
+@keyframes theme-icon-enter { from { opacity: 0; transform: rotate(-30deg) scale(.8); } to { opacity: 1; transform: rotate(0) scale(1); } }
 .navigation-toggle { flex-shrink: 0; }
 .desktop-mac .topbar, .desktop-other .topbar { padding-top: 24px; }
 .desktop-other .topbar-content { padding-right: 150px; }
@@ -84,7 +93,7 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .main-area { min-width: 0; background: var(--canvas); }
 /* Keep the rail, brand, and content on the same animation curve. */
 .app-shell { --sidebar-duration: 280ms; --sidebar-easing: cubic-bezier(0.22, 1, 0.36, 1); }
-.sidebar { transition-property: width, padding, transform; overflow: hidden; }
+.sidebar { transition-property: width, padding, transform, background-color, color, border-color; overflow: hidden; }
 .topbar-brand { overflow: hidden; transition: width var(--sidebar-duration) var(--sidebar-easing), padding var(--sidebar-duration) var(--sidebar-easing), gap var(--sidebar-duration) var(--sidebar-easing); }
 .brand-mark, .nav-icon { flex-shrink: 0; }
 .brand-name, .nav-label { overflow: hidden; white-space: nowrap; max-width: 180px; opacity: 1; transition: max-width var(--sidebar-duration) var(--sidebar-easing), opacity var(--sidebar-duration) var(--sidebar-easing), transform var(--sidebar-duration) var(--sidebar-easing); }
@@ -368,6 +377,9 @@ i.cyan { background: #80deea; }
   .resource-chart.mantine-Paper-root { padding: 16px; }
 }
 @media (max-width: 560px) {
+  .theme-toggle { min-width: 36px; width: 36px; padding-inline: 0; }
+  .theme-toggle .mantine-Button-section { margin: 0; }
+  .theme-toggle .mantine-Button-label { display: none; }
   .dashboard-summary { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
 @media (max-width: 380px) {
