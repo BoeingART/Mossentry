@@ -25,7 +25,7 @@ function RuleRow({ rule, busy, remove }: { rule: Rule; busy: boolean; remove: (r
         onClick={() => remove(rule)}>{t('Delete')}</Button></Table.Td>
     </Table.Tr>
     {expanded && <Table.Tr className="firewall-rule-details"><Table.Td colSpan={4} id={detailsId}>
-      <Text size="xs" c="dimmed" mb="xs">{t('Original firewall rule')}</Text>
+      <Text size="xs" c="dimmed" mb="xs">{t('Firewall rule')}</Text>
       <Code block className="firewall-original-rule">{rule.description}</Code>
     </Table.Td></Table.Tr>}
   </Fragment>;
@@ -38,7 +38,7 @@ export default function FirewallRules({ rules, revision, busy, remove }: {
     <Table horizontalSpacing="md" verticalSpacing="sm" miw={440}>
       <Table.Thead><Table.Tr>
         <Table.Th w={44}><VisuallyHidden>{t('Rule details')}</VisuallyHidden></Table.Th>
-        <Table.Th>{t('Type')}</Table.Th><Table.Th>{t('Ports / range')}</Table.Th>
+        <Table.Th w={160}>{t('Type')}</Table.Th><Table.Th>{t('Port / port range')}</Table.Th>
         <Table.Th ta="right">{t('Actions')}</Table.Th>
       </Table.Tr></Table.Thead>
       <Table.Tbody>{rules.length ? rules.map(rule => <RuleRow key={`${revision}:${rule.id}`} rule={rule} busy={busy} remove={remove} />)
