@@ -27,14 +27,29 @@ test('no newer release, missing manifest and offline checks keep Update hidden',
   }
 });
 
-test('a newer release immediately appears and downloads without a click; readiness waits for verification', async () => {
+test('a newer release stays available without downloading until the user clicks', async () => {
+  const { updater, calls } = fixture();
+  await updater.poll();
+  assert.deepEqual(updater.snapshot(), { phase: 'available', version: '0.2.0' });
+  await updater.check();
+  await updater.poll();
+  await updater.poll();
+  await updater.install();
+  assert.deepEqual(updater.snapshot(), { phase: 'available', version: '0.2.0' });
+  assert.deepEqual(calls, { check: 1, download: 0, install: 0 });
+  await updater.download();
+  assert.equal(updater.snapshot().phase, 'ready');
+  assert.deepEqual(calls, { check: 1, download: 1, install: 0 });
+});
+
+test('a clicked download only becomes ready after verification', async () => {
   const verified = deferred();
   let progress;
   const { updater, calls } = fixture({ download: report => { progress = report; return verified.promise; } });
   const phases = [];
   updater.subscribe(() => phases.push(updater.snapshot().phase));
-  const check = updater.check();
-  await Promise.resolve();
+  await updater.check();
+  const download = updater.download();
   assert.equal(updater.snapshot().phase, 'downloading');
   assert.equal(updater.snapshot().version, '0.2.0');
   progress({ received: 100, total: 100 });
@@ -42,7 +57,7 @@ test('a newer release immediately appears and downloads without a click; readine
   await updater.install();
   assert.equal(calls.install, 0);
   verified.resolve();
-  await check;
+  await download;
   assert.equal(updater.snapshot().phase, 'ready');
   progress({ received: 100, total: 100 });
   assert.equal(updater.snapshot().phase, 'ready');
@@ -56,30 +71,45 @@ test('repeated mounts, polling and clicks share one check and one download', asy
     check: () => { checks++; return checked.promise; },
     download: () => { downloads++; return downloaded.promise; },
   });
+  await updater.download();
+  assert.equal(downloads, 0);
   const first = updater.check();
   await updater.poll();
+  await updater.download();
+  assert.equal(downloads, 0);
   checked.resolve('0.2.0');
-  await Promise.resolve();
+  await first;
   await updater.poll();
   assert.equal(checks, 1);
+  assert.equal(downloads, 0);
+  const download = updater.download();
+  await updater.download();
+  await updater.poll();
   assert.equal(downloads, 1);
   downloaded.resolve();
-  await first;
+  await download;
+  await updater.download();
   await updater.poll();
   assert.equal(downloads, 1);
 });
 
-test('a rejected signature never becomes installable and download can be retried', async () => {
+test('a rejected signature never becomes installable and retries only after a click', async () => {
   let downloads = 0;
   const { updater, calls } = fixture({ download: async () => {
     if (++downloads === 1) throw { detail: 'Could not download or verify the update. Please retry.' };
   } });
   await updater.check();
+  await updater.download();
   assert.equal(updater.snapshot().phase, 'error');
   assert.equal(updater.snapshot().retry, 'download');
   await updater.install();
   assert.equal(calls.install, 0);
   await updater.poll();
+  await updater.poll();
+  await updater.check();
+  assert.equal(updater.snapshot().phase, 'error');
+  assert.equal(downloads, 1);
+  await updater.download();
   assert.equal(updater.snapshot().phase, 'ready');
   assert.equal(downloads, 2);
 });
@@ -92,8 +122,8 @@ test('failed hidden checks recover on a subsequent poll', async () => {
   } });
   await updater.poll();
   await updater.poll();
-  assert.equal(updater.snapshot().phase, 'ready');
-  assert.equal(calls.download, 1);
+  assert.equal(updater.snapshot().phase, 'available');
+  assert.equal(calls.download, 0);
 });
 
 test('a running server task blocks installation; retry reuses the downloaded package and never installs automatically', async () => {
@@ -102,6 +132,7 @@ test('a running server task blocks installation; retry reuses the downloaded pac
     if (++installs === 1) throw { detail: 'Another server operation is running. Wait for it to finish and retry' };
   } });
   await updater.check();
+  await updater.download();
   await updater.install();
   assert.equal(updater.snapshot().phase, 'error');
   assert.equal(updater.snapshot().retry, 'install');
@@ -121,6 +152,8 @@ test('double clicks install once and unknown download sizes still reach readines
     install: () => { installs++; return installed.promise; },
   });
   await updater.check();
+  await updater.download();
+  assert.equal(updater.snapshot().phase, 'ready');
   const first = updater.install();
   await updater.install();
   assert.equal(installs, 1);

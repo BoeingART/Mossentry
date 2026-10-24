@@ -38,6 +38,7 @@ export default function UpdateButton() {
   const hint = downloading ? t('Downloading Mossentry {0} in the background', { 0: state.version })
     : installing ? t('Installing the update and restarting Mossentry…')
     : failed ? `${t(state.error || '')} ${t('Click to retry.')}`
+    : state.phase === 'available' ? t('Mossentry {0} is available. Click to download.', { 0: state.version })
     : t('Mossentry {0} is ready. Click to install and restart.', { 0: state.version });
 
   return <Tooltip label={hint} multiline maw={320} withArrow events={{ hover: true, focus: true, touch: true }}>
@@ -45,7 +46,7 @@ export default function UpdateButton() {
       <Button className="update-button" size="compact-sm" variant="light" color={failed ? 'orange' : 'teal'}
         leftSection={failed ? <IconRefresh size={15} /> : <IconArrowUp size={15} />}
         loading={downloading || installing} disabled={downloading || installing} aria-label={hint}
-        onClick={() => { void (state.retry === 'download' ? updater.retryDownload() : updater.install()); }}>
+        onClick={() => { void (state.phase === 'available' || state.retry === 'download' ? updater.download() : updater.install()); }}>
         {label}
       </Button>
     </span>
