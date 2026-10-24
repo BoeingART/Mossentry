@@ -108,3 +108,9 @@ The packaged app needs no additional software installed on your computer. Linux 
 ## Contributing
 
 Bug reports, feature ideas and pull requests are welcome. [Open an issue](https://github.com/BoeingART/Mossentry/issues) to share a problem or proposal, or follow the [development guide](docs/DEVELOPMENT.md) to work on the app.
+
+## License
+
+Unless otherwise noted, Mossentry's source code, documentation and original assets are licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). See [LICENSE](LICENSE) for the full legal text. Third-party dependencies and materials retain their own licenses.
+
+You may use, modify and redistribute the licensed material, including commercially and within closed-source products, without disclosing source code. When redistributing, include a copy of the license, mark modified files and preserve required legal and attribution notices, including applicable NOTICE attributions if supplied. The license grants relevant contributor patent rights, subject to its patent litigation termination clause, and does not grant trademark rights. The material is provided without warranties, subject to the license terms.

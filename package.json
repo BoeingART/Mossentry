@@ -4,6 +4,7 @@
   "version": "0.3.1",
   "private": true,
   "description": "Desktop manager for SSH hosts and access requests",
+  "license": "Apache-2.0",
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "start": "node scripts/rust-tool.cjs tauri dev",
