@@ -1,26 +1,27 @@
-# Mossentry v0.3.1
+# Mossentry v0.3.2
 
-Import SSH hosts with fewer steps, view firewall status across servers, and choose when update downloads begin.
+Use readable server names and keep the save action visible while editing connection settings.
 
-## Changes since v0.3.0
+## Changes since v0.3.1
 
-- SSH config imports load hosts automatically when the dialog opens or the file path changes. Hosts start unselected; the selection checkbox switches between **Select all** and **Deselect all**, skipping existing servers. Newly imported servers have management enabled by default, while existing servers remain unchanged.
-- Simplified the SSH import list by hiding ports and SSH Host aliases while preserving both in the saved connection settings. If the source config changes before import, the list reloads and requires a fresh selection.
-- Added a firewall overview showing enabled, disabled, unavailable, failed, checking, waiting and paused states for each server. Select a server to manage its firewall. Status checks run serially and prevent responses from old connection settings from replacing current results.
-- Replaced the firewall rule list with an expandable table showing rule type, destination port or port range, and actions. Expand a row to inspect the original UFW rule; unknown formats remain available without inventing a summary.
-- Update checks now show an available update without downloading it. Downloads and retries start only after a click; installation still requires a separate click after signature verification.
-- Removed icons from Operations submenu items and aligned command preview and execution actions with the timeout controls.
+- Server names now accept up to 80 Unicode characters, including mixed case, Chinese, spaces, punctuation and emoji. Empty names, line breaks, control characters and reserved names remain invalid, with matching validation and localized guidance in the editor.
+- Moved **Save server** into the sticky header of the add/edit dialog, so it stays visible while scrolling through SSH settings. Saving preserves the existing server identity, SSH configuration, saved sudo credentials and synced account associations.
+- Added the Apache License 2.0 for the project's source code, documentation and original assets, with license information in both READMEs and package metadata.
+- Added matching English and Chinese dashboard screenshots near the top of each README.
+- Updated contributor guidance and pull-request checks to run tests without building desktop installers. Release tags continue to build and publish all supported platforms.
+
+Existing application data and SSH settings remain compatible; no database migration is required.
 
 ## Downloads
 
 | Platform | Installer |
 | --- | --- |
-| macOS 13+, Apple Silicon | `Mossentry_0.3.1_darwin-aarch64.dmg` |
-| macOS 13+, Intel | `Mossentry_0.3.1_darwin-x86_64.dmg` |
-| Windows 10/11 x64 | `Mossentry_0.3.1_windows-x86_64-setup.exe` |
+| macOS 13+, Apple Silicon | `Mossentry_0.3.2_darwin-aarch64.dmg` |
+| macOS 13+, Intel | `Mossentry_0.3.2_darwin-x86_64.dmg` |
+| Windows 10/11 x64 | `Mossentry_0.3.2_windows-x86_64-setup.exe` |
 
-macOS packages remain ad-hoc signed and **have not been notarized by Apple**. After trusting the download from this repository, open the app once, dismiss the warning, then use **System Settings → Privacy & Security → Open Anyway**. This release does not remove Apple's first-launch verification warning.
+macOS packages remain ad-hoc signed and **have not been notarized by Apple**. After trusting the download from this repository, open the app once, dismiss the warning, then use **System Settings → Privacy & Security → Open Anyway**. See the attached installation instructions for the full procedure.
 
-Signed updater packages, signatures, `latest.json`, checksums, and installation instructions are attached. Existing Rust versions can update in-app. UFW management requires UFW on the managed Linux host and suitable sudo access. Existing application data and SSH settings remain compatible.
+Signed updater packages, signatures, `latest.json`, checksums, and installation instructions are attached. Existing Rust versions can update in-app.
 
-v0.3.1 简化了 SSH config 导入流程，打开窗口后自动加载主机，默认不勾选，支持全选和全不选，新导入的服务器默认启用管理。防火墙页面新增服务器状态总览，规则以可展开表格展示类型、目标端口和原始内容。发现新版本后先显示更新按钮，点击才开始下载，校验完成后再次点击安装。运维子菜单和命令操作区的布局也做了调整。macOS 安装包仍未经过 Apple 公证，首次打开需按安装说明操作。
+v0.3.2 支持最长 80 个 Unicode 字符的服务器名称，可使用中文、大小写字母、空格、符号和 emoji。新增或编辑服务器时，“保存”按钮固定在窗口顶部，滚动查看 SSH 设置时也能直接保存。已有服务器身份、SSH 设置、sudo 凭据和账户关联保持兼容，无需数据库迁移。本版还补充了 Apache 2.0 许可证及授权说明，并在中英文 README 中加入对应语言的概览截图。PR 检查仅运行检查和测试，版本发布仍会生成全部受支持平台的安装包。macOS 安装包仍未经过 Apple 公证，首次打开请按安装说明操作。

@@ -10,7 +10,7 @@ Use the Apple Silicon or Intel DMG matching your Mac, then drag Mossentry to App
 
 ### Apple verification warning / Apple 无法验证
 
-The published v0.2.0 through v0.3.1 macOS builds use ad-hoc signing and have not been notarized by Apple. macOS can display “Apple could not verify Mossentry.app is free of malware” and block the first launch. The updater's `.sig` files authenticate updates to Mossentry; they do not supply an Apple Developer ID signature or notarization.
+The published v0.2.0 through v0.3.2 macOS builds use ad-hoc signing and have not been notarized by Apple. macOS can display “Apple could not verify Mossentry.app is free of malware” and block the first launch. The updater's `.sig` files authenticate updates to Mossentry; they do not supply an Apple Developer ID signature or notarization.
 
 If you downloaded the app from this project's GitHub Releases and choose to trust it, use Apple's [Open Anyway procedure](https://support.apple.com/en-us/102445):
 
@@ -18,7 +18,7 @@ If you downloaded the app from this project's GitHub Releases and choose to trus
 2. Open **System Settings → Privacy & Security**, scroll to Security, and click **Open Anyway** next to the Mossentry warning.
 3. Authenticate if requested and confirm **Open**. macOS saves an exception for this app.
 
-当前发布的 v0.2.0 至 v0.3.1 macOS 安装包尚未经过 Apple 公证，首次打开可能出现“Apple 无法验证 Mossentry.app”的提示。确认安装包来自本项目的 GitHub Releases 并决定信任后，可以按以下步骤打开：
+当前发布的 v0.2.0 至 v0.3.2 macOS 安装包尚未经过 Apple 公证，首次打开可能出现“Apple 无法验证 Mossentry.app”的提示。确认安装包来自本项目的 GitHub Releases 并决定信任后，可以按以下步骤打开：
 
 1. 将 Mossentry 拖到“应用程序”，打开一次，弹出警告后点击“完成”。
 2. 打开“系统设置 → 隐私与安全性”，向下找到“安全性”区域，在 Mossentry 被阻止的提示旁点击“仍要打开”。
