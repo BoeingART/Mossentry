@@ -190,6 +190,7 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .operation-target-count { color: var(--muted); white-space: nowrap; padding-right: 10px; }
 .operation-target-count .mantine-ComboboxChevron-chevron { flex-shrink: 0; }
 .operation-timeout-label { font-size: var(--text-control); white-space: nowrap; }
+.operation-actions { margin-left: auto; }
 .operation-check-action { display: inline-flex; }
 .operation-server-list { border: 1px solid var(--line); border-radius: var(--mantine-radius-md); overflow: hidden; }
 .operation-server-result + .operation-server-result { border-top: 1px solid var(--line); }
