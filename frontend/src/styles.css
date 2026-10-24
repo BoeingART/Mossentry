@@ -205,6 +205,11 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
   .operation-targets > .mantine-MultiSelect-root { flex-basis: 100% !important; }
 }
 /* Servers, permissions, and approvals */
+.firewall-rules-table { overflow: hidden; }
+.firewall-rule-ports { font-variant-numeric: tabular-nums; }
+.firewall-rule-toggle[aria-expanded='true'] svg { transform: rotate(90deg); }
+.firewall-rule-details { background: var(--surface-soft); }
+.firewall-original-rule { white-space: pre-wrap; overflow-wrap: anywhere; }
 .firewall-list-heading { display: flex; justify-content: space-between; padding: 14px 55px 14px 76px; color: var(--muted); background: var(--surface-soft); border-bottom: 1px solid var(--line); }
 .firewall-server-list ul { list-style: none; margin: 0; padding: 0; }
 .firewall-server-list li + li { border-top: 1px solid var(--line); }
