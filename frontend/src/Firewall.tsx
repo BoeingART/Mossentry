@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Badge, Button, Code, Group, Modal, NumberInput, Paper, Select, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Alert, Badge, Button, Code, Group, NumberInput, Paper, Select, Stack, Text, TextInput, Title } from '@mantine/core';
 import { api } from './api';
 import { t } from './i18n';
 import type { FirewallStatus, Server } from './types';
@@ -8,9 +8,10 @@ const message = (error: unknown) => error instanceof Error ? error.message : t('
 const sshBlocked = 'SSH access is not explicitly allowed. Add an inbound TCP allow rule for the SSH port and management IP before enabling the firewall.';
 type Pending = { operation: 'enable' | 'disable' } | { operation: 'delete'; rule_id: number; revision: string; description: string };
 
-export default function Firewall({ server, close, saved }: { server: Server; close: () => void; saved: () => Promise<void> }) {
+export default function Firewall({ server, saved, busy, setBusy }: {
+  server: Server; saved: () => Promise<void>; busy: boolean; setBusy: (busy: boolean) => void;
+}) {
   const [status, setStatus] = useState<FirewallStatus | null>(null);
-  const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [pending, setPending] = useState<Pending | null>(null);
@@ -29,7 +30,7 @@ export default function Firewall({ server, close, saved }: { server: Server; clo
       if (active) { setStatus(value); if (value.available && value.ssh_port) setPort(value.ssh_port); }
     }).catch(cause => { if (active) setError(message(cause)); }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [endpoint]);
+  }, [endpoint, setBusy]);
   async function operate(body: Record<string, unknown>) {
     setBusy(true); setError(''); setNotice(''); setPending(null);
     // Stale data must never leave the enable button available after a failed operation.
@@ -40,8 +41,8 @@ export default function Firewall({ server, close, saved }: { server: Server; clo
     } catch (cause) { setError(message(cause)); }
     finally { setBusy(false); void saved().catch(() => {}); }
   }
-  return <Modal opened onClose={() => !busy && close()} closeOnClickOutside={!busy} closeOnEscape={!busy} title={t('{0} · Firewall', { 0: server.name })} centered size="lg">
-    <Stack>
+  return <Stack>
+      <Title order={3}>{t('{0} · Firewall', { 0: server.name })}</Title>
       <Text size="sm" c="dimmed">{t('Manage inbound UFW rules. Changes take effect immediately when the firewall is enabled.')}</Text>
       {error && <Alert color="red" role="alert">{t(error)}</Alert>}
       {notice && <Alert color="teal" role="status">{notice}</Alert>}
@@ -63,7 +64,6 @@ export default function Firewall({ server, close, saved }: { server: Server; clo
           <Group justify="end"><Button type="submit" disabled={busy || !!pending}>{t('Add rule')}</Button></Group>
         </Stack></form></Paper>
       </>}
-      <Group justify="end"><Button variant="default" disabled={busy} onClick={close}>{t('Close')}</Button><Button variant="default" loading={busy} disabled={!!pending} onClick={() => void operate({ operation: 'status' })}>{t('Refresh')}</Button></Group>
-    </Stack>
-  </Modal>;
+      <Group justify="end"><Button variant="default" loading={busy} disabled={!!pending} onClick={() => void operate({ operation: 'status' })}>{t('Refresh')}</Button></Group>
+    </Stack>;
 }

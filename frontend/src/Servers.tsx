@@ -3,11 +3,9 @@ import { t } from './i18n';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Accordion, ActionIcon, Alert, Button, Card, Checkbox, Group, Menu, Modal, NumberInput, Paper, PasswordInput, Progress, Select, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, Tooltip, Textarea, Badge } from '@mantine/core';
-import { IconCheck, IconDots, IconEdit, IconPlus, IconSearch, IconServer, IconTrash, IconX } from '@tabler/icons-react';
+import { IconCheck, IconDots, IconEdit, IconPlus, IconRefresh, IconSearch, IconServer, IconTrash, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { api } from './api';
-import Firewall from './Firewall';
-import PingTest from './PingTest';
 import InventoryTransfer from './InventoryTransfer';
 import { sshOption, setSshOption } from './sshOptions';
 import type { Dashboard, Server, ServerMetrics } from './types';
@@ -16,6 +14,7 @@ const date = (value: string | null) => value ? numericDate(value, { includeTime:
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : t("Please retry the operation");
 const notify = (message: string, error = false) => notifications.show({ title: error ? t("Could not complete") : t("Done"), message: t(message), color: error ? 'red' : 'teal' });
 type Draft = { name: string; hostname: string; port: number | string; ssh_user: string; key_path: string; enabled: boolean; group_name: string; notes: string; ssh_backend: 'native' | 'openssh'; ssh_alias: string; ssh_options: string; ssh_jump_config: string };
+type ScanResult = { ok: boolean; users: number; errors: Record<string, string> };
 
 function ServerForm({ server, close, saved }: { server: Server | null; close: () => void; saved: () => Promise<void> }) {
   const [draft, setDraft] = useState<Draft>({ name: server?.name || '', hostname: server?.hostname || '', port: server?.port || 22, ssh_user: server?.ssh_user || '', key_path: server?.key_path ?? '~/.ssh/id_rsa', enabled: server ? !!server.enabled : true, group_name: server?.group_name || '', notes: server?.notes || '', ssh_backend: server?.ssh_backend || 'native', ssh_alias: server?.ssh_alias || '', ssh_options: server?.ssh_options || '', ssh_jump_config: server?.ssh_jump_config || '' });
@@ -84,10 +83,9 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
   const [group, setGroup] = useState<string | null>(null);
   const [filter, setFilter] = useState<string | null>('all');
   const [editor, setEditor] = useState<{ server: Server | null } | null>(null);
-  const [firewall, setFirewall] = useState<Server | null>(null);
-  const [ping, setPing] = useState<Server | null>(null);
   const [remove, setRemove] = useState<Server | null>(null);
   const [busy, setBusy] = useState('');
+  const [syncErrors, setSyncErrors] = useState<Record<string, string>>({});
   const [connections, setConnections] = useState<Record<number, { source: string; ok: boolean; detail: string }>>({});
   const [metrics, setMetrics] = useState<{ server: Server; result: ServerMetrics } | null>(null);
   const servers = data.servers.filter(server => [server.name, server.hostname, server.ssh_user, server.group_name || '', server.notes || ''].some(value => value.toLowerCase().includes(search.toLowerCase())) && (!group || server.group_name === group) && (filter === 'all' || (filter === 'enabled' ? !!server.enabled : !server.enabled)));
@@ -108,7 +106,7 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
         recordConnection(server, true, t("Last connection succeeded."));
         setMetrics({ server, result });
       } else {
-        const result = await api<{ ok: boolean; users: number; errors: Record<string, string> }>(`/api/servers/${server.id}/scan`, 'POST');
+        const result = await api<ScanResult>(`/api/servers/${server.id}/scan`, 'POST');
         recordConnection(server, result.ok, result.ok ? t("Last connection succeeded.")
           : Object.values(result.errors).join(' ') || t("Sync failed. Check the connection and retry."));
         if (result.ok) notify(t("{0}: synced {1} accounts", { 0: server.name, 1: result.users }));
@@ -118,6 +116,19 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
       if ((cause as { status?: number }).status === 502) recordConnection(server, false, errorMessage(cause));
       notify(errorMessage(cause), true);
     } finally { await saved(); setBusy(''); }
+  }
+  async function syncAll() {
+    setBusy('scan-all'); setSyncErrors({});
+    try {
+      const result = await api<ScanResult>('/api/scan', 'POST');
+      setSyncErrors(result.errors);
+      for (const server of data.servers.filter(server => server.enabled)) {
+        recordConnection(server, !result.errors[server.name], result.errors[server.name] || t('Last connection succeeded.'));
+      }
+      notify(result.ok ? t('Synced {0} accounts across all enabled servers.', { 0: result.users })
+        : t('Synced {0} accounts. {1} servers failed to sync.', { 0: result.users, 1: Object.keys(result.errors).length }), !result.ok);
+    } catch (cause) { notify(errorMessage(cause), true); }
+    finally { try { await saved(); } finally { setBusy(''); } }
   }
   async function toggle(server: Server) {
     setBusy(`${server.id}:edit`);
@@ -131,7 +142,8 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
     catch (cause) { notify(errorMessage(cause), true); } finally { setBusy(''); }
   }
   return <>
-    <Group className="page-heading" justify="space-between" align="center" mb="lg"><div><Title order={2}>{t("Servers")}</Title></div><Group gap="xs"><InventoryTransfer saved={saved} /><Button leftSection={<IconPlus size={16} />} onClick={() => setEditor({ server: null })} disabled={!!busy}>{t("Add server")}</Button></Group></Group>
+    <Group className="page-heading" justify="space-between" align="center" mb="lg"><div><Title order={2}>{t("Servers")}</Title></div><Group gap="xs"><InventoryTransfer saved={saved} /><Button leftSection={<IconPlus size={16} />} onClick={() => setEditor({ server: null })} disabled={!!busy}>{t("Add server")}</Button><Button variant="light" leftSection={<IconRefresh size={16} />} disabled={!!busy || !data.servers.some(server => server.enabled)} loading={busy === 'scan-all'} onClick={() => void syncAll()}>{t('Sync all servers')}</Button></Group></Group>
+    {Object.keys(syncErrors).length > 0 && <Alert color="orange" mb="md" title={t('Some servers could not sync')} withCloseButton onClose={() => setSyncErrors({})}><Stack gap={4}>{Object.entries(syncErrors).map(([name, error]) => <Text key={name} size="sm">{name}: {t(error)}</Text>)}</Stack></Alert>}
     <Group className="filter-toolbar" mb="lg"><TextInput leftSection={<IconSearch size={16} />} placeholder={t("Find a server")} value={search} onChange={e => setSearch(e.currentTarget.value)} w={300} /><Select aria-label={t("Filter servers")} value={filter} onChange={setFilter} allowDeselect={false} data={[{ value: 'all', label: t("All servers") }, { value: 'enabled', label: t("Enabled") }, { value: 'paused', label: t("Paused") }]} w={160} /><Select clearable searchable placeholder={t("All groups")} aria-label={t("Server group")} value={group} onChange={setGroup} data={[...new Set(data.servers.map(s => s.group_name).filter(Boolean))].sort()} /><Text size="sm" c="dimmed">{t("Enabled / Total: {0}/{1}", { 0: data.servers.filter(s => s.enabled).length, 1: data.servers.length })}</Text></Group>
     {servers.length ? <div className="host-grid">{servers.map(server => {
       const latest = connections[server.id];
@@ -174,13 +186,9 @@ export default function Servers({ data, saved, monitor }: { data: Dashboard; sav
           <Button size="xs" variant="default" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:scan`} onClick={() => void operate(server, 'scan')}>{t("Sync")}</Button>
           <Button size="xs" variant="default" disabled={!server.enabled || !!busy} loading={busy === `${server.id}:status`} onClick={() => void operate(server, 'status')}>{t("Status")}</Button>
           <Button size="xs" variant="default" disabled={!server.enabled} onClick={() => monitor(server)}>{t("Monitor")}</Button>
-          <Button size="xs" variant="default" disabled={!server.enabled || !!busy} onClick={() => setFirewall(server)}>{t("Firewall")}</Button>
-          <Button size="xs" variant="default" disabled={!server.enabled || !!busy} onClick={() => setPing(server)}>{t("Ping test")}</Button>
         </Group>
       </Card>;
     })}</div> : <Paper withBorder radius="lg" p="xl"><Stack align="center"><IconServer size={34} color="#8795a9" /><Title order={3}>{data.servers.length ? t("No matching servers") : t("Add your first server")}</Title>{!data.servers.length && <Button onClick={() => setEditor({ server: null })}>{t("Add server")}</Button>}</Stack></Paper>}
-    {firewall && <Firewall key={firewall.id} server={firewall} close={() => setFirewall(null)} saved={saved} />}
-    {ping && <PingTest key={ping.id} server={ping} close={() => setPing(null)} />}
     {editor && <ServerForm server={editor.server} close={() => setEditor(null)} saved={saved} />}
     <Modal opened={!!remove} onClose={() => !busy && setRemove(null)} title={t("Remove server?")} centered closeOnClickOutside={!busy} closeOnEscape={!busy}><Stack><Text size="sm">{t("Remove")} {remove?.name} {t("and its saved account list from Mossentry. The remote server, its users and files stay unchanged. Operation history is kept.")}</Text><Group justify="end"><Button variant="default" disabled={!!busy} onClick={() => setRemove(null)}>{t("Cancel")}</Button><Button color="red" disabled={!!busy} loading={!!busy} onClick={() => void removeServer()}>{t("Remove server")}</Button></Group></Stack></Modal>
     <Modal opened={!!metrics} onClose={() => setMetrics(null)} title={t("{0} · Server status", { 0: metrics?.server.name || '' })} centered size="lg"><Stack>{metrics && <>
