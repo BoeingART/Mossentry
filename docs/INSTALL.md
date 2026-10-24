@@ -32,7 +32,7 @@ Use the x64 NSIS installer on Windows 10/11. Tauri uses Microsoft WebView2; the 
 
 ## In-app updates
 
-The Rust edition checks the latest stable GitHub Release on launch, every ten minutes and when the network reconnects. The top-right **Update / 更新** button appears only when a higher version is available for your platform, and the signed package downloads automatically. The button shows download progress, then installs and restarts Mossentry when clicked. Local configuration and data remain in their existing directory. Finish running server operations before applying an update; installation is blocked while an operation is active. Download and installation failures can be retried from the same button.
+The Rust edition checks the latest stable GitHub Release on launch, every ten minutes and when the network reconnects. The top-right **Update / 更新** button appears only when a higher version is available for your platform. Click it to download the signed package. The button shows download progress, then a second click installs and restarts Mossentry. Local configuration and data remain in their existing directory. Finish running server operations before applying an update; installation is blocked while an operation is active. Download and installation failures require a click on the same button to retry.
 
 Automatic updates require a release containing `latest.json` and signed updater packages. The historical Electron v0.1.0 release cannot gain this feature remotely; install the first Rust release with update support manually. Development runs do not check or install updates. Release maintainers should follow [UPDATES.md](UPDATES.md).
 

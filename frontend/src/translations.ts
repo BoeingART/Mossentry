@@ -150,6 +150,7 @@ export const zh: Record<string, string> = {
   "Updating…": "正在更新…",
   "Retry update": "重试更新",
   "Downloading Mossentry {0} in the background": "正在后台下载 Mossentry {0}",
+  "Mossentry {0} is available. Click to download.": "Mossentry {0} 新版本可用，点击下载。",
   "Installing the update and restarting Mossentry…": "正在安装更新并重启 Mossentry…",
   "Mossentry {0} is ready. Click to install and restart.": "Mossentry {0} 已下载，点击安装并重启。",
   "Click to retry.": "点击重试。",
