@@ -1,6 +1,6 @@
 [package]
 name = "mossentry"
-version = "0.2.2"
+version = "0.3.0"
 description = "Rust desktop manager for SSH hosts and access requests"
 edition = "2021"
 default-run = "mossentry"
