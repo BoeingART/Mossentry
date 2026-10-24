@@ -69,10 +69,17 @@ impl ServerInput {
         let mut s: Self = serde_json::from_value(v)
             .map_err(|_| Error::new(422, "Check the server settings and try again."))?;
         s.hostname = s.hostname.trim().into();
-        if !matches(r"^[a-z][a-z0-9_-]{0,31}$", &s.name) {
-            return Err(Error::bad("Check the server name and try again."));
+        if s.name.trim().is_empty()
+            || s.name.chars().count() > 80
+            || s.name
+                .chars()
+                .any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}'))
+        {
+            return Err(Error::bad(
+                "Use a server name of 1–80 characters without line breaks or control characters.",
+            ));
         }
-        if ["all", "ungrouped", "managed"].contains(&s.name.as_str()) {
+        if ["all", "ungrouped", "managed"].contains(&s.name.to_ascii_lowercase().as_str()) {
             return Err(Error::bad("This server name is reserved"));
         }
         if !matches(r"^[A-Za-z0-9_][A-Za-z0-9_.@\\$-]{0,127}$", &s.ssh_user) {

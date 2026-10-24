@@ -154,6 +154,8 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .mantine-Modal-header { padding: 22px 24px 14px; }
 .mantine-Modal-title { font-size: var(--title-dialog); font-weight: 600; letter-spacing: -.3px; }
 .mantine-Modal-body { padding: 8px 24px 24px; }
+.server-editor-header { gap: 12px; }
+.server-editor-header .mantine-Modal-title { flex: 1; min-width: 0; }
 .mantine-Alert-root { border-radius: var(--mantine-radius-md); }
 .filter-toolbar { padding: 15px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--mantine-radius-lg); gap: 12px; box-shadow: var(--panel-shadow); }
 .filter-toolbar .mantine-TextInput-root { flex: 1; min-width: min(100%, 210px); max-width: 310px; }
