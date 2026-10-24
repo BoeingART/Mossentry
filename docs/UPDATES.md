@@ -2,7 +2,7 @@
 
 Packaged Rust builds use Tauri's updater with `https://github.com/BoeingART/Mossentry/releases/latest/download/latest.json`. Tauri compares semantic versions against the running application's version, selects the current OS and architecture, and verifies the downloaded package with the public key in `src-tauri/tauri.conf.json`. Signed version binding is required, so the package must also match the announced version. Equal or lower versions keep the button hidden. The workflow marks prerelease tags as prereleases, so they are excluded from the stable endpoint.
 
-Checks run at startup, every ten minutes and on network reconnection. Finding a newer release shows the top-right Update button and immediately downloads the package. Readiness is reported only after signature verification. Clicking the ready button installs and restarts; the Rust service's operation lock prevents installation from interrupting server mutations. A failed download retries on the next check or button click. A failed installation requires a click to retry. Downloads are retained in the Rust process until installation or exit, and are downloaded again after a restart. Development executables and the standalone browser preview never apply updates.
+Checks run at startup, every ten minutes and on network reconnection. Finding a newer release shows the top-right Update button and waits for a click before downloading the package. Readiness is reported only after signature verification. Clicking the ready button installs and restarts; the Rust service's operation lock prevents installation from interrupting server mutations. Download and installation failures require a button click to retry; polling and network reconnection do not start or retry downloads. Downloads are retained in the Rust process until installation or exit. After a restart, downloading requires another click. Development executables and the standalone browser preview never apply updates.
 
 ## One-time signing setup
 
@@ -19,7 +19,7 @@ The workflow deliberately fails tagged builds if the secret is absent. Pull requ
 
 ## macOS Developer ID signing and notarization
 
-Tauri updater signatures and Apple code signatures serve separate purposes. The published v0.2.0 through v0.2.2 macOS packages are ad-hoc signed (`signingIdentity: "-"`) and have no Apple notarization ticket. A valid updater signature does not prevent Gatekeeper from blocking a downloaded application. See [INSTALL.md](INSTALL.md#apple-verification-warning--apple-无法验证) for the supported first-launch exception procedure.
+Tauri updater signatures and Apple code signatures serve separate purposes. The published v0.2.0 through v0.3.0 macOS packages are ad-hoc signed (`signingIdentity: "-"`) and have no Apple notarization ticket. A valid updater signature does not prevent Gatekeeper from blocking a downloaded application. See [INSTALL.md](INSTALL.md#apple-verification-warning--apple-无法验证) for the supported first-launch exception procedure.
 
 macOS releases currently retain ad-hoc signing without Apple notarization. Signed updater packages remain required. Apple signing and notarization are optional: set the repository Actions variable `APPLE_NOTARIZATION=true` only after configuring all Apple credentials below. In that mode both Mac architectures must pass Apple trust verification before publication. Pull requests and untagged manual runs retain ad-hoc signing for development.
 

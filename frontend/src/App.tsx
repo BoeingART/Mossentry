@@ -15,7 +15,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useMediaQuery, useReducedMotion } from '@mantine/hooks';
 import {
-  IconActivity, IconBell, IconArrowUpRight, IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
+  IconCheck, IconChevronRight, IconDownload, IconLayoutDashboard,
   IconEdit, IconHistory, IconKey, IconPlus, IconSearch, IconServer,
   IconShieldCheck, IconUser, IconUsers, IconLayoutSidebarLeftCollapse,
 } from '@tabler/icons-react';
@@ -24,6 +24,8 @@ import { filteredAccounts, type UserFilter } from './userData';
 import type { Action, Dashboard, Server, User } from './types';
 import Servers from './Servers';
 import Operations from './Operations';
+import OperationsNav from './OperationsNav';
+import FirewallPage from './FirewallPage';
 import { approvalLists, type ApprovalList } from './approvalData';
 import { flyToApprovals } from './approvalMotion';
 import ResourceMonitor from './ResourceMonitor';
@@ -31,7 +33,7 @@ import DashboardPage from './DashboardPage';
 import AppearanceControls from './AppearanceControls';
 import UpdateButton from './UpdateButton';
 
-type View = 'operations' | 'dashboard' | 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
+type View = 'firewall' | 'operations' | 'dashboard' | 'overview' | 'monitor' | 'users' | 'approvals' | 'audit';
 type UserAction = 'disable_user' | 'enable_user' | 'set_sudo' | 'delete_user';
 type RequestDraft = { mode: 'create_user' | UserAction; username: string; server?: string; sudo: boolean };
 type ConfirmDraft = { reject?: boolean; title: string; message: string; run: () => Promise<void> };
@@ -318,25 +320,26 @@ export default function App() {
     setMobileOpened(false);
   }
   const nativeDesktop = isTauri();
-  return <AppShell className="app-shell" data-language={language} data-sidebar-collapsed={compactSidebar || undefined} transitionDuration={reducedMotion ? 0 : 280} transitionTimingFunction="cubic-bezier(0.22, 1, 0.36, 1)" navbar={{ width: compactSidebar ? 76 : 232, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: nativeDesktop ? 100 : 76 }} padding={0}>
+  return <AppShell className="app-shell" data-language={language} data-sidebar-collapsed={compactSidebar || undefined} transitionDuration={reducedMotion ? 0 : 280} transitionTimingFunction="cubic-bezier(0.22, 1, 0.36, 1)" navbar={{ width: compactSidebar ? 76 : 232, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }} header={{ height: nativeDesktop ? 'calc(76px + var(--app-titlebar-height))' : 76 }} padding={0}>
     <AppShell.Header className="topbar" onMouseDown={event => {
       if (!nativeDesktop || event.button !== 0 || (event.target as HTMLElement).closest('button,input,a,select,textarea,[role="button"]')) return;
       if (event.detail === 2) void getCurrentWindow().toggleMaximize();
       else void getCurrentWindow().startDragging();
     }}>
       <WindowControls />
-      <div className="topbar-brand" aria-label="Mossentry"><img className="brand-mark" src={brandIcon} width={42} height={42} alt="" /><span className="brand-name" aria-hidden={compactSidebar}><span className="brand-accent">Moss</span>entry</span></div>
-      <div className="topbar-content">
-        <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label={t("Toggle navigation")} />
-        <Tooltip label={compactSidebar ? t("Expand sidebar") : t("Collapse sidebar")}>
-          <ActionIcon className="sidebar-toggle" variant="subtle" color="gray" size="lg" visibleFrom="sm" aria-label={compactSidebar ? t("Expand sidebar") : t("Collapse sidebar")} aria-expanded={!compactSidebar} aria-controls="main-sidebar" onClick={() => setSidebarCollapsed(value => !value)}>
-            <IconLayoutSidebarLeftCollapse size={21} stroke={1.5} />
-          </ActionIcon>
-        </Tooltip>
-        <div className="topbar-actions">
-          <UpdateButton />
-          <Tooltip label={pending ? t("{0} requests awaiting approval", { 0: pending }) : t("View approvals")}><ActionIcon data-approval-bell className="approval-bell" variant="subtle" color="gray" size="lg" aria-label={t("View pending approvals")} onClick={() => navigate('approvals')}><IconBell size={20} stroke={1.5} />{pending > 0 && <span className="notification-dot" />}</ActionIcon></Tooltip>
-          <AppearanceControls />
+      <div className="topbar-toolbar">
+        <div className="topbar-brand" aria-label="Mossentry"><img className="brand-mark" src={brandIcon} width={42} height={42} alt="" /><span className="brand-name" aria-hidden={compactSidebar}><span className="brand-accent">Moss</span>entry</span></div>
+        <div className="topbar-content">
+          <Burger className="navigation-toggle" opened={mobileOpened} onClick={() => setMobileOpened(value => !value)} hiddenFrom="sm" size="sm" aria-label={t("Toggle navigation")} />
+          <Tooltip label={compactSidebar ? t("Expand sidebar") : t("Collapse sidebar")}>
+            <ActionIcon className="sidebar-toggle" variant="subtle" color="gray" size="lg" visibleFrom="sm" aria-label={compactSidebar ? t("Expand sidebar") : t("Collapse sidebar")} aria-expanded={!compactSidebar} aria-controls="main-sidebar" onClick={() => setSidebarCollapsed(value => !value)}>
+              <IconLayoutSidebarLeftCollapse size={21} stroke={1.5} />
+            </ActionIcon>
+          </Tooltip>
+          <div className="topbar-actions">
+            <UpdateButton />
+            <AppearanceControls />
+          </div>
         </div>
       </div>
     </AppShell.Header>
@@ -345,13 +348,12 @@ export default function App() {
         <span className="nav-section-label" aria-hidden={compactSidebar}>{t("Workspace")}</span>
         <Stack component="nav" aria-label={t("Main navigation")} gap={7}>{nav.map(item => <div key={item.id}>
           {item.id === 'users' && <span className="nav-section-label nav-section-divider" aria-hidden={compactSidebar}>{t("Administration")}</span>}
-          <Tooltip label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} position="right" disabled={!compactSidebar} events={{ hover: true, focus: true, touch: false }}>
+          {item.id === 'operations' ? <OperationsNav compact={compactSidebar} view={view} navigate={navigate} expandSidebar={() => setSidebarCollapsed(false)} /> : <Tooltip label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} position="right" disabled={!compactSidebar} events={{ hover: true, focus: true, touch: false }}>
             <button type="button" data-approval-target={item.id === 'approvals' || undefined} aria-label={item.id === 'approvals' && pending > 0 ? `${item.label} · ${t("{0} requests awaiting approval", { 0: pending })}` : item.label} aria-current={view === item.id || (view === 'monitor' && item.id === 'overview') ? 'page' : undefined} className={`nav-button ${view === item.id || (view === 'monitor' && item.id === 'overview') ? 'active' : ''}`} onClick={() => navigate(item.id)}><span className="nav-icon">{item.icon}</span><span className="nav-label" aria-hidden={compactSidebar}>{item.label}</span>{item.id === 'approvals' && pending > 0 && <Badge className="nav-badge" aria-hidden size="sm" color={view === 'approvals' ? 'gray' : 'teal'} variant="light" circle ml="auto">{pending}</Badge>}</button>
-          </Tooltip>
+          </Tooltip>}
         </div>)}</Stack>
       </ScrollArea>
       <div className="sidebar-footer">
-        <div className="workspace-card-reveal" inert={compactSidebar} aria-hidden={compactSidebar}><div><div className="workspace-card"><span className="workspace-card-icon"><IconActivity size={22} stroke={1.5} /></span><strong>{t("Your infrastructure,")}<br />{t("at a glance.")}</strong><Button fullWidth variant="light" rightSection={<IconArrowUpRight size={15} />} onClick={() => navigate('monitor')}>{t("Open monitor")}</Button></div></div></div>
         <Tooltip label={`${fatal ? t("Service needs attention") : t("Mossentry connected")} · ${data.servers.length} ${t("hosts")}`} position="right" disabled={!compactSidebar} events={{ hover: true, focus: true, touch: false }}>
           <div className={`service-status ${fatal ? 'has-error' : ''}`} tabIndex={compactSidebar ? 0 : undefined} aria-label={compactSidebar ? `${fatal ? t("Service needs attention") : t("Mossentry connected")} · ${data.servers.length} ${t("hosts")}` : undefined}><i /><span>{fatal ? t("Service needs attention") : t("Mossentry connected")}</span><span className="service-status-count">{data.servers.length} {t("hosts")}</span></div>
         </Tooltip>
@@ -362,6 +364,7 @@ export default function App() {
       {view === 'dashboard' && <DashboardPage data={data} refresh={refresh} openServers={() => navigate('overview')} openApprovals={() => navigate('approvals')} />}
       {view === 'overview' && <Servers data={data} saved={refresh} monitor={server => { setMonitorServerId(server.id); setView('monitor'); }} />}
       {view === 'monitor' && <ResourceMonitor data={data} serverId={monitorServerId} selectServer={setMonitorServerId} />}
+      {view === 'firewall' && <FirewallPage servers={data.servers} saved={refresh} />}
       {view === 'operations' && <Operations servers={data.servers} />}
       {view === 'users' && <Users data={data} openRequest={userRequest} openProfile={(username, fullName) => setProfile({ username, fullName })} />}
       {view === 'approvals' && <Approvals data={data} run={approvalConfirm} busy={busy} saved={refresh} download={action => void download(action)} />}

@@ -166,7 +166,7 @@ export default function Operations({ servers }: { servers: Server[] }) {
     finally { setBusy(false); }
   }
   return <Stack gap="lg">
-    <div><Title order={2}>{t('Operations')}</Title><Text size="sm" c="dimmed">{t('Check and run Linux commands on selected servers over SSH.')}</Text></div>
+    <div><Title order={2}>{t('Execute commands')}</Title><Text size="sm" c="dimmed">{t('Check and run Linux commands on selected servers over SSH.')}</Text></div>
     {error && <Alert color="red" withCloseButton onClose={() => setError('')}>{t(error)}</Alert>}
     <Card withBorder radius="lg" p="lg"><Stack gap="md">
       <Group align="end" wrap="nowrap" className="operation-targets">
@@ -175,20 +175,22 @@ export default function Operations({ servers }: { servers: Server[] }) {
         <Button variant="light" disabled={busy || running || !eligible.length} onClick={() => setSelected(eligible.map(s => s.name))}>{t('Select all servers')}</Button>
       </Group>
       <BashEditor label={t('Operation')} hint={t('Enter one or more Bash commands. Commands run non-interactively; use non-interactive options when needed.')} value={command} onChange={setCommand} disabled={busy || running} />
-      <Group justify="start" gap="lg" className="operation-options">
-        <Group gap="xs" wrap="nowrap">
-          <label htmlFor="operation-timeout" className="operation-timeout-label">{t('Server timeout (s)')}</label>
-          <NumberInput id="operation-timeout" min={10} max={3600} allowDecimal={false} value={timeout} onChange={setTimeout} disabled={busy || running} w={100} />
+      <Group justify="space-between">
+        <Group justify="start" gap="lg" className="operation-options">
+          <Group gap="xs" wrap="nowrap">
+            <label htmlFor="operation-timeout" className="operation-timeout-label">{t('Server timeout (s)')}</label>
+            <NumberInput id="operation-timeout" min={10} max={3600} allowDecimal={false} value={timeout} onChange={setTimeout} disabled={busy || running} w={100} />
+          </Group>
+          <Checkbox label={t('Run with sudo')} checked={elevated} onChange={e => setElevated(e.currentTarget.checked)} disabled={busy || running} />
         </Group>
-        <Checkbox label={t('Run with sudo')} checked={elevated} onChange={e => setElevated(e.currentTarget.checked)} disabled={busy || running} />
+        <Group justify="end" wrap="nowrap" className="operation-actions">
+          <Tooltip label={t('Check syntax using bash -n')} withArrow events={{ hover: true, focus: true, touch: true }}>
+            <span className="operation-check-action"><Button variant="light" leftSection={<IconTestPipe size={16} />} disabled={busy || !valid || running} onClick={() => void start('dry_run')}>{t('Check syntax and risks')}</Button></span>
+          </Tooltip>
+          <Button leftSection={<IconPlayerPlay size={16} />} loading={busy} disabled={running || !valid} onClick={() => void reviewCommand()}>{t('Run command')}</Button>
+        </Group>
       </Group>
-      <Group justify="start">
-        <Tooltip label={t('Check syntax using bash -n')} withArrow events={{ hover: true, focus: true, touch: true }}>
-          <span className="operation-check-action"><Button variant="light" leftSection={<IconTestPipe size={16} />} disabled={busy || !valid || running} onClick={() => void start('dry_run')}>{t('Check syntax and risks')}</Button></span>
-        </Tooltip>
-        <Button leftSection={<IconPlayerPlay size={16} />} loading={busy} disabled={running || !valid} onClick={() => void reviewCommand()}>{t('Run command')}</Button>
-        {running && <Text size="sm" c="dimmed">{t('A server task is running')}</Text>}
-      </Group>
+      {running && <Text size="sm" c="dimmed">{t('A server task is running')}</Text>}
     </Stack></Card>
     {jobId !== null && !job && <Loader size="sm" />}
     {job && <Card withBorder radius="lg" p="lg"><Stack>

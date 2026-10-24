@@ -10,7 +10,7 @@ Use the Apple Silicon or Intel DMG matching your Mac, then drag Mossentry to App
 
 ### Apple verification warning / Apple 无法验证
 
-The published v0.2.0 through v0.2.2 macOS builds use ad-hoc signing and have not been notarized by Apple. macOS can display “Apple could not verify Mossentry.app is free of malware” and block the first launch. The updater's `.sig` files authenticate updates to Mossentry; they do not supply an Apple Developer ID signature or notarization.
+The published v0.2.0 through v0.3.0 macOS builds use ad-hoc signing and have not been notarized by Apple. macOS can display “Apple could not verify Mossentry.app is free of malware” and block the first launch. The updater's `.sig` files authenticate updates to Mossentry; they do not supply an Apple Developer ID signature or notarization.
 
 If you downloaded the app from this project's GitHub Releases and choose to trust it, use Apple's [Open Anyway procedure](https://support.apple.com/en-us/102445):
 
@@ -18,7 +18,7 @@ If you downloaded the app from this project's GitHub Releases and choose to trus
 2. Open **System Settings → Privacy & Security**, scroll to Security, and click **Open Anyway** next to the Mossentry warning.
 3. Authenticate if requested and confirm **Open**. macOS saves an exception for this app.
 
-当前发布的 v0.2.0 至 v0.2.2 macOS 安装包尚未经过 Apple 公证，首次打开可能出现“Apple 无法验证 Mossentry.app”的提示。确认安装包来自本项目的 GitHub Releases 并决定信任后，可以按以下步骤打开：
+当前发布的 v0.2.0 至 v0.3.0 macOS 安装包尚未经过 Apple 公证，首次打开可能出现“Apple 无法验证 Mossentry.app”的提示。确认安装包来自本项目的 GitHub Releases 并决定信任后，可以按以下步骤打开：
 
 1. 将 Mossentry 拖到“应用程序”，打开一次，弹出警告后点击“完成”。
 2. 打开“系统设置 → 隐私与安全性”，向下找到“安全性”区域，在 Mossentry 被阻止的提示旁点击“仍要打开”。
@@ -32,7 +32,7 @@ Use the x64 NSIS installer on Windows 10/11. Tauri uses Microsoft WebView2; the 
 
 ## In-app updates
 
-The Rust edition checks the latest stable GitHub Release on launch, every ten minutes and when the network reconnects. The top-right **Update / 更新** button appears only when a higher version is available for your platform, and the signed package downloads automatically. The button shows download progress, then installs and restarts Mossentry when clicked. Local configuration and data remain in their existing directory. Finish running server operations before applying an update; installation is blocked while an operation is active. Download and installation failures can be retried from the same button.
+The Rust edition checks the latest stable GitHub Release on launch, every ten minutes and when the network reconnects. The top-right **Update / 更新** button appears only when a higher version is available for your platform. Click it to download the signed package. The button shows download progress, then a second click installs and restarts Mossentry. Local configuration and data remain in their existing directory. Finish running server operations before applying an update; installation is blocked while an operation is active. Download and installation failures require a click on the same button to retry.
 
 Automatic updates require a release containing `latest.json` and signed updater packages. The historical Electron v0.1.0 release cannot gain this feature remotely; install the first Rust release with update support manually. Development runs do not check or install updates. Release maintainers should follow [UPDATES.md](UPDATES.md).
 
@@ -56,7 +56,7 @@ Connection changes invalidate cached accounts. Pending approval operations must 
 
 ## SSH config import and login options
 
-Use **Import SSH config** on the Servers page. The default file is `~/.ssh/config` on macOS/Linux and `%USERPROFILE%\.ssh\config` on Windows; Browse can select another file. The host list loads automatically when the dialog opens or the file path changes. Loading resolves explicit `Host` aliases, wildcard/negated defaults, multiple aliases per block and `Include` files in lexical order. Scalar options use OpenSSH's first-value precedence, while identity and certificate files accumulate. No hosts are selected initially. Select individual hosts or use **Select all servers**, which skips existing names, then choose **Import servers**. Existing servers remain unchanged and new entries start enabled. Loading reads local files without opening network connections or executing proxy commands. If the source changes before import, the list reloads and you must select the hosts again.
+Use **Import SSH config** on the Servers page. The default file is `~/.ssh/config` on macOS/Linux and `%USERPROFILE%\.ssh\config` on Windows; Browse can select another file. The host list loads automatically when the dialog opens or the file path changes. Loading resolves explicit `Host` aliases, wildcard/negated defaults, multiple aliases per block and `Include` files in lexical order. Scalar options use OpenSSH's first-value precedence, while identity and certificate files accumulate. No hosts are selected initially. Select individual hosts or use the checkbox beside the selection count, then choose **Import servers**. The checkbox shows **Deselect all** when all new hosts are selected and **Select all** otherwise; existing names cannot be selected. Existing servers remain unchanged and new entries have management enabled by default. The host list hides ports and SSH Host aliases, while retaining both in the imported connection settings. Loading reads local files without opening network connections or executing proxy commands. If the source changes before import, the list reloads and you must select the hosts again.
 
 Imported names are normalized to Mossentry's lowercase server-name format. The original alias is saved separately for OpenSSH tokens. Login settings and referenced `ProxyJump` host definitions are copied into local server records, so changing the source config afterward does not change an imported connection. Review settings before importing. Imports do not copy private key contents or sudo passwords. Inventory export is no longer available; exporting task results and downloading generated credentials still work.
 

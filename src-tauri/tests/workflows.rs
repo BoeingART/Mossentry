@@ -478,6 +478,52 @@ fn ssh_config_import_enables_only_selected_hosts_and_rejects_stale_files() {
     );
 }
 #[test]
+fn ssh_config_import_enables_only_selected_new_hosts_and_preserves_login_settings() {
+    let f = Fixture::new();
+    let existing_id = f.add("one");
+    let mut existing = server("one");
+    existing["enabled"] = json!(false);
+    f.req(&format!("/api/servers/{existing_id}"), "PUT", existing)
+        .unwrap();
+    let before = f.dashboard()["servers"][0].clone();
+    let path = f.dir.path().join("ssh-config");
+    std::fs::write(
+        &path,
+        "Host one GPU.One unselected\n HostName example.test\n Port 2202\n User operator\n",
+    )
+    .unwrap();
+    let preview = f
+        .req(
+            "/api/inventory/import",
+            "POST",
+            json!({"path":path,"preview":true}),
+        )
+        .unwrap();
+    assert_eq!(preview["conflicts"], json!(["one"]));
+    let result = f
+        .req(
+            "/api/inventory/import",
+            "POST",
+            json!({"path":path,"preview":false,"revision":preview["revision"],"names":["gpu_one"]}),
+        )
+        .unwrap();
+    assert_eq!(result["count"], 1);
+    let dashboard = f.dashboard();
+    let servers = dashboard["servers"].as_array().unwrap();
+    assert_eq!(servers.len(), 2);
+    assert_eq!(
+        servers.iter().find(|s| s["name"] == "one").unwrap(),
+        &before
+    );
+    let imported = servers.iter().find(|s| s["name"] == "gpu_one").unwrap();
+    assert_eq!(imported["enabled"], 1);
+    assert_eq!(imported["port"], 2202);
+    assert_eq!(imported["ssh_alias"], "GPU.One");
+    assert_eq!(imported["ssh_user"], "operator");
+    assert_eq!(imported["ssh_backend"], "openssh");
+    assert!(f.remote.calls.lock().unwrap().is_empty());
+}
+#[test]
 fn scanning_keeps_all_accounts_but_filters_dashboard_and_preserves_history() {
     let f = Fixture::new();
     let id = f.add("one");

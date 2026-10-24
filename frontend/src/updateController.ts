@@ -1,6 +1,6 @@
 export type DownloadProgress = { received: number; total: number | null };
 export type UpdateState = {
-  phase: 'hidden' | 'downloading' | 'ready' | 'installing' | 'error';
+  phase: 'hidden' | 'available' | 'downloading' | 'ready' | 'installing' | 'error';
   version?: string;
   progress?: DownloadProgress;
   error?: string;
@@ -43,11 +43,10 @@ export class UpdateController {
     catch { return; } // No release, offline or unavailable GitHub: keep the button hidden.
     finally { this.pending = false; }
     if (!version) return;
-    this.publish({ phase: 'downloading', version });
-    await this.download();
+    this.publish({ phase: 'available', version });
   }
-  private async download() {
-    if (this.pending) return;
+  async download() {
+    if (this.pending || !(this.state.phase === 'available' || (this.state.phase === 'error' && this.state.retry === 'download'))) return;
     this.pending = true;
     const version = this.state.version;
     this.publish({ phase: 'downloading', version });
@@ -71,11 +70,7 @@ export class UpdateController {
       this.publish({ phase: 'error', version, error: errorMessage(cause), retry: 'install' });
     } finally { this.pending = false; }
   }
-  async retryDownload() {
-    if (this.state.phase === 'error' && this.state.retry === 'download') await this.download();
-  }
   async poll() {
     if (this.state.phase === 'hidden') await this.check();
-    else await this.retryDownload();
   }
 }
