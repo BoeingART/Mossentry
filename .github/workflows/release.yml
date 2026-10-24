@@ -26,7 +26,7 @@ jobs:
           workspaces: src-tauri
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
       - run: npm ci
-      - run: npm run check
+      - run: npm run check:ci
       - run: npm run check:rust
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: npm run test:ssh
@@ -34,6 +34,7 @@ jobs:
         run: docker run --rm -v "$PWD:/source:ro" ubuntu:22.04 bash -c 'apt-get update -qq && apt-get install -y -qq python3 sudo passwd && python3 /source/scripts/test-remote-linux.py'
 
   native:
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:

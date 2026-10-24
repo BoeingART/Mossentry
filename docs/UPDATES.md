@@ -15,13 +15,13 @@ gh secret set TAURI_SIGNING_PRIVATE_KEY --repo BoeingART/Mossentry \
   < ~/.config/Mossentry/updater-signing/mossentry.key
 ```
 
-The workflow deliberately fails tagged builds if the secret is absent. Pull requests and untagged manual runs build ordinary installers without requiring the secret. Replacing this key after distribution requires a key migration through a release signed by the existing key, or a manual reinstall.
+The workflow deliberately fails tagged builds if the secret is absent. Untagged manual runs build ordinary installers without requiring the secret. Pull requests run checks and tests only, with no desktop builds or installer artifacts. Replacing this key after distribution requires a key migration through a release signed by the existing key, or a manual reinstall.
 
 ## macOS Developer ID signing and notarization
 
 Tauri updater signatures and Apple code signatures serve separate purposes. The published v0.2.0 through v0.3.1 macOS packages are ad-hoc signed (`signingIdentity: "-"`) and have no Apple notarization ticket. A valid updater signature does not prevent Gatekeeper from blocking a downloaded application. See [INSTALL.md](INSTALL.md#apple-verification-warning--apple-无法验证) for the supported first-launch exception procedure.
 
-macOS releases currently retain ad-hoc signing without Apple notarization. Signed updater packages remain required. Apple signing and notarization are optional: set the repository Actions variable `APPLE_NOTARIZATION=true` only after configuring all Apple credentials below. In that mode both Mac architectures must pass Apple trust verification before publication. Pull requests and untagged manual runs retain ad-hoc signing for development.
+macOS releases currently retain ad-hoc signing without Apple notarization. Signed updater packages remain required. Apple signing and notarization are optional: set the repository Actions variable `APPLE_NOTARIZATION=true` only after configuring all Apple credentials below. In that mode both Mac architectures must pass Apple trust verification before publication. Untagged manual runs retain ad-hoc signing for development. Pull requests skip all desktop builds, signing and notarization.
 
 To provision a release:
 

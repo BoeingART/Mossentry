@@ -34,7 +34,8 @@ Use an isolated application data directory when developing against disposable ho
 ## Verify
 
 ```bash
-npm run check          # frontend build, tooling, chart/UI data, Rust and remote-probe tests
+npm run check:ci       # type checks, tooling, chart/UI data, Rust and remote-probe tests; no application bundles
+npm run check          # optional local frontend build plus the same tests; not a PR requirement
 npm run check:rust     # full desktop Clippy checks
 npm run fmt:rust       # format Rust sources
 npm run test:ssh       # optional real SSH/account lifecycle test; requires Docker
@@ -51,7 +52,7 @@ npm run dist:win       # on Windows: NSIS installer
 
 `npm run build` builds only the frontend into `dist/`. Native installers are generated under `src-tauri/target/release/bundle/`. Run `npm run dist` on Linux to build the native bundles configured for that platform.
 
-The release workflow builds macOS arm64/x64 and Windows x64 packages. Manual runs upload artifacts; explicit version tags publish after tests, platform builds and package-version checks succeed. Both npm and Cargo lockfiles are committed.
+PRs run checks and tests without frontend production builds or native desktop builds. For version tags and manual runs, the release workflow builds macOS arm64/x64 and Windows x64 packages. Manual runs upload artifacts; explicit version tags publish after tests, platform builds and package-version checks succeed. Both npm and Cargo lockfiles are committed.
 
 For signed release packages, follow [release and updater setup](UPDATES.md). User-facing release notes are in [RELEASE.md](RELEASE.md).
 
