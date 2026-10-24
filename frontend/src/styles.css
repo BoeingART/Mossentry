@@ -204,6 +204,26 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
   .operation-targets > .mantine-MultiSelect-root { flex-basis: 100% !important; }
 }
 /* Servers, permissions, and approvals */
+.firewall-list-heading { display: flex; justify-content: space-between; padding: 14px 55px 14px 76px; color: var(--muted); background: var(--surface-soft); border-bottom: 1px solid var(--line); }
+.firewall-server-list ul { list-style: none; margin: 0; padding: 0; }
+.firewall-server-list li + li { border-top: 1px solid var(--line); }
+.firewall-server-row { display: flex; align-items: center; gap: 16px; width: 100%; min-width: 0; padding: 20px 24px; text-align: left; color: var(--ink); }
+.firewall-server-row:hover:not(:disabled) { background: var(--surface-hover); }
+.firewall-server-row:focus-visible { outline-offset: -3px; }
+.firewall-server-row:disabled { cursor: default; }
+.firewall-server-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: var(--mantine-radius-sm); color: var(--teal); background: var(--tint); }
+.firewall-server-row:disabled .firewall-server-icon { background: var(--surface-soft); color: var(--muted); }
+.firewall-server-identity { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.firewall-server-state, .firewall-server-chevron { flex-shrink: 0; }
+.firewall-server-chevron { color: var(--muted); }
+.firewall-server-row:disabled .firewall-server-chevron { visibility: hidden; }
+@media (max-width: 600px) {
+  .firewall-list-heading { padding-left: 18px; padding-right: 18px; }
+  .firewall-server-row { flex-wrap: wrap; gap: 10px; padding: 16px 18px; }
+  .firewall-server-identity { flex-basis: calc(100% - 50px); }
+  .firewall-server-state { margin-left: 46px; }
+  .firewall-server-chevron { margin-left: auto; }
+}
 .host-grid, .monitor-host-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 275px), 1fr)); gap: 18px; align-items: stretch; }
 .host-card { min-width: 0; display: flex; flex-direction: column; gap: 20px; border: 1px solid var(--line); border-radius: var(--mantine-radius-lg); }
 .host-heading .mantine-Title-root { font-size: var(--title-compact); font-weight: 600; }
