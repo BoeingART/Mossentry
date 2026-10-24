@@ -108,3 +108,9 @@ Mossentry复用已有的SSH访问方式，连接前校验服务器主机密钥�
 ## 参与贡献
 
 欢迎提交问题反馈、功能建议和Pull Request。可以[创建Issue](https://github.com/BoeingART/Mossentry/issues)描述问题或提议，也可以按照[开发指南](docs/DEVELOPMENT.md)开始修改代码。
+
+## 许可证
+
+除另有说明外，Mossentry 的源代码、文档和原创资源采用 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 授权。完整法律条款见 [LICENSE](LICENSE)。第三方依赖和素材保留各自的许可证。
+
+你可以使用、修改和再分发许可范围内的内容，包括商业用途和集成到闭源产品中，无需公开源代码。再分发时，需要附带许可证副本、在修改过的文件中注明变更，并保留要求保留的法律与署名声明；如果附有 NOTICE，还需保留其中适用的署名信息。许可证包含贡献者相关专利的授权，并规定了提起相关专利诉讼时终止专利授权的条款，不授予商标权。内容按许可证条款以原样提供，不作担保。
