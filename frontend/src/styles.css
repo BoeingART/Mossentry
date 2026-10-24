@@ -68,6 +68,7 @@ button:focus-visible, summary:focus-visible, [tabindex='0']:focus-visible { outl
 .nav-button { display: flex; width: 100%; min-height: 42px; align-items: center; gap: 12px; padding: 10px 13px; border: 1px solid transparent; border-radius: var(--mantine-radius-sm); background: transparent; color: var(--secondary); font: inherit; font-size: var(--text-body); font-weight: 500; text-align: left; transition: background .15s, color .15s, box-shadow .15s; }
 .nav-button:hover { background: var(--surface-hover); color: #00796b; }
 .nav-button.active { background: #009688; border-color: #008f82; color: #fff; box-shadow: 0 3px 8px #00968819; font-weight: 500; }
+.nav-button.section-active { background: var(--tint); color: var(--tint-ink); }
 .nav-button > span:first-child { display: flex; align-items: center; }
 .nav-button svg { stroke-width: 1.5; }
 .nav-chevron { flex-shrink: 0; margin-left: auto; transition: transform .2s; }

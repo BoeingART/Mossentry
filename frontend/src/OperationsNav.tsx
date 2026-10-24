@@ -12,7 +12,7 @@ export default function OperationsNav({ compact, view, navigate, expandSidebar }
   const active = view === 'firewall' || view === 'operations';
   return <>
     <Tooltip label={t('Operations')} position="right" disabled={!compact} events={{ hover: true, focus: true, touch: false }}>
-      <button type="button" className={`nav-button ${active ? 'active' : ''}`} aria-label={t('Operations')}
+      <button type="button" className={`nav-button ${active ? 'section-active' : ''}`} aria-label={t('Operations')}
         aria-expanded={!compact && opened} aria-controls="operations-navigation" onClick={() => {
           if (compact) { expandSidebar(); setOpened(true); }
           else setOpened(value => !value);
