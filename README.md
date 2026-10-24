@@ -96,7 +96,7 @@ See how your servers are being used while you work.
 
 The packaged app needs no additional software installed on your computer. Linux desktop users can [build from source](docs/DEVELOPMENT.md); the release workflow currently provides macOS and Windows installers.
 
-**macOS first-launch Apple verification warning:** v0.2.0 through v0.3.1 have not been notarized by Apple. If you trust the download from this project, use **System Settings → Privacy & Security → Open Anyway**. See the [installation guide](docs/INSTALL.md#apple-verification-warning--apple-无法验证) for the full procedure.
+**macOS first-launch Apple verification warning:** v0.2.0 through v0.3.2 have not been notarized by Apple. If you trust the download from this project, use **System Settings → Privacy & Security → Open Anyway**. See the [installation guide](docs/INSTALL.md#apple-verification-warning--apple-无法验证) for the full procedure.
 
 ## Documentation
 
