@@ -4,7 +4,7 @@ Manage UFW firewall rules, synchronize enabled servers together, and use a clear
 
 ## Changes since v0.2.2
 
-- Added UFW firewall management over SSH, including status, inbound allow rules, rule deletion, and enable/disable actions. Enabling UFW checks that an explicit rule allows the current SSH port and management address. Changes require confirmation and are recorded in operation history.
+- Added UFW firewall management over SSH, including status, inbound allow rules, rule deletion, and enable/disable actions. Enabling UFW checks that an explicit rule allows the current SSH port and management address. Enable/disable actions and rule deletion require confirmation; changes are recorded in operation history.
 - Added **Sync all servers** beside **Add server**. It synchronizes all enabled servers regardless of the current search or group filter, prevents duplicate submissions, and reports per-server failures.
 - Grouped **Firewall** and **Execute commands** under an expandable **Operations** section in the sidebar, with a server selector on the firewall page. The section and selected child have distinct highlights.
 - Removed Firewall and Ping shortcuts from server cards, the bottom-left monitor shortcut, and the top-right approval bell. Monitoring remains available from server cards, and approvals remain in the sidebar.
