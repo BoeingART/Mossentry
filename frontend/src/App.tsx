@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type * as React from 'react';
 import {
   ActionIcon, Alert, AppShell, Avatar, Badge, Box, Burger, Button, Card, Center, Checkbox,
-  Group, Loader, Modal, Pagination, Paper, ScrollArea,
+  Group, Loader, Modal, Pagination, Paper, PasswordInput, ScrollArea,
   SegmentedControl, Select, SimpleGrid, Stack, Switch, Table, Text, TextInput,
   ThemeIcon, Title, Tooltip,
 } from '@mantine/core';
@@ -182,11 +182,12 @@ function AuditLog({ data }: { data: Dashboard }) {
 function RequestModal({ draft, servers, close, saved }: { draft: RequestDraft | null; servers: Server[]; close: () => void; saved: () => Promise<void> }) {
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
+  const [password, setPassword] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [sudo, setSudo] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { if (draft) { setUsername(''); setFullName(''); setSelected([]); setSudo(false); setError(''); } }, [draft]);
+  useEffect(() => { setPassword(''); if (draft) { setUsername(''); setFullName(''); setSelected([]); setSudo(false); setError(''); } }, [draft]);
   if (!draft) return null;
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError('');
@@ -194,7 +195,7 @@ function RequestModal({ draft, servers, close, saved }: { draft: RequestDraft | 
     const button = event.currentTarget.querySelector<HTMLElement>('button[type="submit"]');
     setBusy(true);
     try {
-      await api('/api/actions/create-user', 'POST', { username, full_name: fullName, servers: selected, sudo });
+      await api('/api/actions/create-user', 'POST', { username, full_name: fullName, password, servers: selected, sudo });
       if (button) flyToApprovals(button);
       close(); await saved();
     } catch (cause) { setError(message(cause)); }
@@ -204,6 +205,7 @@ function RequestModal({ draft, servers, close, saved }: { draft: RequestDraft | 
     <form onSubmit={submit}><Stack gap="md">
       <TextInput label={t("Linux username")} placeholder={t("e.g. alex")} value={username} onChange={e => setUsername(e.currentTarget.value)} pattern="[a-z_][a-z0-9_-]{0,31}" required />
       <TextInput label={t("Name or note (optional)")} value={fullName} onChange={e => setFullName(e.currentTarget.value)} maxLength={100} />
+      <PasswordInput label={t("Password (optional)")} description={t("Leave blank to generate a password automatically.")} value={password} onChange={e => setPassword(e.currentTarget.value)} autoComplete="new-password" maxLength={511} />
       <Checkbox.Group label={t("Allowed hosts")} value={selected} onChange={setSelected}><SimpleGrid cols={2} mt="sm">{servers.filter(server => server.enabled).map(server => <Checkbox key={server.id} value={server.name} label={server.name.toUpperCase()} />)}</SimpleGrid></Checkbox.Group>
       <Switch label={t("Grant sudo access")} checked={sudo} onChange={e => setSudo(e.currentTarget.checked)} />
       {error && <Alert color="red" role="alert">{t(error)}</Alert>}

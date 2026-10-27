@@ -6,7 +6,7 @@ use mossentry::{
     ssh::{NativeSsh, Transport},
 };
 use serde_json::{json, Value};
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{io::Read, path::PathBuf, sync::Arc, time::Duration};
 #[test]
 #[ignore = "requires the isolated Docker SSH fixture; run npm run test:ssh"]
 fn loopback_ssh_transport_and_complete_account_lifecycle() {
@@ -128,6 +128,44 @@ fn loopback_ssh_transport_and_complete_account_lifecycle() {
     service
         .save_credentials(created, &home.path().join("credentials.zip"))
         .unwrap();
+    let manual_password = " 手动:P@ss'\"\\$();!<&>密碼 ";
+    let manual = n(
+        &service
+            .request(
+                "/api/actions/create-user",
+                "POST",
+                json!({
+                    "username":"fixture_manual", "servers":["fixture"], "password":manual_password
+                }),
+            )
+            .unwrap(),
+        "action_id",
+    );
+    service
+        .request(&format!("/api/actions/{manual}/approve"), "POST", json!({}))
+        .unwrap();
+    let shadow = ssh
+        .execute(
+            &server,
+            "import json,spwd;print(json.dumps({'hash':spwd.getspnam('fixture_manual').sp_pwdp}))",
+            &json!({}),
+            true,
+            Some("fixture-password"),
+            10,
+        )
+        .unwrap();
+    sha_crypt::sha512_check(manual_password, s(&shadow, "hash")).unwrap();
+    let manual_output = home.path().join("manual-credentials.zip");
+    service.save_credentials(manual, &manual_output).unwrap();
+    let mut zip = zip::ZipArchive::new(std::fs::File::open(manual_output).unwrap()).unwrap();
+    let mut instructions = String::new();
+    zip.by_name("login-instructions.txt")
+        .unwrap()
+        .read_to_string(&mut instructions)
+        .unwrap();
+    assert!(instructions.contains(&format!("Password: {manual_password}\n")));
+    assert!(!dashboard().to_string().contains("手动:P@ss"));
+    queue("delete_user", "fixture_manual");
     queue("disable_user", "fixture_person");
     assert_eq!(user()["is_disabled"], 1);
     queue("enable_user", "fixture_person");

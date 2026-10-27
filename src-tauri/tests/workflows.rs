@@ -22,6 +22,7 @@ type RemoteCall = (String, String, bool, Option<String>);
 #[derive(Default)]
 struct Fake {
     calls: Mutex<Vec<RemoteCall>>,
+    created_accounts: Mutex<Vec<Value>>,
     fail: AtomicBool,
     fail_create: AtomicBool,
     slow: AtomicBool,
@@ -44,6 +45,9 @@ impl Transport for Fake {
             sudo,
             password.map(str::to_string),
         ));
+        if source == ssh::ACCOUNTS && payload["operation"] == "create_user" {
+            self.created_accounts.lock().unwrap().push(payload.clone());
+        }
         if self.slow.load(Ordering::SeqCst) {
             std::thread::sleep(Duration::from_millis(300));
         }
@@ -821,6 +825,8 @@ fn credentials_contain_valid_ed25519_password_and_are_exported_once() {
     assert!(password.bytes().all(|b| b.is_ascii_alphanumeric()));
     assert!(password.bytes().any(|b| b.is_ascii_digit()));
     assert!(password.bytes().any(|b| b.is_ascii_alphabetic()));
+    let created = f.remote.created_accounts.lock().unwrap();
+    sha_crypt::sha512_check(password, s(&created[0], "managed_password_hash")).unwrap();
     assert!(!f.dashboard().to_string().contains(password));
     assert_eq!(f.dashboard()["actions"][0]["private_key_ready"], false);
     assert_eq!(
@@ -829,6 +835,323 @@ fn credentials_contain_valid_ed25519_password_and_are_exported_once() {
             .count(),
         0
     );
+}
+#[test]
+fn manual_password_survives_restart_and_matches_all_hosts_and_exported_credentials() {
+    let f = Fixture::new();
+    f.add("one");
+    f.add("two");
+    let password = " 手动:P@ss'\"\\$();!<&>密碼 ";
+    let secret_marker = "手动:P@ss";
+    let queued = f
+        .req(
+            "/api/actions/create-user",
+            "POST",
+            json!({
+                "username":"alice", "servers":["one","two"], "sudo":true, "password":password
+            }),
+        )
+        .unwrap();
+    let id = n(&queued, "action_id");
+    assert!(!f.dashboard().to_string().contains(secret_marker));
+    let Fixture {
+        service,
+        remote,
+        dir,
+    } = f;
+    let config = service.config.clone();
+    drop(service);
+    let service = Service::open(config, remote.clone()).unwrap();
+    let batch = n(&queued, "batch_id");
+    service
+        .request(
+            &format!("/api/approval-batches/{batch}/approve"),
+            "POST",
+            json!({}),
+        )
+        .unwrap();
+    let created = remote.created_accounts.lock().unwrap();
+    assert_eq!(created.len(), 2);
+    for payload in created.iter() {
+        sha_crypt::sha512_check(password, s(payload, "managed_password_hash")).unwrap();
+        assert_eq!(payload["managed_sudo"], true);
+        assert!(!payload.to_string().contains(secret_marker));
+        assert_eq!(
+            payload["managed_password_hash"],
+            created[0]["managed_password_hash"]
+        );
+    }
+    let output = dir.path().join("manual-credentials.zip");
+    service.save_credentials(id, &output).unwrap();
+    let mut zip = zip::ZipArchive::new(std::fs::File::open(output).unwrap()).unwrap();
+    let mut instructions = String::new();
+    zip.by_name("login-instructions.txt")
+        .unwrap()
+        .read_to_string(&mut instructions)
+        .unwrap();
+    assert!(instructions.contains(&format!("Password: {password}\n")));
+    assert!(!instructions.contains("16-character"));
+    assert!(!service
+        .request("/api/dashboard", "GET", Value::Null)
+        .unwrap()
+        .to_string()
+        .contains(secret_marker));
+    let c = service.connection().unwrap();
+    assert_eq!(
+        n(
+            &db::row(&c, "SELECT COUNT(*) AS count FROM action_passwords", [])
+                .unwrap()
+                .unwrap(),
+            "count"
+        ),
+        0
+    );
+    for row in db::rows(&c, "SELECT payload_json FROM actions", []).unwrap() {
+        assert!(!s(&row, "payload_json").contains(secret_marker));
+    }
+    for row in db::rows(&c, "SELECT details_json FROM audit_log", []).unwrap() {
+        assert!(!s(&row, "details_json").contains(secret_marker));
+    }
+}
+#[test]
+fn empty_and_null_passwords_use_the_existing_generator() {
+    for password in [json!(""), Value::Null] {
+        let f = Fixture::new();
+        f.add("one");
+        let id = f.queued("alice", true);
+        let queued = f.req("/api/actions/create-user", "POST", json!({
+            "username":"alice", "servers":["one"], "sudo":false, "full_name":"Example", "password":password
+        })).unwrap();
+        assert_eq!(n(&queued, "action_id"), id);
+        f.req(&format!("/api/actions/{id}/approve"), "POST", json!({}))
+            .unwrap();
+        let output = f.dir.path().join("generated-credentials.zip");
+        f.service.save_credentials(id, &output).unwrap();
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(output).unwrap()).unwrap();
+        let mut instructions = String::new();
+        zip.by_name("login-instructions.txt")
+            .unwrap()
+            .read_to_string(&mut instructions)
+            .unwrap();
+        let generated = instructions
+            .lines()
+            .find_map(|line| line.strip_prefix("Password: "))
+            .unwrap();
+        assert_eq!(generated.len(), 16);
+        assert!(generated.bytes().all(|b| b.is_ascii_alphanumeric()));
+        assert!(generated.bytes().any(|b| b.is_ascii_uppercase()));
+        assert!(generated.bytes().any(|b| b.is_ascii_digit()));
+        sha_crypt::sha512_check(
+            generated,
+            s(
+                &f.remote.created_accounts.lock().unwrap()[0],
+                "managed_password_hash",
+            ),
+        )
+        .unwrap();
+    }
+}
+#[test]
+fn manual_password_validation_happens_before_queueing() {
+    let f = Fixture::new();
+    f.add("one");
+    for password in [
+        json!(true),
+        json!(123),
+        json!([]),
+        json!({}),
+        json!("secret\nline"),
+        json!("secret\rline"),
+        json!("secret\0byte"),
+        json!("secret\tvalue"),
+        json!("a".repeat(512)),
+        json!("密".repeat(171)),
+    ] {
+        let error = f
+            .req(
+                "/api/actions/create-user",
+                "POST",
+                json!({
+                    "username":"alice", "servers":["one"], "password":password
+                }),
+            )
+            .unwrap_err();
+        assert_eq!(error.status, 400);
+    }
+    assert!(f.dashboard()["actions"].as_array().unwrap().is_empty());
+    assert!(f.dashboard()["approval_batches"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(f.remote.calls.lock().unwrap().is_empty());
+    for password in ["a".repeat(511), format!("{}a", "密".repeat(170))] {
+        f.req(
+            "/api/actions/create-user",
+            "POST",
+            json!({
+                "username":"alice", "servers":["one"], "password":password
+            }),
+        )
+        .unwrap();
+    }
+}
+#[test]
+fn creation_deduplication_compares_manual_passwords() {
+    let f = Fixture::new();
+    f.add("one");
+    let queue = |password| {
+        f.req(
+            "/api/actions/create-user",
+            "POST",
+            json!({
+                "username":"alice", "servers":["one"], "password":password
+            }),
+        )
+        .unwrap()
+    };
+    let first = queue("first password");
+    assert_eq!(first["action_id"], queue("first password")["action_id"]);
+    assert_ne!(first["action_id"], queue("different password")["action_id"]);
+    let generated = queue("");
+    assert_ne!(first["action_id"], generated["action_id"]);
+    assert_eq!(generated["action_id"], queue("")["action_id"]);
+    assert_eq!(f.dashboard()["actions"].as_array().unwrap().len(), 3);
+}
+#[test]
+fn rejected_and_failed_creations_remove_pending_passwords() {
+    for outcome in [
+        "reject",
+        "remove",
+        "reject_batch",
+        "preflight_failure",
+        "create_failure",
+        "batch_preflight_failure",
+    ] {
+        let f = Fixture::new();
+        f.add("one");
+        let queued = f
+            .req(
+                "/api/actions/create-user",
+                "POST",
+                json!({
+                    "username":"alice", "servers":["one"], "password":"pending secret"
+                }),
+            )
+            .unwrap();
+        let id = n(&queued, "action_id");
+        let batch = n(&queued, "batch_id");
+        match outcome {
+            "reject" => {
+                f.req(&format!("/api/actions/{id}/reject"), "POST", json!({}))
+                    .unwrap();
+            }
+            "remove" => {
+                f.req(
+                    &format!("/api/approval-batches/{batch}/items/{id}"),
+                    "DELETE",
+                    Value::Null,
+                )
+                .unwrap();
+            }
+            "reject_batch" => {
+                f.req(
+                    &format!("/api/approval-batches/{batch}/reject"),
+                    "POST",
+                    json!({}),
+                )
+                .unwrap();
+            }
+            _ => {
+                f.remote
+                    .fail
+                    .store(outcome != "create_failure", Ordering::SeqCst);
+                f.remote
+                    .fail_create
+                    .store(outcome == "create_failure", Ordering::SeqCst);
+                let path = if outcome == "batch_preflight_failure" {
+                    format!("/api/approval-batches/{batch}/approve")
+                } else {
+                    format!("/api/actions/{id}/approve")
+                };
+                assert!(f.req(&path, "POST", json!({})).is_err());
+            }
+        }
+        assert_eq!(
+            n(
+                &db::row(
+                    &f.service.connection().unwrap(),
+                    "SELECT COUNT(*) AS count FROM action_passwords",
+                    []
+                )
+                .unwrap()
+                .unwrap(),
+                "count"
+            ),
+            0,
+            "{outcome}"
+        );
+        assert_eq!(
+            std::fs::read_dir(f.service.config.data.join("keys"))
+                .unwrap()
+                .count(),
+            0,
+            "{outcome}"
+        );
+    }
+}
+#[test]
+fn interrupted_creation_removes_pending_password_on_restart() {
+    for interrupted_batch in [false, true] {
+        let f = Fixture::new();
+        f.add("one");
+        let queued = f
+            .req(
+                "/api/actions/create-user",
+                "POST",
+                json!({
+                    "username":"alice", "servers":["one"], "password":"pending secret"
+                }),
+            )
+            .unwrap();
+        let c = f.service.connection().unwrap();
+        if interrupted_batch {
+            c.execute(
+                "UPDATE approval_batches SET status='approved' WHERE id=?",
+                [n(&queued, "batch_id")],
+            )
+            .unwrap();
+        } else {
+            c.execute(
+                "UPDATE actions SET status='approved' WHERE id=?",
+                [n(&queued, "action_id")],
+            )
+            .unwrap();
+        }
+        drop(c);
+        let config = f.service.config.clone();
+        drop(f.service);
+        let service = Service::open(config, f.remote.clone()).unwrap();
+        assert_eq!(
+            service
+                .request("/api/dashboard", "GET", Value::Null)
+                .unwrap()["actions"][0]["status"],
+            "failed"
+        );
+        assert_eq!(
+            n(
+                &db::row(
+                    &service.connection().unwrap(),
+                    "SELECT COUNT(*) AS count FROM action_passwords",
+                    []
+                )
+                .unwrap()
+                .unwrap(),
+                "count"
+            ),
+            0
+        );
+        assert!(f.remote.calls.lock().unwrap().is_empty());
+    }
 }
 #[test]
 fn failed_export_keeps_credentials_available() {

@@ -56,10 +56,28 @@ impl Service {
                 .take(100)
                 .collect::<String>());
         }
+        let password =
+            if creating {
+                match body.get("password") {
+                    None | Some(Value::Null) => None,
+                    Some(Value::String(value)) if value.is_empty() => None,
+                    // libxcrypt allows 512 bytes including the terminating NUL.
+                    Some(Value::String(value))
+                        if value.len() <= 511 && !value.chars().any(char::is_control) =>
+                    {
+                        Some(value.as_str())
+                    }
+                    _ => return Err(Error::bad(
+                        "Enter a password of at most 511 UTF-8 bytes without control characters",
+                    )),
+                }
+            } else {
+                None
+            };
         let mut c = self.connection()?;
         let tx = c.transaction()?;
         let batch = crate::batches::pending(&tx)?;
-        if let Some(existing) = db::row(&tx, "SELECT id FROM actions WHERE batch_id=? AND status='pending' AND action_type=? AND target_user=? AND payload_json=?", params![batch, action, username, payload.to_string()])? {
+        if let Some(existing) = db::row(&tx, "SELECT a.id FROM actions a LEFT JOIN action_passwords p ON p.action_id=a.id WHERE a.batch_id=? AND a.status='pending' AND a.action_type=? AND a.target_user=? AND a.payload_json=? AND COALESCE(p.password,'')=?", params![batch, action, username, payload.to_string(), password.unwrap_or("")])? {
             return Ok(json!({"ok":true,"action_id":existing["id"],"batch_id":batch}));
         }
         if n(
@@ -78,6 +96,12 @@ impl Service {
         }
         tx.execute("INSERT INTO actions(batch_id,action_type,target_server,target_user,payload_json,status,requested_by,requested_at) VALUES(?,?,?,?,?,'pending',(SELECT id FROM admins WHERE active=1 ORDER BY id LIMIT 1),?)",params![batch,action,names.join(","),username,payload.to_string(),db::now()])?;
         let id = tx.last_insert_rowid();
+        if let Some(password) = password {
+            tx.execute(
+                "INSERT INTO action_passwords(action_id,password) VALUES(?,?)",
+                params![id, password],
+            )?;
+        }
         db::audit(
             &tx,
             "action_requested",
@@ -132,8 +156,19 @@ impl Service {
             self.run_accounts(&names, "preflight", &extra, 45)?;
             let mut credentials = None;
             if s(&action, "action_type") == "create_user" {
+                let password = db::row(
+                    &c,
+                    "SELECT password FROM action_passwords WHERE action_id=?",
+                    [id],
+                )
+                .map_err(|e| e.detail)?;
                 let generated = self
-                    .generate_credentials(id, username, &names)
+                    .generate_credentials(
+                        id,
+                        username,
+                        &names,
+                        password.as_ref().map(|p| s(p, "password")),
+                    )
                     .map_err(|e| e.detail)?;
                 archive = Some(generated.path.clone());
                 extra["managed_public_key"] = json!(generated.public);
@@ -220,6 +255,7 @@ impl Service {
         id: i64,
         username: &str,
         names: &[String],
+        requested_password: Option<&str>,
     ) -> Result<Credentials> {
         let mut rng = rand::rngs::OsRng;
         let mut key = ssh_key::PrivateKey::random(&mut rng, ssh_key::Algorithm::Ed25519)
@@ -233,11 +269,13 @@ impl Service {
         let private = key
             .to_openssh(ssh_key::LineEnding::LF)
             .map_err(|_| Error::new(500, "Could not encode SSH key"))?;
-        let mut password: Vec<u8> = (&mut rng).sample_iter(Alphanumeric).take(14).collect();
-        password.push(b'A' + rng.gen_range(0..26));
-        password.push(b'0' + rng.gen_range(0..10));
-        password.shuffle(&mut rng);
-        let password = String::from_utf8(password).unwrap();
+        let password = requested_password.map(str::to_owned).unwrap_or_else(|| {
+            let mut password: Vec<u8> = (&mut rng).sample_iter(Alphanumeric).take(14).collect();
+            password.push(b'A' + rng.gen_range(0..26));
+            password.push(b'0' + rng.gen_range(0..10));
+            password.shuffle(&mut rng);
+            String::from_utf8(password).unwrap()
+        });
         let params = sha_crypt::Sha512Params::new(100_000)
             .map_err(|_| Error::new(500, "Could not prepare password hashing"))?;
         let hash = sha_crypt::sha512_simple(&password, &params)
@@ -252,7 +290,7 @@ impl Service {
                 n(&server, "port")
             ));
         }
-        let instructions=format!("Username: {username}\n\nPassword: {password}\n\nSign-in:\n{}\n\nImportant notes\n\n1. Save the 16-character alphanumeric password immediately. Use passwd to change it after signing in.\n2. The public key has been added to ~/.ssh/authorized_keys. The host currently supports key-based sign-in only.\n3. Run chmod 600 {key_name} before using the key on macOS or Linux.\n4. To use your own key, copy your public key into ~/.ssh/authorized_keys after signing in.\n5. Host information: https://gitlab.deepsynthesis.top/root/gitlab-mannual/-/blob/main/服务器登录指南.md\n",commands.join("\n"));
+        let instructions=format!("Username: {username}\n\nPassword: {password}\n\nSign-in:\n{}\n\nImportant notes\n\n1. Save this password immediately. Use passwd to change it after signing in.\n2. The public key has been added to ~/.ssh/authorized_keys. The host currently supports key-based sign-in only.\n3. Run chmod 600 {key_name} before using the key on macOS or Linux.\n4. To use your own key, copy your public key into ~/.ssh/authorized_keys after signing in.\n5. Host information: https://gitlab.deepsynthesis.top/root/gitlab-mannual/-/blob/main/服务器登录指南.md\n",commands.join("\n"));
         let path = self
             .config
             .data

@@ -2,7 +2,9 @@
 
 ## Account approvals
 
-User access buttons immediately add an operation to the current pending approval list. Multiple users, hosts and permission changes can share one list. Repeated identical items are deduplicated. New-user forms collect the username, target hosts and desired sudo access before adding the item.
+User access buttons immediately add an operation to the current pending approval list. Multiple users, hosts and permission changes can share one list. Repeated identical items are deduplicated. New-user forms collect the username, target hosts, desired sudo access and an optional password before adding the item. Leave the password blank to keep the existing generator: 16 alphanumeric characters, including an uppercase letter and a digit. A manual password is used exactly as entered on every selected host and in the one-time credential archive.
+
+Pending manual passwords survive restart in a separate table in the private local database. They are excluded from approval payloads and audit history, and their pending records are removed when an operation completes, fails or is rejected. Passwords may contain spaces, symbols and Unicode, with a maximum of 511 UTF-8 bytes and no control characters. This leaves room for the terminating NUL within [libxcrypt's password size limit](https://github.com/besser82/libxcrypt/blob/develop/lib/crypt.h.in).
 
 The Approvals page displays all list items. Remove an item before approval, or approve/reject the entire list. All usernames, protected accounts, enabled servers and remote preconditions are checked before the first mutation. Individual results remain visible if a later operation fails; remote mutations cannot be rolled back automatically. New-user credential archives are exported once per creation operation.
 

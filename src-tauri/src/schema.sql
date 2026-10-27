@@ -97,6 +97,17 @@ CREATE TABLE IF NOT EXISTS audit_log (
   ip_address TEXT,
   created_at TEXT NOT NULL
 );
+-- Keep pending passwords out of action payloads returned to the UI and history.
+CREATE TABLE IF NOT EXISTS action_passwords (
+  action_id INTEGER PRIMARY KEY REFERENCES actions(id) ON DELETE CASCADE,
+  password TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS clear_finished_action_password
+AFTER UPDATE OF status ON actions
+WHEN NEW.status NOT IN ('pending', 'approved')
+BEGIN
+  DELETE FROM action_passwords WHERE action_id = NEW.id;
+END;
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_server_users_username ON server_users(username);
 CREATE INDEX IF NOT EXISTS idx_actions_status_requested ON actions(status, requested_at DESC);
