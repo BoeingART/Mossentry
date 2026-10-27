@@ -1,27 +1,26 @@
-# Mossentry v0.3.2
+# Mossentry v0.3.3
 
-Use readable server names and keep the save action visible while editing connection settings.
+Choose a password when creating a user, or leave it blank to keep the existing automatic password generator.
 
-## Changes since v0.3.1
+## Changes since v0.3.2
 
-- Server names now accept up to 80 Unicode characters, including mixed case, Chinese, spaces, punctuation and emoji. Empty names, line breaks, control characters and reserved names remain invalid, with matching validation and localized guidance in the editor.
-- Moved **Save server** into the sticky header of the add/edit dialog, so it stays visible while scrolling through SSH settings. Saving preserves the existing server identity, SSH configuration, saved sudo credentials and synced account associations.
-- Added the Apache License 2.0 for the project's source code, documentation and original assets, with license information in both READMEs and package metadata.
-- Added matching English and Chinese dashboard screenshots near the top of each README.
-- Updated contributor guidance and pull-request checks to run tests without building desktop installers. Release tags continue to build and publish all supported platforms.
+- Added an optional password field to **New user**, with masked input and a visibility toggle. A supplied password is used exactly as entered on every selected host. Leaving the field blank preserves the existing 16-character alphanumeric generator, including an uppercase letter and a digit.
+- The one-time login credential archive contains the password actually set for the account, whether supplied manually or generated automatically. SSH key generation and the approval workflow remain the same.
+- Pending manual passwords survive application restarts in the private local database, separately from approval payloads and audit history. Pending password records are removed when a request completes, fails or is rejected, including interrupted work recovered at startup.
+- Added validation for control characters and Linux's password size limit, plus regression coverage for generated and manual passwords, multi-host execution, restart recovery and cleanup.
 
-Existing application data and SSH settings remain compatible; no database migration is required.
+Existing application data and SSH settings remain compatible. The application automatically adds the table used for pending passwords; no manual migration is required.
 
 ## Downloads
 
 | Platform | Installer |
 | --- | --- |
-| macOS 13+, Apple Silicon | `Mossentry_0.3.2_darwin-aarch64.dmg` |
-| macOS 13+, Intel | `Mossentry_0.3.2_darwin-x86_64.dmg` |
-| Windows 10/11 x64 | `Mossentry_0.3.2_windows-x86_64-setup.exe` |
+| macOS 13+, Apple Silicon | `Mossentry_0.3.3_darwin-aarch64.dmg` |
+| macOS 13+, Intel | `Mossentry_0.3.3_darwin-x86_64.dmg` |
+| Windows 10/11 x64 | `Mossentry_0.3.3_windows-x86_64-setup.exe` |
 
-macOS packages remain ad-hoc signed and **have not been notarized by Apple**. After trusting the download from this repository, open the app once, dismiss the warning, then use **System Settings → Privacy & Security → Open Anyway**. See the attached installation instructions for the full procedure.
+macOS release signing follows the repository's configured release workflow. If macOS displays an Apple verification warning, follow the attached installation instructions.
 
-Signed updater packages, signatures, `latest.json`, checksums, and installation instructions are attached. Existing Rust versions can update in-app.
+Signed updater packages, signatures, `latest.json`, checksums, and installation instructions are included with a successful release. Existing Rust versions can update in-app.
 
-v0.3.2 支持最长 80 个 Unicode 字符的服务器名称，可使用中文、大小写字母、空格、符号和 emoji。新增或编辑服务器时，“保存”按钮固定在窗口顶部，滚动查看 SSH 设置时也能直接保存。已有服务器身份、SSH 设置、sudo 凭据和账户关联保持兼容，无需数据库迁移。本版还补充了 Apache 2.0 许可证及授权说明，并在中英文 README 中加入对应语言的概览截图。PR 检查仅运行检查和测试，版本发布仍会生成全部受支持平台的安装包。macOS 安装包仍未经过 Apple 公证，首次打开请按安装说明操作。
+v0.3.3 在“新建用户”窗口中增加可选密码输入框。填写后会在所有选定服务器上使用该密码；留空则继续使用原有的 16 位随机字母数字密码算法。一次性下载的登录凭据包含实际设置的密码。待审批密码可在应用重启后保留，不会出现在审批详情或审计记录中；请求完成、失败、拒绝，或启动时恢复中断任务后，会清除对应的待审批密码记录。现有应用数据和 SSH 配置保持兼容，新增数据表由应用自动创建，无需手动迁移。
